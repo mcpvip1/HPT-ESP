@@ -1,19 +1,34 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import fs from 'fs';
 import path from 'path';
 import {defineConfig} from 'vite';
 
-export default defineConfig(() => {
-  // When running in GitHub Actions for GitHub Pages, use repository path /HPT-ESP/ or respect VITE_BASE; fallback to relative './'
-  const base =
-    process.env.VITE_BASE ||
-    (process.env.GITHUB_REPOSITORY
-      ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/`
-      : './');
+export default defineConfig(({command}) => {
+  const isDev = command === 'serve';
+  // Repository name for GitHub Pages (https://mcpvip1.github.io/HPT-ESP/)
+  const repoName = process.env.GITHUB_REPOSITORY
+    ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/`
+    : '/HPT-ESP/';
+  const base = isDev ? '/' : (process.env.VITE_BASE || repoName);
 
   return {
     base,
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'copy-404-for-github-pages',
+        closeBundle() {
+          const distDir = path.resolve(__dirname, 'dist');
+          const indexPath = path.join(distDir, 'index.html');
+          const notFoundPath = path.join(distDir, '404.html');
+          if (fs.existsSync(indexPath)) {
+            fs.copyFileSync(indexPath, notFoundPath);
+          }
+        },
+      },
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
