@@ -28,6 +28,7 @@ import { DecisionLayers } from './components/DecisionLayers';
 import { ResultsDashboard } from './components/ResultsDashboard';
 import { DataPreviewModal } from './components/DataPreviewModal';
 import { Toast, ToastMessage } from './components/Toast';
+import { GlobalLoadingSkeleton } from './components/GlobalLoadingSkeleton';
 import { translations } from './translations';
 import {
   FileSpreadsheet,
@@ -36,6 +37,7 @@ import {
 } from 'lucide-react';
 
 export default function App() {
+  const [isStorageLoading, setIsStorageLoading] = useState(true);
   const [language, setLanguage] = useState<Language>('en');
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
@@ -86,10 +88,16 @@ export default function App() {
 
   // Initial Load from Persistent Storage
   useEffect(() => {
+    let isMounted = true;
+    // Safety guard: max 1200ms loading skeleton time
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) setIsStorageLoading(false);
+    }, 1200);
+
     async function loadSavedState() {
       try {
         const savedLang = await getFromIDB<Language>(StorageKeys.LANGUAGE);
-        if (savedLang) setLanguage(savedLang);
+        if (savedLang && isMounted) setLanguage(savedLang);
 
         const savedRef = await getFromIDB<WorkbookData>(
           StorageKeys.REFERENCE_WORKBOOK
@@ -104,13 +112,13 @@ export default function App() {
           StorageKeys.DECISION_LAYERS
         );
 
-        if (savedNorm) setNormalization(savedNorm);
-        if (savedLayers && savedLayers.length > 0) setLayers(savedLayers);
+        if (savedNorm && isMounted) setNormalization(savedNorm);
+        if (savedLayers && savedLayers.length > 0 && isMounted) setLayers(savedLayers);
 
-        if (savedRef) {
+        if (savedRef && isMounted) {
           setReferenceWb(savedRef);
           if (savedMappings) setMappings(savedMappings);
-        } else {
+        } else if (isMounted) {
           // Preload enterprise demo datasets on very first visit so user has immediate working experience
           const demo = generateSampleDatasets();
           setReferenceWb(demo.reference);
@@ -122,10 +130,20 @@ export default function App() {
         }
       } catch (e) {
         console.error('Storage loading error:', e);
+      } finally {
+        if (isMounted) {
+          clearTimeout(safetyTimer);
+          setIsStorageLoading(false);
+        }
       }
     }
 
     loadSavedState();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
   // Auto-save Reference Workbook to Persistent Storage
@@ -229,6 +247,10 @@ export default function App() {
       }
     }, 250);
   };
+
+  if (isStorageLoading) {
+    return <GlobalLoadingSkeleton />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">

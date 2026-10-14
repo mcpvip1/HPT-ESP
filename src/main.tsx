@@ -1,5 +1,6 @@
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
 
 // Suppress non-fatal SheetJS cfb zip streaming warnings (where local header size is 0 and Central Directory has the real size)
@@ -17,4 +18,8 @@ console.error = (...args: any[]) => {
   originalConsoleError.apply(console, args);
 };
 
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);

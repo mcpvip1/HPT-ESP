@@ -38,12 +38,14 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
   const [modalSearch, setModalSearch] = useState('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | 'system' | 'data' | 'reference'>('all');
 
-  if (!isOpen) return null;
-
   // Safe configs array guaranteed to never be null/undefined
-  const safeConfigs: ColumnConfigItem[] = Array.isArray(columnConfigs) ? columnConfigs : [];
+  const safeConfigs: ColumnConfigItem[] = useMemo(
+    () => (Array.isArray(columnConfigs) ? columnConfigs : []),
+    [columnConfigs]
+  );
 
   const filteredConfigs = useMemo(() => {
+    if (!isOpen) return [];
     const q = modalSearch.trim().toLowerCase();
     return safeConfigs.filter((c) => {
       if (!c) return false;
@@ -59,7 +61,9 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
       if (!q) return true;
       return labelStr.includes(q) || idStr.includes(q) || catStr.includes(q);
     });
-  }, [safeConfigs, modalSearch, activeCategoryFilter]);
+  }, [safeConfigs, modalSearch, activeCategoryFilter, isOpen]);
+
+  if (!isOpen) return null;
 
   const tableVisibleCount = safeConfigs.filter((c) => c?.showInTable).length;
   const exportVisibleCount = safeConfigs.filter((c) => c?.showInExport).length;
@@ -211,7 +215,7 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
             {/* Category Filter Tabs */}
             <div className="flex items-center gap-1">
-              {(['all', 'system', 'data', 'reference'] as const).map((cat) => (
+              {(['all', 'data', 'reference', 'system'] as const).map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setActiveCategoryFilter(cat)}
@@ -221,7 +225,7 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
                   }`}
                 >
-                  {cat === 'all' ? 'All' : cat === 'system' ? 'Audit' : cat === 'data' ? 'Dataset' : 'Reference'}
+                  {cat === 'all' ? 'All' : cat === 'data' ? 'Dataset' : cat === 'reference' ? 'Reference' : 'Decision & Audit'}
                 </button>
               ))}
             </div>
@@ -288,74 +292,9 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
 
         {/* Scrollable Column List */}
         <div className="overflow-y-auto flex-1 p-3 sm:px-5 divide-y divide-slate-800/60 space-y-4">
-          {/* 1. System / Audit Columns */}
-          {systemCols.length > 0 && (
-            <div className="space-y-1 pt-1 first:pt-0">
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 py-1 px-2 bg-slate-950/50 rounded">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Decision & System Audit Columns ({systemCols.length})</span>
-              </div>
-              <div className="divide-y divide-slate-800/40">
-                {systemCols.map((col) => (
-                  <div
-                    key={col.id}
-                    className="grid grid-cols-12 gap-2 items-center py-2 px-2 hover:bg-slate-800/40 rounded-lg transition-colors"
-                  >
-                    <div className="col-span-6 sm:col-span-7 flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-semibold text-slate-200 truncate" title={String(col.label)}>
-                        {String(col.label)}
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-emerald-950 text-emerald-400 border border-emerald-900/60 shrink-0">
-                        System
-                      </span>
-                    </div>
-
-                    {/* Table View Checkbox */}
-                    <div className="col-span-3 sm:col-span-2 flex justify-center">
-                      <button
-                        onClick={() => handleToggleTable(col.id)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-                          col.showInTable
-                            ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/80 shadow-sm'
-                            : 'bg-slate-950 text-slate-500 border border-slate-800 hover:text-slate-300'
-                        }`}
-                      >
-                        {col.showInTable ? (
-                          <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
-                        ) : (
-                          <Square className="w-3.5 h-3.5 text-slate-600" />
-                        )}
-                        <span className="hidden sm:inline">Show</span>
-                      </button>
-                    </div>
-
-                    {/* Export Checkbox */}
-                    <div className="col-span-3 flex justify-center">
-                      <button
-                        onClick={() => handleToggleExport(col.id)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-                          col.showInExport
-                            ? 'bg-sky-950/80 text-sky-300 border border-sky-700/80 shadow-sm'
-                            : 'bg-slate-950 text-slate-500 border border-slate-800 hover:text-slate-300'
-                        }`}
-                      >
-                        {col.showInExport ? (
-                          <CheckSquare className="w-3.5 h-3.5 text-sky-400" />
-                        ) : (
-                          <Square className="w-3.5 h-3.5 text-slate-600" />
-                        )}
-                        <span className="hidden sm:inline">Export</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 2. Incoming Data Columns */}
+          {/* 1. Incoming Data Columns */}
           {dataCols.length > 0 && (
-            <div className="space-y-1 pt-3">
+            <div className="space-y-1 pt-1 first:pt-0">
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 py-1 px-2 bg-slate-950/50 rounded">
                 <Database className="w-3.5 h-3.5 text-sky-400" />
                 <span>Dataset Data Columns ({dataCols.length})</span>
@@ -430,7 +369,7 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
             </div>
           )}
 
-          {/* 3. Reference Columns */}
+          {/* 2. Reference Columns */}
           {refCols.length > 0 && (
             <div className="space-y-1 pt-3">
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 py-1 px-2 bg-slate-950/50 rounded">
@@ -470,6 +409,71 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
                       </button>
                     </div>
 
+                    <div className="col-span-3 flex justify-center">
+                      <button
+                        onClick={() => handleToggleExport(col.id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                          col.showInExport
+                            ? 'bg-sky-950/80 text-sky-300 border border-sky-700/80 shadow-sm'
+                            : 'bg-slate-950 text-slate-500 border border-slate-800 hover:text-slate-300'
+                        }`}
+                      >
+                        {col.showInExport ? (
+                          <CheckSquare className="w-3.5 h-3.5 text-sky-400" />
+                        ) : (
+                          <Square className="w-3.5 h-3.5 text-slate-600" />
+                        )}
+                        <span className="hidden sm:inline">Export</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 3. Decision & System Audit Columns - Positioned as Last Columns */}
+          {systemCols.length > 0 && (
+            <div className="space-y-1 pt-3">
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 py-1 px-2 bg-slate-950/50 rounded">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Decision & System Audit Columns ({systemCols.length})</span>
+              </div>
+              <div className="divide-y divide-slate-800/40">
+                {systemCols.map((col) => (
+                  <div
+                    key={col.id}
+                    className="grid grid-cols-12 gap-2 items-center py-2 px-2 hover:bg-slate-800/40 rounded-lg transition-colors"
+                  >
+                    <div className="col-span-6 sm:col-span-7 flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-semibold text-slate-200 truncate" title={String(col.label)}>
+                        {String(col.label)}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-emerald-950 text-emerald-400 border border-emerald-900/60 shrink-0">
+                        System
+                      </span>
+                    </div>
+
+                    {/* Table View Checkbox */}
+                    <div className="col-span-3 sm:col-span-2 flex justify-center">
+                      <button
+                        onClick={() => handleToggleTable(col.id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                          col.showInTable
+                            ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/80 shadow-sm'
+                            : 'bg-slate-950 text-slate-500 border border-slate-800 hover:text-slate-300'
+                        }`}
+                      >
+                        {col.showInTable ? (
+                          <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Square className="w-3.5 h-3.5 text-slate-600" />
+                        )}
+                        <span className="hidden sm:inline">Show</span>
+                      </button>
+                    </div>
+
+                    {/* Export Checkbox */}
                     <div className="col-span-3 flex justify-center">
                       <button
                         onClick={() => handleToggleExport(col.id)}

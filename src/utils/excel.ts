@@ -914,7 +914,7 @@ export function exportStyledExcel(
 
   XLSXStyle.utils.book_append_sheet(wb, wsSummary, 'Executive Summary');
 
-  // 2. Evaluated Results Sheet (with rich Green, Yellow, Red fills & selected columns)
+  // 2. Evaluated Results Sheet (with data columns first, and Decision & System Audit columns placed last)
   const resultRows = results.map((item) => {
     const rowObj: Record<string, any> = {};
 
@@ -922,6 +922,22 @@ export function exportStyledExcel(
       rowObj['Row #'] = item.rowIndex;
     }
 
+    for (const h of compHeaders) {
+      if (shouldInclude(h, h)) {
+        rowObj[h] = item.comparisonRow[h] ?? '';
+      }
+    }
+
+    if (item.matchedMainRow) {
+      for (const [k, v] of Object.entries(item.matchedMainRow)) {
+        const refKey = `[Ref] ${k}`;
+        if (!compHeaders.includes(k) && shouldInclude(refKey, refKey)) {
+          rowObj[refKey] = v ?? '';
+        }
+      }
+    }
+
+    // Decision & System Audit Columns - Positioned as Last Columns
     if (shouldInclude('decisionStatus', 'Decision Outcome')) {
       rowObj['Decision Outcome'] =
         item.decisionColor === 'green'
@@ -945,21 +961,6 @@ export function exportStyledExcel(
 
     if (shouldInclude('decisionReason', 'Evaluation Reason')) {
       rowObj['Evaluation Reason'] = item.decisionReason;
-    }
-
-    for (const h of compHeaders) {
-      if (shouldInclude(h, h)) {
-        rowObj[h] = item.comparisonRow[h] ?? '';
-      }
-    }
-
-    if (item.matchedMainRow) {
-      for (const [k, v] of Object.entries(item.matchedMainRow)) {
-        const refKey = `[Ref] ${k}`;
-        if (!compHeaders.includes(k) && shouldInclude(refKey, refKey)) {
-          rowObj[refKey] = v ?? '';
-        }
-      }
     }
 
     // Safety fallback: if no columns were selected, default to Outcome and Row #
@@ -1177,17 +1178,6 @@ export function exportCsv(
     if (shouldInclude('rowIndex', 'Row')) {
       rowObj['Row'] = item.rowIndex;
     }
-    if (shouldInclude('decisionStatus', 'Decision Outcome')) {
-      rowObj['Decision Outcome'] = item.decisionColor.toUpperCase();
-    }
-    if (shouldInclude('decisionReason', 'Reason')) {
-      rowObj['Reason'] = item.decisionReason;
-    }
-    if (shouldInclude('matchStatus', 'Reference Match')) {
-      rowObj['Reference Match'] = item.isMatched
-        ? 'MATCHED'
-        : `UNMATCHED: ${item.unmatchedInfo?.primaryIdentifier || item.matchKey} — ${item.unmatchedInfo?.reason || 'Not in Reference'}`;
-    }
 
     for (const h of compHeaders) {
       if (shouldInclude(h, h)) {
@@ -1202,6 +1192,19 @@ export function exportCsv(
           rowObj[refKey] = v ?? '';
         }
       }
+    }
+
+    // Decision & System Audit Columns - Positioned as Last Columns
+    if (shouldInclude('decisionStatus', 'Decision Outcome')) {
+      rowObj['Decision Outcome'] = item.decisionColor.toUpperCase();
+    }
+    if (shouldInclude('matchStatus', 'Reference Match')) {
+      rowObj['Reference Match'] = item.isMatched
+        ? 'MATCHED'
+        : `UNMATCHED: ${item.unmatchedInfo?.primaryIdentifier || item.matchKey} — ${item.unmatchedInfo?.reason || 'Not in Reference'}`;
+    }
+    if (shouldInclude('decisionReason', 'Reason')) {
+      rowObj['Reason'] = item.decisionReason;
     }
 
     if (Object.keys(rowObj).length === 0) {

@@ -1,0 +1,125 @@
+import React from 'react';
+import { Database, FileSpreadsheet, Loader2, Sparkles } from 'lucide-react';
+
+interface GlobalLoadingSkeletonProps {
+  message?: string;
+}
+
+export const GlobalLoadingSkeleton: React.FC<GlobalLoadingSkeletonProps> = ({
+  message = 'Restoring workbooks, column mappings, and decision rules...',
+}) => {
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none animate-in fade-in duration-300">
+      {/* 1. Header Bar Skeleton */}
+      <header className="h-16 border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-md px-4 sm:px-6 lg:px-8 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 animate-pulse">
+            <FileSpreadsheet className="w-5 h-5" />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-base text-white tracking-tight">ExcelMatch</span>
+              <span className="text-emerald-400 font-bold text-base">Pro</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-semibold hidden sm:inline-flex items-center gap-1">
+                <Database className="w-3 h-3" /> IndexedDB Active
+              </span>
+            </div>
+            <div className="h-2.5 w-48 bg-slate-800 rounded animate-pulse" />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-24 bg-slate-800 rounded-lg animate-pulse hidden sm:block" />
+          <div className="h-8 w-28 bg-slate-800 rounded-lg animate-pulse" />
+        </div>
+      </header>
+
+      {/* 2. Main Loading Viewport */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Step Indicator Skeleton */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="h-8 w-36 bg-slate-800 rounded-lg animate-pulse" />
+            <span className="text-slate-700 hidden sm:inline">→</span>
+            <div className="h-8 w-44 bg-slate-800/60 rounded-lg animate-pulse hidden sm:block" />
+            <span className="text-slate-700 hidden sm:inline">→</span>
+            <div className="h-8 w-36 bg-slate-800/40 rounded-lg animate-pulse hidden sm:block" />
+          </div>
+          <div className="h-8 w-32 bg-slate-800 rounded-lg animate-pulse hidden sm:block" />
+        </div>
+
+        {/* Global Loading Status Banner */}
+        <div className="bg-slate-900/90 border border-emerald-900/50 rounded-2xl p-6 sm:p-8 text-center space-y-4 shadow-xl relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-slate-800/20 to-sky-500/5 pointer-events-none" />
+
+          <div className="relative flex flex-col items-center justify-center space-y-3">
+            <div className="relative">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-950/80 border border-emerald-700/60 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-950/50">
+                <Loader2 className="w-7 h-7 animate-spin text-emerald-400" />
+              </div>
+              <Sparkles className="w-4 h-4 text-emerald-300 absolute -top-1 -right-1 animate-bounce" />
+            </div>
+
+            <div className="space-y-1">
+              <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center justify-center gap-2">
+                <span>Loading Enterprise Workspace</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              </h2>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                {message}
+              </p>
+            </div>
+
+            {/* Shimmer Progress Track */}
+            <div className="w-full max-w-xs h-1.5 bg-slate-800 rounded-full overflow-hidden relative">
+              <div className="h-full bg-emerald-500 rounded-full w-2/3 animate-pulse" />
+            </div>
+          </div>
+        </div>
+
+        {/* Realistic Card Skeletons */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Card 1 Skeleton */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-slate-800 animate-pulse" />
+                <div className="space-y-2">
+                  <div className="h-4 w-32 bg-slate-800 rounded animate-pulse" />
+                  <div className="h-3 w-48 bg-slate-800/60 rounded animate-pulse" />
+                </div>
+              </div>
+              <div className="h-6 w-16 bg-slate-800 rounded animate-pulse" />
+            </div>
+
+            <div className="h-44 border-2 border-dashed border-slate-800 rounded-xl bg-slate-950/40 flex flex-col items-center justify-center space-y-2">
+              <div className="w-10 h-10 rounded-lg bg-slate-800 animate-pulse" />
+              <div className="h-3.5 w-40 bg-slate-800 rounded animate-pulse" />
+              <div className="h-2.5 w-28 bg-slate-800/60 rounded animate-pulse" />
+            </div>
+          </div>
+
+          {/* Card 2 Skeleton */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-slate-800 animate-pulse" />
+                <div className="space-y-2">
+                  <div className="h-4 w-32 bg-slate-800 rounded animate-pulse" />
+                  <div className="h-3 w-48 bg-slate-800/60 rounded animate-pulse" />
+                </div>
+              </div>
+              <div className="h-6 w-16 bg-slate-800 rounded animate-pulse" />
+            </div>
+
+            <div className="h-44 border-2 border-dashed border-slate-800 rounded-xl bg-slate-950/40 flex flex-col items-center justify-center space-y-2">
+              <div className="w-10 h-10 rounded-lg bg-slate-800 animate-pulse" />
+              <div className="h-3.5 w-40 bg-slate-800 rounded animate-pulse" />
+              <div className="h-2.5 w-28 bg-slate-800/60 rounded animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};

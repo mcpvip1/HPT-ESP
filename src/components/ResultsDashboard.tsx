@@ -85,7 +85,19 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRow, setSelectedRow] = useState<MatchedRow | null>(null);
 
-  const compHeaders = comparisonWb?.headers || [];
+  // Safely derive comparison headers from comparisonWb, or fall back to results
+  const compHeaders = useMemo(() => {
+    if (comparisonWb?.headers && comparisonWb.headers.length > 0) {
+      return comparisonWb.headers;
+    }
+    const keys = new Set<string>();
+    for (const r of results) {
+      if (r.comparisonRow) {
+        Object.keys(r.comparisonRow).forEach((k) => keys.add(k));
+      }
+    }
+    return Array.from(keys);
+  }, [comparisonWb, results]);
 
   // Extract any reference headers from merged/matched results
   const refHeaders = useMemo(() => {
@@ -102,13 +114,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     return Array.from(keys);
   }, [results, compHeaders]);
 
-  // Build the complete list of candidate columns (system, comparison data, and reference)
+  // Build the complete list of candidate columns with data & reference first, and Decision & System Audit as last columns
   const allCandidateColumns: ColumnConfigItem[] = useMemo(() => {
     const items: ColumnConfigItem[] = [
       { id: 'rowIndex', label: 'Row #', category: 'system', showInTable: true, showInExport: true },
-      { id: 'decisionStatus', label: 'Decision Status', category: 'system', showInTable: true, showInExport: true },
-      { id: 'matchStatus', label: t.matchedStatus || 'Match Status', category: 'system', showInTable: true, showInExport: true },
-      { id: 'decisionReason', label: t.reason || 'Evaluation Reason', category: 'system', showInTable: true, showInExport: true },
     ];
 
     compHeaders.forEach((h) => {
@@ -130,6 +139,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         showInExport: true,
       });
     });
+
+    // Decision & System Audit Columns moved to last columns
+    items.push(
+      { id: 'decisionStatus', label: 'Decision Status', category: 'system', showInTable: true, showInExport: true },
+      { id: 'matchStatus', label: t.matchedStatus || 'Match Status', category: 'system', showInTable: true, showInExport: true },
+      { id: 'decisionReason', label: t.reason || 'Evaluation Reason', category: 'system', showInTable: true, showInExport: true },
+    );
 
     return items;
   }, [compHeaders, refHeaders, t.matchedStatus, t.reason]);
@@ -760,6 +776,46 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   </th>
                 )}
 
+                {/* Comparison Columns */}
+                {compHeaders.filter((h) => isTableColVisible(h)).map((header) => (
+                  <th
+                    key={header}
+                    onClick={() => handleSort(header)}
+                    className="py-3 px-4 border-r border-slate-800 whitespace-nowrap cursor-pointer hover:bg-slate-900/60 font-mono text-slate-300"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>{header}</span>
+                      {sortColumn === header ? (
+                        sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-emerald-400" /> : <ArrowDown className="w-3 h-3 text-emerald-400" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-600" />
+                      )}
+                    </div>
+                  </th>
+                ))}
+
+                {/* Reference Columns */}
+                {refHeaders.filter((ref) => isTableColVisible(ref)).map((refHeader) => (
+                  <th
+                    key={refHeader}
+                    onClick={() => handleSort(refHeader)}
+                    className="py-3 px-4 border-r border-slate-800 whitespace-nowrap cursor-pointer hover:bg-slate-900/60 font-mono text-purple-300 bg-purple-950/20"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] px-1 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800/60 font-sans">
+                        Ref
+                      </span>
+                      <span>{refHeader.replace('[Ref] ', '')}</span>
+                      {sortColumn === refHeader ? (
+                        sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-400" /> : <ArrowDown className="w-3 h-3 text-purple-400" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-600" />
+                      )}
+                    </div>
+                  </th>
+                ))}
+
+                {/* Decision & System Audit Columns - Positioned as Last Columns */}
                 {/* Solid Decision Status */}
                 {isTableColVisible('decisionStatus') && (
                   <th
@@ -811,45 +867,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   </th>
                 )}
 
-                {/* Comparison Columns */}
-                {compHeaders.filter((h) => isTableColVisible(h)).map((header) => (
-                  <th
-                    key={header}
-                    onClick={() => handleSort(header)}
-                    className="py-3 px-4 border-r border-slate-800 whitespace-nowrap cursor-pointer hover:bg-slate-900/60 font-mono text-slate-300"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>{header}</span>
-                      {sortColumn === header ? (
-                        sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-emerald-400" /> : <ArrowDown className="w-3 h-3 text-emerald-400" />
-                      ) : (
-                        <ArrowUpDown className="w-3 h-3 text-slate-600" />
-                      )}
-                    </div>
-                  </th>
-                ))}
-
-                {/* Reference Columns */}
-                {refHeaders.filter((ref) => isTableColVisible(ref)).map((refHeader) => (
-                  <th
-                    key={refHeader}
-                    onClick={() => handleSort(refHeader)}
-                    className="py-3 px-4 border-r border-slate-800 whitespace-nowrap cursor-pointer hover:bg-slate-900/60 font-mono text-purple-300 bg-purple-950/20"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] px-1 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800/60 font-sans">
-                        Ref
-                      </span>
-                      <span>{refHeader.replace('[Ref] ', '')}</span>
-                      {sortColumn === refHeader ? (
-                        sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-400" /> : <ArrowDown className="w-3 h-3 text-purple-400" />
-                      ) : (
-                        <ArrowUpDown className="w-3 h-3 text-slate-600" />
-                      )}
-                    </div>
-                  </th>
-                ))}
-
                 {/* Actions */}
                 <th className="py-3 px-3 text-center w-20">
                   {t.viewDetails}
@@ -858,7 +875,35 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             </thead>
 
             <tbody className="divide-y divide-slate-800/80">
-              {currentPageRows.length > 0 ? (
+              {tableVisibleCount === 0 ? (
+                <tr>
+                  <td colSpan={100} className="py-16 text-center text-slate-400 bg-slate-950/60">
+                    <div className="max-w-md mx-auto space-y-3 px-4">
+                      <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 mx-auto">
+                        <SlidersHorizontal className="w-6 h-6" />
+                      </div>
+                      <h4 className="text-sm font-bold text-white">All Table Columns are Currently Hidden</h4>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        You currently have 0 columns enabled for the table view. To see data rows again, restore all columns or configure your column choices.
+                      </p>
+                      <div className="flex justify-center gap-2.5 pt-2">
+                        <button
+                          onClick={handleResetDefaultColumns}
+                          className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-colors"
+                        >
+                          Restore All Columns
+                        </button>
+                        <button
+                          onClick={() => setShowColumnModal(true)}
+                          className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors"
+                        >
+                          Choose Columns
+                        </button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : currentPageRows.length > 0 ? (
                 currentPageRows.map((row) => {
                   const isGreen = row.decisionColor === 'green';
                   const isYellow = row.decisionColor === 'yellow';
@@ -884,6 +929,42 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         </td>
                       )}
 
+                      {/* Comparison Columns Values with Real-Time Match Highlighting & Inspection Badges */}
+                      {compHeaders.filter((h) => isTableColVisible(h)).map((header) => {
+                        const valStr = String(row.comparisonRow[header] ?? '');
+                        const isWaiveOrAccept =
+                          valStr.toLowerCase().includes('waive') ||
+                          valStr.toLowerCase().includes('accept');
+
+                        return (
+                          <td
+                            key={header}
+                            className={`py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap font-mono text-xs ${
+                              isWaiveOrAccept
+                                ? 'text-emerald-300 font-bold bg-emerald-950/30'
+                                : 'text-slate-200'
+                            }`}
+                          >
+                            {highlightText(row.comparisonRow[header], searchTerm)}
+                          </td>
+                        );
+                      })}
+
+                      {/* Reference Columns Values */}
+                      {refHeaders.filter((ref) => isTableColVisible(ref)).map((refHeader) => {
+                        const rawKey = refHeader.replace('[Ref] ', '');
+                        const val = row.matchedMainRow?.[rawKey];
+                        return (
+                          <td
+                            key={refHeader}
+                            className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap text-purple-200 font-mono text-xs bg-purple-950/10"
+                          >
+                            {highlightText(val, searchTerm)}
+                          </td>
+                        );
+                      })}
+
+                      {/* Decision & System Audit Columns - Positioned as Last Columns */}
                       {/* Decision Status with Solid Color Badge */}
                       {isTableColVisible('decisionStatus') && (
                         <td className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap">
@@ -940,41 +1021,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           </span>
                         </td>
                       )}
-
-                      {/* Comparison Columns Values with Real-Time Match Highlighting & Inspection Badges */}
-                      {compHeaders.filter((h) => isTableColVisible(h)).map((header) => {
-                        const valStr = String(row.comparisonRow[header] ?? '');
-                        const isWaiveOrAccept =
-                          valStr.toLowerCase().includes('waive') ||
-                          valStr.toLowerCase().includes('accept');
-
-                        return (
-                          <td
-                            key={header}
-                            className={`py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap font-mono text-xs ${
-                              isWaiveOrAccept
-                                ? 'text-emerald-300 font-bold bg-emerald-950/30'
-                                : 'text-slate-200'
-                            }`}
-                          >
-                            {highlightText(row.comparisonRow[header], searchTerm)}
-                          </td>
-                        );
-                      })}
-
-                      {/* Reference Columns Values */}
-                      {refHeaders.filter((ref) => isTableColVisible(ref)).map((refHeader) => {
-                        const rawKey = refHeader.replace('[Ref] ', '');
-                        const val = row.matchedMainRow?.[rawKey];
-                        return (
-                          <td
-                            key={refHeader}
-                            className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap text-purple-200 font-mono text-xs bg-purple-950/10"
-                          >
-                            {highlightText(val, searchTerm)}
-                          </td>
-                        );
-                      })}
 
                       {/* Row Inspect Button */}
                       <td className="py-2.5 px-3 text-center whitespace-nowrap">

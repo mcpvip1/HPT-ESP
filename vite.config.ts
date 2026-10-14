@@ -4,7 +4,15 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
+  // When running in GitHub Actions for GitHub Pages, use repository path /HPT-ESP/ or respect VITE_BASE; fallback to relative './'
+  const base =
+    process.env.VITE_BASE ||
+    (process.env.GITHUB_REPOSITORY
+      ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/`
+      : './');
+
   return {
+    base,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
