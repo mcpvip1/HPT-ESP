@@ -1,0 +1,6 @@
+{
+  "name": "ExcelMatch Pro - Enterprise Intelligent Auto-Sorting & Decision Engine",
+  "description": "Enterprise automated Excel data comparison, multi-column matching, hierarchical decision rules, solid color highlighting, and professional Excel exporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
