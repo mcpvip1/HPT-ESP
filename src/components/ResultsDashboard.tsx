@@ -17,6 +17,13 @@ import {
   Filter,
   SlidersHorizontal,
   Table as TableIcon,
+  Share2,
+  EyeOff,
+  Copy,
+  Check,
+  RotateCw,
+  RefreshCw,
+  Save,
 } from 'lucide-react';
 import {
   MatchedRow,
@@ -28,8 +35,11 @@ import {
 } from '../types';
 import { translations } from '../translations';
 import { exportStyledExcel, exportCsv } from '../utils/excel';
+import { generatePreviewLink, copyPreviewLinkToClipboard } from '../utils/previewSharing';
 import { RowDetailModal } from './RowDetailModal';
 import { ColumnCustomizationModal } from './ColumnCustomizationModal';
+import { SharePreviewModal } from './SharePreviewModal';
+import { ExcelColumnFilter, UniqueValueItem } from './ExcelColumnFilter';
 
 interface ResultsDashboardProps {
   results: MatchedRow[];
@@ -37,6 +47,13 @@ interface ResultsDashboardProps {
   comparisonWb: WorkbookData | null;
   language: Language;
   onShowToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+  initialFilter?: FilterType;
+  initialSearchTerm?: string;
+  initialSearchColumn?: string;
+  initialColumnConfigs?: ColumnConfigItem[];
+  isPreviewMode?: boolean;
+  onExitPreview?: () => void;
+  onRefresh?: () => void;
 }
 
 type FilterType = 'all' | 'green' | 'yellow' | 'red' | 'unmatched';
@@ -73,17 +90,75 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   comparisonWb,
   language,
   onShowToast,
+  initialFilter,
+  initialSearchTerm,
+  initialSearchColumn,
+  initialColumnConfigs,
+  isPreviewMode,
+  onExitPreview,
+  onRefresh,
 }) => {
   const t = translations[language];
 
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchColumn, setSearchColumn] = useState<string>('all');
+  const [activeFilter, setActiveFilter] = useState<FilterType>(initialFilter || 'all');
+  const [searchTerm, setSearchTerm] = useState(initialSearchTerm || '');
+  const [searchColumn, setSearchColumn] = useState<string>(initialSearchColumn || 'all');
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [quickCopied, setQuickCopied] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [sortColumn, setSortColumn] = useState<string>('rowIndex');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRow, setSelectedRow] = useState<MatchedRow | null>(null);
+
+  // Excel-style column filters: mapping colId -> allowed string values
+  const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
+  const [openFilterColId, setOpenFilterColId] = useState<string | null>(null);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    try {
+      // Re-sync latest saved column view settings from localStorage
+      const saved = localStorage.getItem('excelmatch_column_settings_v2');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setColumnConfigs(parsed);
+            setHasUnsavedColumnChanges(false);
+          }
+        } catch {}
+      }
+      if (onRefresh) onRefresh();
+      onShowToast('Refreshed to latest data & column view settings', 'success');
+    } catch {
+      onShowToast('Refresh completed', 'info');
+    } finally {
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 350);
+    }
+  };
+
+  // Synchronize state when initialFilter/Search changes from URL or parent
+  useEffect(() => {
+    if (initialFilter) {
+      setActiveFilter(initialFilter);
+    }
+  }, [initialFilter]);
+
+  useEffect(() => {
+    if (initialSearchTerm !== undefined) {
+      setSearchTerm(initialSearchTerm);
+    }
+  }, [initialSearchTerm]);
+
+  useEffect(() => {
+    if (initialSearchColumn) {
+      setSearchColumn(initialSearchColumn);
+    }
+  }, [initialSearchColumn]);
 
   // Safely derive comparison headers from comparisonWb, or fall back to results
   const compHeaders = useMemo(() => {
@@ -161,13 +236,44 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     }
   });
 
-  // Persistent column visibility settings in localStorage
-  const [columnConfigs, setColumnConfigs] = useState<ColumnConfigItem[]>(() => {
+  // Load custom column order and visibility (priority: preview link -> stored v2 -> default candidate)
+  const loadStoredConfigs = (candidateCols: ColumnConfigItem[]): ColumnConfigItem[] => {
+    if (initialColumnConfigs && initialColumnConfigs.length > 0) {
+      return initialColumnConfigs;
+    }
     try {
-      const saved = localStorage.getItem('excelmatch_column_settings');
-      if (saved) {
-        const parsed: Record<string, { table: boolean; export: boolean }> = JSON.parse(saved);
-        return allCandidateColumns.map((c) => ({
+      const stored = localStorage.getItem('excelmatch_column_settings_v2');
+      if (stored) {
+        const parsed: {
+          order: string[];
+          visibility: Record<string, { table: boolean; export: boolean }>;
+        } = JSON.parse(stored);
+        if (parsed && Array.isArray(parsed.order)) {
+          const candidateMap = new Map(candidateCols.map((c) => [c.id, c]));
+          const ordered: ColumnConfigItem[] = [];
+
+          parsed.order.forEach((id) => {
+            const found = candidateMap.get(id);
+            if (found) {
+              const vis = parsed.visibility?.[id];
+              ordered.push({
+                ...found,
+                showInTable: vis?.table ?? found.showInTable,
+                showInExport: vis?.export ?? found.showInExport,
+              });
+              candidateMap.delete(id);
+            }
+          });
+          candidateMap.forEach((found) => ordered.push(found));
+          return ordered;
+        }
+      }
+
+      // Legacy fallback
+      const legacySaved = localStorage.getItem('excelmatch_column_settings');
+      if (legacySaved) {
+        const parsed: Record<string, { table: boolean; export: boolean }> = JSON.parse(legacySaved);
+        return candidateCols.map((c) => ({
           ...c,
           showInTable: parsed[c.id]?.table ?? c.showInTable,
           showInExport: parsed[c.id]?.export ?? c.showInExport,
@@ -176,37 +282,89 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     } catch (e) {
       console.warn('Failed to load column settings', e);
     }
-    return allCandidateColumns;
-  });
+    return candidateCols;
+  };
 
-  // Keep columnConfigs up to date when columns change in incoming datasets
+  // Persistent column order and visibility settings in localStorage
+  const [columnConfigs, setColumnConfigs] = useState<ColumnConfigItem[]>(() =>
+    loadStoredConfigs(allCandidateColumns)
+  );
+  const [hasUnsavedColumnChanges, setHasUnsavedColumnChanges] = useState(false);
+
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('excelmatch_column_settings');
-      const parsed: Record<string, { table: boolean; export: boolean }> = saved ? JSON.parse(saved) : {};
-      setColumnConfigs(
-        allCandidateColumns.map((c) => ({
-          ...c,
-          showInTable: parsed[c.id]?.table ?? c.showInTable,
-          showInExport: parsed[c.id]?.export ?? c.showInExport,
-        }))
-      );
-    } catch {
-      setColumnConfigs(allCandidateColumns);
-    }
-  }, [allCandidateColumns]);
+    setColumnConfigs(loadStoredConfigs(allCandidateColumns));
+  }, [allCandidateColumns, initialColumnConfigs]);
 
   const handleUpdateColumnConfigs = (newConfigs: ColumnConfigItem[]) => {
     setColumnConfigs(newConfigs);
+    setHasUnsavedColumnChanges(true);
+  };
+
+  // Move column left or right directly from table headers
+  const handleMoveColumn = (colId: string, direction: 'left' | 'right') => {
+    const visibleIdx = visibleTableColumns.findIndex((c) => c.id === colId);
+    if (visibleIdx === -1) return;
+    const targetVisibleIdx = direction === 'left' ? visibleIdx - 1 : visibleIdx + 1;
+    if (targetVisibleIdx < 0 || targetVisibleIdx >= visibleTableColumns.length) return;
+
+    const targetColId = visibleTableColumns[targetVisibleIdx].id;
+    const fromIdx = columnConfigs.findIndex((c) => c.id === colId);
+    const toIdx = columnConfigs.findIndex((c) => c.id === targetColId);
+    if (fromIdx === -1 || toIdx === -1) return;
+
+    const updated = [...columnConfigs];
+    const [moved] = updated.splice(fromIdx, 1);
+    updated.splice(toIdx, 0, moved);
+
+    setColumnConfigs(updated);
+    setHasUnsavedColumnChanges(true);
+  };
+
+  const handleSaveColumnConfigs = (newConfigs: ColumnConfigItem[]) => {
+    setColumnConfigs(newConfigs);
+    setHasUnsavedColumnChanges(false);
     try {
-      const saveObj: Record<string, { table: boolean; export: boolean }> = {};
+      const saveObj = {
+        order: newConfigs.map((c) => c.id),
+        visibility: {} as Record<string, { table: boolean; export: boolean }>,
+      };
       newConfigs.forEach((c) => {
-        saveObj[c.id] = { table: c.showInTable, export: c.showInExport };
+        saveObj.visibility[c.id] = { table: c.showInTable, export: c.showInExport };
       });
-      localStorage.setItem('excelmatch_column_settings', JSON.stringify(saveObj));
+      localStorage.setItem('excelmatch_column_settings_v2', JSON.stringify(saveObj));
+
+      // Sync to shared preview cache
+      const latestPreview = localStorage.getItem('emp_shared_preview_latest');
+      if (latestPreview) {
+        try {
+          const p = JSON.parse(latestPreview);
+          p.columnConfigs = newConfigs;
+          localStorage.setItem('emp_shared_preview_latest', JSON.stringify(p));
+        } catch {}
+      }
+
+      // If in preview mode, also update hash immediately
+      if (isPreviewMode) {
+        const linkInfo = generatePreviewLink({
+          version: 1,
+          createdAt: Date.now(),
+          comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+          stats,
+          results,
+          filter: activeFilter,
+          searchTerm,
+          searchColumn,
+          columnConfigs: newConfigs,
+        });
+        const hashPart = linkInfo.url.split('#')[1];
+        if (hashPart && window.location.hash !== `#${hashPart}`) {
+          window.history.replaceState(null, '', `#${hashPart}`);
+        }
+      }
     } catch (e) {
       console.warn('Failed to save column settings', e);
     }
+    onShowToast('Column layout saved! Synced to preview.', 'success');
   };
 
   const handleResetDefaultColumns = () => {
@@ -215,8 +373,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       showInTable: true,
       showInExport: true,
     }));
-    handleUpdateColumnConfigs(defaults);
-    onShowToast('All columns restored to default (visible in Table & Export)', 'info');
+    handleSaveColumnConfigs(defaults);
+    onShowToast('All columns restored to default order and visibility', 'info');
   };
 
   const handleToggleSyncExport = (sync: boolean) => {
@@ -229,9 +387,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         ...c,
         showInExport: c.showInTable,
       }));
-      handleUpdateColumnConfigs(updated);
+      handleSaveColumnConfigs(updated);
     }
   };
+
+  // Active columns shown in table, rendered strictly in customized sequence
+  const visibleTableColumns = useMemo(() => {
+    return columnConfigs.filter((c) => c.showInTable);
+  }, [columnConfigs]);
 
   // Lookup for fast visibility check
   const tableVisibilityMap = useMemo(() => {
@@ -251,6 +414,99 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const tableVisibleCount = columnConfigs.filter((c) => c.showInTable).length;
   const exportVisibleCount = columnConfigs.filter((c) => c.showInExport).length;
 
+  // Keep URL hash updated seamlessly when in preview mode as filters or columns change
+  useEffect(() => {
+    if (!isPreviewMode) return;
+    try {
+      const linkInfo = generatePreviewLink({
+        version: 1,
+        createdAt: Date.now(),
+        comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+        stats,
+        results,
+        filter: activeFilter,
+        searchTerm,
+        searchColumn,
+        columnConfigs,
+      });
+      const hashPart = linkInfo.url.split('#')[1];
+      if (hashPart && window.location.hash !== `#${hashPart}`) {
+        window.history.replaceState(null, '', `#${hashPart}`);
+      }
+    } catch {
+      // Ignore URL length edge cases
+    }
+  }, [isPreviewMode, activeFilter, searchTerm, searchColumn, columnConfigs, comparisonWb, stats, results]);
+
+  const handleQuickCopyPreviewLink = async () => {
+    try {
+      const res = await copyPreviewLinkToClipboard({
+        version: 1,
+        createdAt: Date.now(),
+        comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+        stats,
+        results,
+        filter: activeFilter,
+        searchTerm,
+        searchColumn,
+        columnConfigs,
+      });
+      if (res.success) {
+        setQuickCopied(true);
+        const filterName = activeFilter === 'all' ? 'All records' : `${activeFilter.toUpperCase()} filter`;
+        onShowToast(`Result Preview link with ${filterName} and custom columns copied! Anyone clicking it sees this result view only.`, 'success');
+        setTimeout(() => setQuickCopied(false), 2500);
+      } else {
+        setShowShareModal(true);
+      }
+    } catch {
+      setShowShareModal(true);
+    }
+  };
+
+  // Helper to retrieve cell string value for any column (System, Ref, Comp)
+  const getRowColValue = (row: MatchedRow, colId: string): string => {
+    if (colId === 'rowIndex') return String(row.rowIndex);
+    if (colId === 'decisionStatus') {
+      return row.decisionColor === 'green'
+        ? 'PASSED'
+        : row.decisionColor === 'yellow'
+        ? 'REVIEW'
+        : row.decisionColor === 'red'
+        ? 'REJECTED'
+        : 'NO RULE';
+    }
+    if (colId === 'matchStatus') {
+      return row.isMatched ? 'Matched' : 'Unmatched';
+    }
+    if (colId === 'decisionReason') {
+      return row.decisionReason ? String(row.decisionReason).trim() : '(Empty)';
+    }
+    if (colId.startsWith('[Ref] ')) {
+      const rawKey = colId.replace('[Ref] ', '');
+      const val = row.matchedMainRow?.[rawKey];
+      return val !== undefined && val !== null && String(val).trim() !== '' ? String(val) : '(Blanks)';
+    }
+    const val = row.comparisonRow[colId];
+    return val !== undefined && val !== null && String(val).trim() !== '' ? String(val) : '(Blanks)';
+  };
+
+  // Helper to calculate distinct values and occurrences for Excel-style filter
+  const getColumnUniqueValues = (colId: string): UniqueValueItem[] => {
+    const counts = new Map<string, number>();
+    for (const r of results) {
+      const val = getRowColValue(r, colId);
+      counts.set(val, (counts.get(val) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => {
+        if (a.value === '(Blanks)' || a.value === '(Empty)') return 1;
+        if (b.value === '(Blanks)' || b.value === '(Empty)') return -1;
+        return a.value.localeCompare(b.value, undefined, { numeric: true, sensitivity: 'base' });
+      });
+  };
+
   // Real-Time Filter & Search Logic
   const filteredRows = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -262,7 +518,17 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       if (activeFilter === 'red' && item.decisionColor !== 'red') return false;
       if (activeFilter === 'unmatched' && item.isMatched) return false;
 
-      // 2. Real-Time Content Search Field
+      // 2. Excel-Style Column Filters (Multi-Column Checklists)
+      for (const [filterColId, allowedVals] of Object.entries(columnFilters)) {
+        if (allowedVals && Array.isArray(allowedVals)) {
+          const rowVal = getRowColValue(item, filterColId);
+          if (!allowedVals.includes(rowVal)) {
+            return false;
+          }
+        }
+      }
+
+      // 3. Real-Time Content Search Field
       if (query) {
         if (searchColumn === 'all') {
           // Search across all comparison fields, reference fields, key, and evaluation reason
@@ -306,7 +572,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
       return true;
     });
-  }, [results, activeFilter, searchTerm, searchColumn]);
+  }, [results, activeFilter, columnFilters, searchTerm, searchColumn]);
 
   // Sorting Logic
   const sortedRows = useMemo(() => {
@@ -316,22 +582,31 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
       if (sortColumn === 'rowIndex') {
         valA = a.rowIndex;
-        valB = b.rowIndex;
       } else if (sortColumn === 'decisionColor') {
         valA = a.decisionColor;
-        valB = b.decisionColor;
       } else if (sortColumn === 'isMatched') {
         valA = a.isMatched ? 1 : 0;
-        valB = b.isMatched ? 1 : 0;
       } else if (sortColumn === 'decisionReason') {
         valA = a.decisionReason;
-        valB = b.decisionReason;
       } else if (sortColumn.startsWith('[Ref] ')) {
         const rawKey = sortColumn.replace('[Ref] ', '');
         valA = a.matchedMainRow?.[rawKey] ?? '';
-        valB = b.matchedMainRow?.[rawKey] ?? '';
       } else {
         valA = a.comparisonRow[sortColumn] ?? '';
+      }
+
+      if (sortColumn === 'rowIndex') {
+        valB = b.rowIndex;
+      } else if (sortColumn === 'decisionColor') {
+        valB = b.decisionColor;
+      } else if (sortColumn === 'isMatched') {
+        valB = b.isMatched ? 1 : 0;
+      } else if (sortColumn === 'decisionReason') {
+        valB = b.decisionReason;
+      } else if (sortColumn.startsWith('[Ref] ')) {
+        const rawKey = sortColumn.replace('[Ref] ', '');
+        valB = b.matchedMainRow?.[rawKey] ?? '';
+      } else {
         valB = b.comparisonRow[sortColumn] ?? '';
       }
 
@@ -347,12 +622,16 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     });
   }, [filteredRows, sortColumn, sortDirection]);
 
-  // Pagination
+  // Pagination (In Preview Mode, show all rows with no pagination cutoff)
   const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
   const currentPageRows = useMemo(() => {
+    if (isPreviewMode) {
+      // User request: "Only show this Result Table in the live preview page; show all the rows."
+      return sortedRows;
+    }
     const start = (page - 1) * pageSize;
     return sortedRows.slice(start, start + pageSize);
-  }, [sortedRows, page, pageSize]);
+  }, [sortedRows, page, pageSize, isPreviewMode]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -417,91 +696,95 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      {/* 1. Summary KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        {/* Total Incoming Rows */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm flex flex-col justify-between">
-          <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-            {t.kpiTotalRows}
+      {/* 1. Summary KPI Cards (Hidden in Preview Mode to show ONLY the Table) */}
+      {!isPreviewMode && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+          {/* Total Incoming Rows */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm flex flex-col justify-between">
+            <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+              {t.kpiTotalRows}
+            </div>
+            <div className="mt-2 text-2xl sm:text-3xl font-bold text-white font-mono tabular-nums">
+              {stats.totalIncoming.toLocaleString()}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-500">Evaluated dataset</div>
           </div>
-          <div className="mt-2 text-2xl sm:text-3xl font-bold text-white font-mono tabular-nums">
-            {stats.totalIncoming.toLocaleString()}
-          </div>
-          <div className="mt-1 text-[11px] text-slate-500">Evaluated dataset</div>
-        </div>
 
-        {/* Green / Passed */}
-        <div className="bg-gradient-to-br from-emerald-950/80 via-slate-900 to-emerald-950/40 border-2 border-emerald-500/60 rounded-xl p-4 shadow-lg shadow-emerald-950/50 flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-400 via-green-400 to-emerald-500 shadow-[0_0_14px_rgba(16,185,129,0.8)]" />
-          <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              {t.kpiPassed}
-            </span>
-            <span className="font-mono text-emerald-950 bg-emerald-400 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
-              {stats.totalIncoming > 0 ? ((stats.greenCount / stats.totalIncoming) * 100).toFixed(1) : 0}%
-            </span>
+          {/* Green / Passed */}
+          <div className="bg-gradient-to-br from-emerald-950/80 via-slate-900 to-emerald-950/40 border-2 border-emerald-500/70 rounded-xl p-4 shadow-lg shadow-emerald-950/50 flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-400 via-green-400 to-emerald-500 shadow-[0_0_14px_rgba(16,185,129,0.8)]" />
+            <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                {t.kpiPassed}
+              </span>
+              <span className="font-mono text-emerald-950 bg-emerald-400 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
+                {stats.totalIncoming > 0 ? ((stats.greenCount / stats.totalIncoming) * 100).toFixed(1) : 0}%
+              </span>
+            </div>
+            <div className="mt-2 text-3xl sm:text-4xl font-black text-emerald-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(16,185,129,0.35)]">
+              {stats.greenCount.toLocaleString()}
+            </div>
+            <div className="mt-1 text-[11px] text-emerald-400 font-medium">Vibrant Green passed</div>
           </div>
-          <div className="mt-2 text-3xl sm:text-4xl font-black text-emerald-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(16,185,129,0.35)]">
-            {stats.greenCount.toLocaleString()}
-          </div>
-          <div className="mt-1 text-[11px] text-emerald-400/90 font-medium">Vibrant Green passed</div>
-        </div>
 
-        {/* Yellow / Review */}
-        <div className="bg-gradient-to-br from-amber-950/80 via-slate-900 to-amber-950/40 border-2 border-amber-500/60 rounded-xl p-4 shadow-lg shadow-amber-950/50 flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 shadow-[0_0_14px_rgba(245,158,11,0.8)]" />
-          <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              {t.kpiReview}
-            </span>
-            <span className="font-mono text-slate-950 bg-amber-400 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
-              {stats.totalIncoming > 0 ? ((stats.yellowCount / stats.totalIncoming) * 100).toFixed(1) : 0}%
-            </span>
+          {/* Yellow / Review */}
+          <div className="bg-gradient-to-br from-amber-950/80 via-slate-900 to-amber-950/40 border-2 border-amber-500/70 rounded-xl p-4 shadow-lg shadow-amber-950/50 flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 shadow-[0_0_14px_rgba(245,158,11,0.8)]" />
+            <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                {t.kpiReview}
+              </span>
+              <span className="font-mono text-slate-950 bg-amber-400 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
+                {stats.totalIncoming > 0 ? ((stats.yellowCount / stats.totalIncoming) * 100).toFixed(1) : 0}%
+              </span>
+            </div>
+            <div className="mt-2 text-3xl sm:text-4xl font-black text-amber-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(245,158,11,0.35)]">
+              {stats.yellowCount.toLocaleString()}
+            </div>
+            <div className="mt-1 text-[11px] text-amber-400 font-medium">Vibrant Amber review</div>
           </div>
-          <div className="mt-2 text-3xl sm:text-4xl font-black text-amber-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(245,158,11,0.35)]">
-            {stats.yellowCount.toLocaleString()}
-          </div>
-          <div className="mt-1 text-[11px] text-amber-400/90 font-medium">Vibrant Amber review</div>
-        </div>
 
-        {/* Red / Rejected */}
-        <div className="bg-gradient-to-br from-rose-950/80 via-slate-900 to-rose-950/40 border-2 border-rose-500/60 rounded-xl p-4 shadow-lg shadow-rose-950/50 flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-rose-500 via-red-500 to-rose-600 shadow-[0_0_14px_rgba(244,63,94,0.8)]" />
-          <div className="text-[11px] font-bold text-rose-400 uppercase tracking-wider flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
-              {t.kpiRejected}
-            </span>
-            <span className="font-mono text-white bg-rose-600 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
-              {stats.totalIncoming > 0 ? ((stats.redCount / stats.totalIncoming) * 100).toFixed(1) : 0}%
-            </span>
+          {/* Red / Rejected */}
+          <div className="bg-gradient-to-br from-rose-950/80 via-slate-900 to-rose-950/40 border-2 border-rose-500/70 rounded-xl p-4 shadow-lg shadow-rose-950/50 flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-rose-500 via-red-500 to-rose-600 shadow-[0_0_14px_rgba(244,63,94,0.8)]" />
+            <div className="text-[11px] font-bold text-rose-400 uppercase tracking-wider flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                {t.kpiRejected}
+              </span>
+              <span className="font-mono text-white bg-rose-600 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
+                {stats.totalIncoming > 0 ? ((stats.redCount / stats.totalIncoming) * 100).toFixed(1) : 0}%
+              </span>
+            </div>
+            <div className="mt-2 text-3xl sm:text-4xl font-black text-rose-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(244,63,94,0.35)]">
+              {stats.redCount.toLocaleString()}
+            </div>
+            <div className="mt-1 text-[11px] text-rose-400 font-medium">Vibrant Crimson rejected</div>
           </div>
-          <div className="mt-2 text-3xl sm:text-4xl font-black text-rose-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(244,63,94,0.35)]">
-            {stats.redCount.toLocaleString()}
-          </div>
-          <div className="mt-1 text-[11px] text-rose-400/90 font-medium">Vibrant Crimson rejected</div>
-        </div>
 
-        {/* Blue / Key Match Rate */}
-        <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-blue-950/80 via-slate-900 to-indigo-950/40 border-2 border-blue-500/60 rounded-xl p-4 shadow-lg shadow-blue-950/50 flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-400 via-cyan-400 to-indigo-500 shadow-[0_0_14px_rgba(59,130,246,0.8)]" />
-          <div className="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-              {t.kpiMatchRate}
-            </span>
-            <Percent className="w-3.5 h-3.5 text-blue-400 stroke-[2.5]" />
-          </div>
-          <div className="mt-2 text-3xl sm:text-4xl font-black text-blue-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(59,130,246,0.35)]">
-            {stats.matchRate}%
-          </div>
-          <div className="mt-1 text-[11px] text-blue-300 font-mono font-medium">
-            {stats.matchedCount} matched · {stats.unmatchedCount} new
+          {/* Blue / Key Match Rate */}
+          <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-blue-950/80 via-slate-900 to-indigo-950/40 border-2 border-blue-500/70 rounded-xl p-4 shadow-lg shadow-blue-950/50 flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-400 via-cyan-400 to-indigo-500 shadow-[0_0_14px_rgba(59,130,246,0.8)]" />
+            <div className="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Percent className="w-3.5 h-3.5 text-blue-400 stroke-[2.5]" />
+                {t.kpiMatchRate}
+              </span>
+              <span className="font-mono text-white bg-blue-600 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
+                {stats.matchRate}%
+              </span>
+            </div>
+            <div className="mt-2 text-3xl sm:text-4xl font-black text-blue-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(59,130,246,0.35)]">
+              {stats.matchRate}%
+            </div>
+            <div className="mt-1 text-[11px] text-blue-300 font-mono font-medium">
+              {stats.matchedCount} matched · {stats.unmatchedCount} new
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 2. Interactive Control Bar (Filters & Clean Professional Export) */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm space-y-4">
@@ -579,38 +862,109 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             </button>
           </div>
 
-          {/* Column Customizer Button & Professional Export Actions */}
+          {/* Action Toolbar: Refresh, Save Column View, Columns Settings, Share, Export */}
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            {/* Customize Columns Button */}
+            {/* Refresh Button */}
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-750 active:bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 group"
+              title="Refresh results data"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-teal-400 group-hover:rotate-180 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+
+            {/* Save Column View & Sync button (Main Results page) */}
+            {!isPreviewMode && (
+              <button
+                onClick={() => handleSaveColumnConfigs(columnConfigs)}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none ${
+                  hasUnsavedColumnChanges
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/50 shadow-md ring-1 ring-emerald-400 animate-pulse'
+                    : 'bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 hover:border-slate-600'
+                }`}
+                title="Save custom column order and visibility (syncs to preview links)"
+              >
+                <Save className={`w-3.5 h-3.5 ${hasUnsavedColumnChanges ? 'text-white' : 'text-emerald-400'}`} />
+                <span>{hasUnsavedColumnChanges ? 'Save & Sync View' : 'Save View'}</span>
+              </button>
+            )}
+
+            {/* Customize Columns Button (Exact same settings in both evaluation results & styled export and preview page) */}
             <button
               onClick={() => setShowColumnModal(true)}
               className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none group"
-              title="Choose what columns to show in Results Table and in Excel Export"
+              title="Customize and reorder columns for Results Table and Excel Export"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
               <span>Columns</span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-950 text-emerald-300 border border-emerald-900/60 font-bold">
-                {tableVisibleCount} Table · {exportVisibleCount} Export
+                {tableVisibleCount}
               </span>
             </button>
 
-            <button
-              onClick={handleExportExcel}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 border border-emerald-400/50 rounded-lg shadow-md shadow-emerald-950 transition-all whitespace-nowrap shrink-0"
-              title="Export clean professional Excel workbook retaining solid Green, Yellow, and Red fills for selected columns"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
-              <span>{t.exportExcel}</span>
-            </button>
+            {/* In Preview Mode: Keep page clean to ONLY show Result Table */}
+            {isPreviewMode ? (
+              onExitPreview && (
+                <button
+                  onClick={onExitPreview}
+                  className="px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition-colors whitespace-nowrap shrink-0"
+                  title="Open the full ExcelMatch Pro studio"
+                >
+                  Open Studio
+                </button>
+              )
+            ) : (
+              <>
+                {/* Quick 1-Click Copy Preview Link */}
+                <button
+                  onClick={handleQuickCopyPreviewLink}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-teal-300 hover:text-white bg-slate-800 hover:bg-slate-750 active:bg-slate-900 border border-teal-500/50 hover:border-teal-400 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none group"
+                  title="Quick copy preview link with current active filter and column layout"
+                >
+                  {quickCopied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
+                      <span className="text-emerald-400 font-bold">Link Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-teal-400 group-hover:scale-110 transition-transform" />
+                      <span>Copy Link</span>
+                    </>
+                  )}
+                </button>
 
-            <button
-              onClick={handleExportCsv}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border border-blue-400/50 rounded-lg shadow-md shadow-blue-950 transition-all whitespace-nowrap shrink-0"
-              title="Export selected columns to CSV"
-            >
-              <Download className="w-3.5 h-3.5 text-blue-100" />
-              <span>{t.exportCsv}</span>
-            </button>
+                {/* Share Preview Options Button */}
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-100 bg-slate-800 hover:bg-slate-750 active:bg-slate-900 border border-teal-500/50 hover:border-teal-400 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none group"
+                  title="Configure and share result preview link with other users"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-teal-400 group-hover:scale-110 transition-transform" />
+                  <span>Share Preview</span>
+                </button>
+
+                <button
+                  onClick={handleExportExcel}
+                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 border border-emerald-400/50 rounded-lg shadow-md shadow-emerald-950 transition-all whitespace-nowrap shrink-0"
+                  title="Export clean professional Excel workbook retaining solid Green, Yellow, and Red fills"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
+                  <span>{t.exportExcel}</span>
+                </button>
+
+                <button
+                  onClick={handleExportCsv}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border border-blue-400/50 rounded-lg shadow-md shadow-blue-950 transition-all whitespace-nowrap shrink-0"
+                  title="Export selected columns to CSV"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-100" />
+                  <span>{t.exportCsv}</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -689,24 +1043,74 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             )}
           </div>
 
-          {/* Rows Per Page Selector */}
-          <div className="flex items-center gap-3 text-xs text-slate-400 self-end md:self-auto shrink-0">
-            <span>{t.rowsPerPage}:</span>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
+          {/* Rows Per Page Selector (Only in Studio mode since Preview mode shows all rows) */}
+          {!isPreviewMode && (
+            <div className="flex items-center gap-3 text-xs text-slate-400 self-end md:self-auto shrink-0">
+              <span>{t.rowsPerPage}:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={250}>250</option>
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Active Excel Column Filters Pill Bar */}
+        {Object.keys(columnFilters).length > 0 && (
+          <div className="pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-emerald-400 font-semibold flex items-center gap-1.5 shrink-0">
+              <Filter className="w-3.5 h-3.5" />
+              <span>Excel Column Filters:</span>
+            </span>
+            {Object.entries(columnFilters).map(([colId, vals]) => {
+              const colObj = allCandidateColumns.find((c) => c.id === colId);
+              const label = colObj?.label ? colObj.label.replace('[Ref] ', '') : colId;
+              return (
+                <span
+                  key={colId}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-700/60 shadow-sm"
+                >
+                  <span className="font-sans font-medium text-slate-300">{label}:</span>
+                  <span>{vals.length} selected</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setColumnFilters((prev) => {
+                        const next = { ...prev };
+                        delete next[colId];
+                        return next;
+                      });
+                      setPage(1);
+                    }}
+                    className="p-0.5 hover:text-white rounded hover:bg-emerald-900/50 transition-colors ml-0.5"
+                    title={`Clear filter on ${label}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => {
+                setColumnFilters({});
                 setPage(1);
               }}
-              className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
+              className="text-xs text-rose-400 hover:text-rose-300 underline font-medium ml-1 transition-colors"
             >
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-              <option value={250}>250</option>
-            </select>
+              Clear all column filters
+            </button>
           </div>
-        </div>
+        )}
       </div>
 
 
@@ -717,121 +1121,160 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-slate-950 border-b border-slate-800 text-slate-300 font-semibold select-none">
               <tr>
-                {/* Row # */}
-                {isTableColVisible('rowIndex') && (
-                  <th
-                    onClick={() => handleSort('rowIndex')}
-                    className="py-3 px-3 border-r border-slate-800 text-center w-14 font-mono text-slate-400 cursor-pointer hover:bg-slate-900/60"
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      <span>#</span>
-                      {sortColumn === 'rowIndex' && (
-                        sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-emerald-400" /> : <ArrowDown className="w-3 h-3 text-emerald-400" />
-                      )}
-                    </div>
-                  </th>
-                )}
+                {visibleTableColumns.map((col, idx) => {
+                  const isFirst = idx === 0;
+                  const isLast = idx === visibleTableColumns.length - 1;
+                  const isSorted =
+                    sortColumn === col.id ||
+                    (col.id === 'decisionStatus' && sortColumn === 'decisionColor') ||
+                    (col.id === 'matchStatus' && sortColumn === 'isMatched');
 
-                {/* Comparison Columns */}
-                {compHeaders.filter((h) => isTableColVisible(h)).map((header) => (
-                  <th
-                    key={header}
-                    onClick={() => handleSort(header)}
-                    className="py-3 px-4 border-r border-slate-800 whitespace-nowrap cursor-pointer hover:bg-slate-900/60 font-mono text-slate-300"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>{header}</span>
-                      {sortColumn === header ? (
-                        sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-emerald-400" /> : <ArrowDown className="w-3 h-3 text-emerald-400" />
-                      ) : (
-                        <ArrowUpDown className="w-3 h-3 text-slate-600" />
-                      )}
-                    </div>
-                  </th>
-                ))}
+                  const isColFiltered = columnFilters[col.id] !== undefined;
 
-                {/* Reference Columns */}
-                {refHeaders.filter((ref) => isTableColVisible(ref)).map((refHeader) => (
-                  <th
-                    key={refHeader}
-                    onClick={() => handleSort(refHeader)}
-                    className="py-3 px-4 border-r border-slate-800 whitespace-nowrap cursor-pointer hover:bg-slate-900/60 font-mono text-blue-300 bg-blue-950/40"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-950 text-blue-300 border border-blue-700/80 font-sans shadow-sm">
-                        Ref
-                      </span>
-                      <span>{refHeader.replace('[Ref] ', '')}</span>
-                      {sortColumn === refHeader ? (
-                        sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-400" /> : <ArrowDown className="w-3 h-3 text-blue-400" />
-                      ) : (
-                        <ArrowUpDown className="w-3 h-3 text-slate-600" />
-                      )}
-                    </div>
-                  </th>
-                ))}
+                  const handleColSort = () => {
+                    if (col.id === 'decisionStatus') handleSort('decisionColor');
+                    else if (col.id === 'matchStatus') handleSort('isMatched');
+                    else handleSort(col.id);
+                  };
 
-                {/* Decision & System Audit Columns - Positioned as Last Columns */}
-                {/* Solid Decision Status */}
-                {isTableColVisible('decisionStatus') && (
-                  <th
-                    onClick={() => handleSort('decisionColor')}
-                    className="py-3 px-4 border-r border-slate-800 whitespace-nowrap cursor-pointer hover:bg-slate-900/60 min-w-[130px]"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Decision Status</span>
-                      {sortColumn === 'decisionColor' ? (
-                        sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-emerald-400" /> : <ArrowDown className="w-3 h-3 text-emerald-400" />
-                      ) : (
-                        <ArrowUpDown className="w-3 h-3 text-slate-600" />
-                      )}
-                    </div>
-                  </th>
-                )}
+                  return (
+                    <th
+                      key={col.id}
+                      className={`py-3 px-3 border-r border-slate-800 whitespace-nowrap group/th transition-colors relative ${
+                        col.category === 'reference' ? 'text-blue-300 bg-blue-950/30' : 'text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        {/* Sortable Header Label */}
+                        <div
+                          onClick={handleColSort}
+                          className="flex items-center gap-1.5 cursor-pointer font-mono select-none hover:text-emerald-400 transition-colors"
+                          title={`Click to sort by ${col.label}`}
+                        >
+                          {col.category === 'reference' && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-950 text-blue-300 border border-blue-700/80 font-sans shadow-sm">
+                              Ref
+                            </span>
+                          )}
+                          <span>{col.label.replace('[Ref] ', '')}</span>
+                          {isSorted ? (
+                            sortDirection === 'asc' ? (
+                              <ArrowUp className="w-3 h-3 text-emerald-400 shrink-0" />
+                            ) : (
+                              <ArrowDown className="w-3 h-3 text-emerald-400 shrink-0" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 text-slate-600 shrink-0 opacity-0 group-hover/th:opacity-100 transition-opacity" />
+                          )}
+                        </div>
 
-                {/* Match Status */}
-                {isTableColVisible('matchStatus') && (
-                  <th
-                    onClick={() => handleSort('isMatched')}
-                    className="py-3 px-4 border-r border-slate-800 whitespace-nowrap cursor-pointer hover:bg-slate-900/60 min-w-[130px]"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>{t.matchedStatus}</span>
-                      {sortColumn === 'isMatched' ? (
-                        sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-emerald-400" /> : <ArrowDown className="w-3 h-3 text-emerald-400" />
-                      ) : (
-                        <ArrowUpDown className="w-3 h-3 text-slate-600" />
-                      )}
-                    </div>
-                  </th>
-                )}
+                        {/* Excel-style Column Filter & Move Actions Container */}
+                        <div className="flex items-center gap-1">
+                          {/* Excel Column Filter Dropdown Button */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenFilterColId((prev) => (prev === col.id ? null : col.id));
+                              }}
+                              className={`p-1 rounded transition-colors ${
+                                isColFiltered
+                                  ? 'text-emerald-300 bg-emerald-950 border border-emerald-500/70 shadow-sm'
+                                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                              }`}
+                              title={`Filter ${col.label} like Excel (multi-select checklist & search)`}
+                              aria-label={`Filter ${col.label}`}
+                            >
+                              <Filter className="w-3.5 h-3.5" />
+                            </button>
 
-                {/* Evaluation Reason */}
-                {isTableColVisible('decisionReason') && (
-                  <th
-                    onClick={() => handleSort('decisionReason')}
-                    className="py-3 px-4 border-r border-slate-800 whitespace-nowrap cursor-pointer hover:bg-slate-900/60 min-w-[200px]"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>{t.reason}</span>
-                      {sortColumn === 'decisionReason' ? (
-                        sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-emerald-400" /> : <ArrowDown className="w-3 h-3 text-emerald-400" />
-                      ) : (
-                        <ArrowUpDown className="w-3 h-3 text-slate-600" />
-                      )}
-                    </div>
-                  </th>
-                )}
+                            {openFilterColId === col.id && (
+                              <ExcelColumnFilter
+                                columnId={col.id}
+                                columnLabel={col.label}
+                                uniqueValues={getColumnUniqueValues(col.id)}
+                                selectedValues={columnFilters[col.id]}
+                                onApply={(newVals) => {
+                                  setColumnFilters((prev) => {
+                                    const next = { ...prev };
+                                    if (newVals === undefined) {
+                                      delete next[col.id];
+                                    } else {
+                                      next[col.id] = newVals;
+                                    }
+                                    return next;
+                                  });
+                                  setPage(1);
+                                }}
+                                onClear={() => {
+                                  setColumnFilters((prev) => {
+                                    const next = { ...prev };
+                                    delete next[col.id];
+                                    return next;
+                                  });
+                                  setPage(1);
+                                }}
+                                onSort={(dir) => {
+                                  if (col.id === 'decisionStatus') {
+                                    setSortColumn('decisionColor');
+                                  } else if (col.id === 'matchStatus') {
+                                    setSortColumn('isMatched');
+                                  } else {
+                                    setSortColumn(col.id);
+                                  }
+                                  setSortDirection(dir);
+                                }}
+                                isOpen={true}
+                                onClose={() => setOpenFilterColId(null)}
+                              />
+                            )}
+                          </div>
 
-                {/* Actions */}
-                <th className="py-3 px-3 text-center w-20">
+                          {/* Move Column Left / Right Arrows (Only in Main Results page, hidden in Preview Mode per user instructions) */}
+                          {!isPreviewMode && (
+                            <div className="flex items-center gap-0.5 opacity-60 group-hover/th:opacity-100 transition-opacity">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveColumn(col.id, 'left');
+                                }}
+                                disabled={isFirst}
+                                className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+                                title="Move column left (earlier in table)"
+                              >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveColumn(col.id, 'right');
+                                }}
+                                disabled={isLast}
+                                className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+                                title="Move column right (later in table)"
+                              >
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </th>
+                  );
+                })}
+
+                {/* Actions column */}
+                <th className="py-3 px-3 text-center w-16 text-slate-400 whitespace-nowrap">
                   {t.viewDetails}
                 </th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-800/80">
-              {tableVisibleCount === 0 ? (
+              {visibleTableColumns.length === 0 ? (
                 <tr>
                   <td colSpan={100} className="py-16 text-center text-slate-400 bg-slate-950/60">
                     <div className="max-w-md mx-auto space-y-3 px-4">
@@ -878,105 +1321,110 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           : 'hover:bg-slate-800/60 border-l-4 border-l-transparent'
                       }`}
                     >
-                      {/* Row # */}
-                      {isTableColVisible('rowIndex') && (
-                        <td className="py-2.5 px-3 border-r border-slate-800/80 text-center text-slate-400 font-mono tabular-nums text-[11px] font-bold">
-                          {highlightText(row.rowIndex, searchTerm)}
-                        </td>
-                      )}
+                      {visibleTableColumns.map((col) => {
+                        if (col.id === 'rowIndex') {
+                          return (
+                            <td
+                              key={col.id}
+                              className="py-2.5 px-3 border-r border-slate-800/80 text-center text-slate-400 font-mono tabular-nums text-[11px] font-bold"
+                            >
+                              {highlightText(row.rowIndex, searchTerm)}
+                            </td>
+                          );
+                        }
 
-                      {/* Comparison Columns Values with Real-Time Match Highlighting & Inspection Badges */}
-                      {compHeaders.filter((h) => isTableColVisible(h)).map((header) => {
-                        const valStr = String(row.comparisonRow[header] ?? '');
+                        if (col.id === 'decisionStatus') {
+                          return (
+                            <td key={col.id} className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap">
+                              {getSolidBadge(row.decisionColor)}
+                            </td>
+                          );
+                        }
+
+                        if (col.id === 'matchStatus') {
+                          return (
+                            <td key={col.id} className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap">
+                              {row.isMatched ? (
+                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-200 bg-blue-950/80 px-2.5 py-1 rounded-md border border-blue-500/60 shadow-sm shadow-blue-500/25">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0 stroke-[2.5]" />
+                                  Matched
+                                </span>
+                              ) : (
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold text-amber-300 bg-amber-950/80 border border-amber-800/60 shrink-0">
+                                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                      UNMATCHED
+                                    </span>
+                                    {row.unmatchedInfo?.matchType === 'partial_mismatch' && (
+                                      <span className="text-[9px] font-semibold text-rose-300 bg-rose-950/60 px-1 py-0.2 rounded border border-rose-900/60 shrink-0">
+                                        Differs
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div
+                                    className="font-mono text-xs font-bold text-amber-300 hover:text-amber-200 cursor-pointer truncate max-w-[210px]"
+                                    onClick={() => setSelectedRow(row)}
+                                    title={row.unmatchedInfo?.unmatchedKeyDisplay || row.matchKey}
+                                  >
+                                    {highlightText(row.unmatchedInfo?.primaryIdentifier || row.matchKey || 'Unidentified', searchTerm)}
+                                  </div>
+                                  <span
+                                    className="text-[10px] text-slate-400 truncate max-w-[210px] font-sans"
+                                    title={row.unmatchedInfo?.reason}
+                                  >
+                                    {row.unmatchedInfo?.matchType === 'partial_mismatch'
+                                      ? 'Ref match has differing fields'
+                                      : 'Missing in Reference file'}
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                          );
+                        }
+
+                        if (col.id === 'decisionReason') {
+                          return (
+                            <td key={col.id} className="py-2.5 px-4 border-r border-slate-800/80 text-xs text-slate-300 font-medium truncate max-w-xs">
+                              <span title={row.decisionReason}>
+                                {highlightText(row.decisionReason, searchTerm)}
+                              </span>
+                            </td>
+                          );
+                        }
+
+                        if (col.id.startsWith('[Ref] ')) {
+                          const rawKey = col.id.replace('[Ref] ', '');
+                          const val = row.matchedMainRow?.[rawKey];
+                          return (
+                            <td
+                              key={col.id}
+                              className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap text-blue-200 font-mono text-xs bg-blue-950/25"
+                            >
+                              {highlightText(val, searchTerm)}
+                            </td>
+                          );
+                        }
+
+                        // Default: Comparison column
+                        const valStr = String(row.comparisonRow[col.id] ?? '');
                         const isWaiveOrAccept =
                           valStr.toLowerCase().includes('waive') ||
                           valStr.toLowerCase().includes('accept');
 
                         return (
                           <td
-                            key={header}
+                            key={col.id}
                             className={`py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap font-mono text-xs ${
                               isWaiveOrAccept
                                 ? 'text-emerald-300 font-bold bg-emerald-950/50 border-emerald-800/50'
                                 : 'text-slate-200'
                             }`}
                           >
-                            {highlightText(row.comparisonRow[header], searchTerm)}
+                            {highlightText(row.comparisonRow[col.id], searchTerm)}
                           </td>
                         );
                       })}
-
-                      {/* Reference Columns Values */}
-                      {refHeaders.filter((ref) => isTableColVisible(ref)).map((refHeader) => {
-                        const rawKey = refHeader.replace('[Ref] ', '');
-                        const val = row.matchedMainRow?.[rawKey];
-                        return (
-                          <td
-                            key={refHeader}
-                            className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap text-blue-200 font-mono text-xs bg-blue-950/25"
-                          >
-                            {highlightText(val, searchTerm)}
-                          </td>
-                        );
-                      })}
-
-                      {/* Decision & System Audit Columns - Positioned as Last Columns */}
-                      {/* Decision Status with Solid Color Badge */}
-                      {isTableColVisible('decisionStatus') && (
-                        <td className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap">
-                          {getSolidBadge(row.decisionColor)}
-                        </td>
-                      )}
-
-                      {/* Match Status */}
-                      {isTableColVisible('matchStatus') && (
-                        <td className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap">
-                          {row.isMatched ? (
-                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-200 bg-blue-950/80 px-2.5 py-1 rounded-md border border-blue-500/60 shadow-sm shadow-blue-500/25">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0 stroke-[2.5]" />
-                              Matched
-                            </span>
-                          ) : (
-                            <div className="flex flex-col gap-0.5">
-                              <div className="flex items-center gap-1.5">
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold text-amber-300 bg-amber-950/80 border border-amber-800/60 shrink-0">
-                                  <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
-                                  UNMATCHED
-                                </span>
-                                {row.unmatchedInfo?.matchType === 'partial_mismatch' && (
-                                  <span className="text-[9px] font-semibold text-rose-300 bg-rose-950/60 px-1 py-0.2 rounded border border-rose-900/60 shrink-0">
-                                    Differs
-                                  </span>
-                                )}
-                              </div>
-                              <div
-                                className="font-mono text-xs font-bold text-amber-300 hover:text-amber-200 cursor-pointer truncate max-w-[210px]"
-                                onClick={() => setSelectedRow(row)}
-                                title={row.unmatchedInfo?.unmatchedKeyDisplay || row.matchKey}
-                              >
-                                {highlightText(row.unmatchedInfo?.primaryIdentifier || row.matchKey || 'Unidentified', searchTerm)}
-                              </div>
-                              <span
-                                className="text-[10px] text-slate-400 truncate max-w-[210px] font-sans"
-                                title={row.unmatchedInfo?.reason}
-                              >
-                                {row.unmatchedInfo?.matchType === 'partial_mismatch'
-                                  ? 'Ref match has differing fields'
-                                  : 'Missing in Reference file'}
-                              </span>
-                            </div>
-                          )}
-                        </td>
-                      )}
-
-                      {/* Evaluation Reason */}
-                      {isTableColVisible('decisionReason') && (
-                        <td className="py-2.5 px-4 border-r border-slate-800/80 text-xs text-slate-300 font-medium truncate max-w-xs">
-                          <span title={row.decisionReason}>
-                            {highlightText(row.decisionReason, searchTerm)}
-                          </span>
-                        </td>
-                      )}
 
                       {/* Row Inspect Button */}
                       <td className="py-2.5 px-3 text-center whitespace-nowrap">
@@ -994,15 +1442,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               ) : (
                 <tr>
                   <td
-                    colSpan={
-                      (isTableColVisible('rowIndex') ? 1 : 0) +
-                      (isTableColVisible('decisionStatus') ? 1 : 0) +
-                      (isTableColVisible('matchStatus') ? 1 : 0) +
-                      (isTableColVisible('decisionReason') ? 1 : 0) +
-                      compHeaders.filter((h) => isTableColVisible(h)).length +
-                      refHeaders.filter((r) => isTableColVisible(r)).length +
-                      1
-                    }
+                    colSpan={visibleTableColumns.length + 1}
                     className="py-16 text-center text-slate-500 text-xs space-y-2"
                   >
                     <div>{t.noResultsFound}</div>
@@ -1081,9 +1521,24 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         onClose={() => setShowColumnModal(false)}
         columnConfigs={columnConfigs}
         onChangeConfigs={handleUpdateColumnConfigs}
+        onSaveConfigs={handleSaveColumnConfigs}
         syncExportWithTable={syncExportWithTable}
         onToggleSync={handleToggleSyncExport}
         onResetDefaults={handleResetDefaultColumns}
+      />
+
+      {/* Share Result Preview Modal */}
+      <SharePreviewModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        results={results}
+        stats={stats}
+        comparisonWbName={comparisonWb?.name || 'Evaluation_Results'}
+        activeFilter={activeFilter}
+        searchTerm={searchTerm}
+        searchColumn={searchColumn}
+        columnConfigs={columnConfigs}
+        onShowToast={onShowToast}
       />
     </div>
   );

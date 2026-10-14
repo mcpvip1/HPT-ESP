@@ -1,17 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Globe, Sparkles, FileSpreadsheet } from 'lucide-react';
+import { Globe, SlidersHorizontal, FileSpreadsheet } from 'lucide-react';
 import { Language } from '../types';
 import { translations } from '../translations';
 
 interface HeaderProps {
-  currentStep: 1 | 2 | 3;
-  onSelectStep: (step: 1 | 2 | 3) => void;
+  currentStep?: 1 | 2;
+  onSelectStep?: (step: 1 | 2) => void;
   language: Language;
   onLanguageChange: (lang: Language) => void;
-  onLoadSampleData: () => void;
+  onOpenRulesSetting: () => void;
   hasRefFile: boolean;
   hasCompFile: boolean;
   hasResults: boolean;
+  isPreviewMode?: boolean;
+  onExitPreview?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -19,10 +21,11 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectStep,
   language,
   onLanguageChange,
-  onLoadSampleData,
+  onOpenRulesSetting,
   hasRefFile,
-  hasCompFile,
   hasResults,
+  isPreviewMode,
+  onExitPreview,
 }) => {
   const t = translations[language];
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -48,76 +51,41 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-8 h-16">
-          {/* Zone 1: Single text element wordmark */}
+        <div className="flex items-center justify-between gap-6 h-16">
+          {/* Zone 1: Single text element wordmark with icon */}
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-sm shadow-emerald-500/20">
-              <FileSpreadsheet className="w-5 h-5" />
+              <FileSpreadsheet className="w-4 h-4" />
             </div>
             <button
-              onClick={() => onSelectStep(1)}
+              onClick={() => {
+                if (!isPreviewMode && onSelectStep) onSelectStep(1);
+              }}
               className="text-lg font-bold tracking-tight text-white hover:text-emerald-400 transition-colors whitespace-nowrap shrink-0 focus:outline-none"
             >
               ExcelMatch Pro
             </button>
           </div>
 
-          {/* Zone 2: 3-zone clean navigation links */}
-          <nav className="hidden md:flex items-center gap-1 sm:gap-2">
-            <button
-              onClick={() => onSelectStep(1)}
-              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                currentStep === 1
-                  ? 'bg-slate-800 text-emerald-400 shadow-sm border border-slate-700'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                {t.step1}
-                {hasRefFile && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                )}
+          {/* Zone 2: Subtitle or Mode Tag */}
+          {!isPreviewMode ? (
+            <div className="hidden md:flex items-center gap-2 text-xs text-slate-400">
+              <span className="text-slate-200 font-medium">Enterprise Excel Evaluation</span>
+              <span className="text-slate-600">·</span>
+              <span>Automated Rules & Filtered Results</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+              <span className="w-2 h-2 rounded-full bg-teal-400" />
+              <span>Result Preview</span>
+              <span className="hidden sm:inline text-slate-500 font-normal font-sans">
+                (Read-Only Table View)
               </span>
-            </button>
+            </div>
+          )}
 
-            <button
-              onClick={() => onSelectStep(2)}
-              disabled={!hasRefFile && !hasCompFile}
-              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                currentStep === 2
-                  ? 'bg-slate-800 text-emerald-400 shadow-sm border border-slate-700'
-                  : !hasRefFile && !hasCompFile
-                  ? 'text-slate-600 cursor-not-allowed'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                {t.step2}
-              </span>
-            </button>
-
-            <button
-              onClick={() => onSelectStep(3)}
-              disabled={!hasResults}
-              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                currentStep === 3
-                  ? 'bg-slate-800 text-emerald-400 shadow-sm border border-slate-700'
-                  : !hasResults
-                  ? 'text-slate-600 cursor-not-allowed'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                {t.step3}
-                {hasResults && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                )}
-              </span>
-            </button>
-          </nav>
-
-          {/* Zone 3: Language Selector & Primary Action */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Zone 3: Language Selector & Actions */}
+          <div className="flex items-center gap-2.5 shrink-0">
             {/* Language Switcher Dropdown */}
             <div className="relative" ref={langRef}>
               <button
@@ -154,16 +122,28 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            {/* Load Sample Data Button */}
-            <button
-              onClick={onLoadSampleData}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 hover:text-white rounded-lg border border-slate-700 hover:border-slate-600 transition-all shadow-sm whitespace-nowrap shrink-0"
-              title="Load realistic procurement dataset to test rules instantly"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline">{t.loadDemoData}</span>
-              <span className="sm:hidden">Demo</span>
-            </button>
+            {/* In preview mode, show Exit / Open Full App. Otherwise show Rules & Logic Setting */}
+            {isPreviewMode ? (
+              onExitPreview && (
+                <button
+                  onClick={onExitPreview}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 active:bg-slate-900 rounded-lg border border-slate-700 transition-all shadow-sm whitespace-nowrap shrink-0"
+                  title="Exit live preview and return to full app editor"
+                >
+                  <span>Open Full App</span>
+                </button>
+              )
+            ) : (
+              <button
+                onClick={onOpenRulesSetting}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-100 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-600 transition-all shadow-sm whitespace-nowrap shrink-0 group focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                title="Configure mapping keys and decision rules (saved permanently in browser)"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-12 transition-transform" />
+                <span className="hidden sm:inline">{t.rulesLogicSetting}</span>
+                <span className="sm:hidden">Rules</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

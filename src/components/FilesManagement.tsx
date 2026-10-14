@@ -9,6 +9,7 @@ import {
   ArrowRight,
   Database,
   FileUp,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { WorkbookData, Language } from '../types';
 import { translations } from '../translations';
@@ -18,9 +19,10 @@ interface FilesManagementProps {
   referenceWb: WorkbookData | null;
   comparisonWb: WorkbookData | null;
   onSetReferenceWb: (wb: WorkbookData | null) => void;
-  onSetComparisonWb: (wb: WorkbookData | null) => void;
+  onSetComparisonWb: (wb: WorkbookData | null, autoEvaluate?: boolean) => void;
   onPreviewWb: (wb: WorkbookData, title: string) => void;
-  onProceedToStep2: () => void;
+  onOpenRulesSetting?: () => void;
+  onProceedToStep3?: () => void;
   language: Language;
   onShowToast: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
@@ -31,7 +33,6 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
   onSetReferenceWb,
   onSetComparisonWb,
   onPreviewWb,
-  onProceedToStep2,
   language,
   onShowToast,
 }) => {
@@ -98,8 +99,11 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
         setCompProgress({ percent, text });
       });
 
-      onSetComparisonWb(parsed);
-      onShowToast(`Loaded ${parsed.name} (${parsed.rows.length.toLocaleString()} rows)`, 'success');
+      // Pass true for autoEvaluate so it jumps straight to Results & Export if reference file exists
+      onSetComparisonWb(parsed, true);
+      if (!referenceWb) {
+        onShowToast(`Loaded ${parsed.name} (${parsed.rows.length.toLocaleString()} rows). Please upload Reference file to complete evaluation.`, 'info');
+      }
     } catch (err: any) {
       console.error('File parsing error:', err);
       onShowToast(err.message || t.toastError, 'error');
@@ -439,18 +443,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
         </div>
       </div>
 
-      {/* Primary Workflow CTA: Proceed to Step 2 */}
-      {referenceWb && comparisonWb && (
-        <div className="flex justify-end pt-4">
-          <button
-            onClick={onProceedToStep2}
-            className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-lg shadow-emerald-950/50 transition-all hover:translate-x-0.5"
-          >
-            <span>Proceed to Step 2: Mapping & Rules</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+
 
       {/* Confirmation Dialog for Resetting Reference File */}
       {showResetDialog && (
