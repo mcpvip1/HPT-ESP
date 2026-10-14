@@ -37,13 +37,13 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
         <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-800 bg-slate-900 shrink-0">
           <div className="flex items-center gap-3">
             <span
-              className={`w-3.5 h-3.5 rounded-full shrink-0 ${
+              className={`w-3.5 h-3.5 rounded-full shrink-0 shadow-sm ${
                 row.decisionColor === 'green'
-                  ? 'bg-[#059669]'
+                  ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]'
                   : row.decisionColor === 'yellow'
-                  ? 'bg-[#D97706]'
+                  ? 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.9)]'
                   : row.decisionColor === 'red'
-                  ? 'bg-[#DC2626]'
+                  ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.9)]'
                   : 'bg-slate-500'
               }`}
             />

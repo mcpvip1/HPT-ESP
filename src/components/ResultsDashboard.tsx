@@ -387,22 +387,22 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     switch (color) {
       case 'green':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold text-white bg-[#059669] shadow-sm">
-            <CheckCircle2 className="w-3.5 h-3.5" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-black text-white bg-gradient-to-r from-emerald-500 to-green-600 border border-emerald-300/80 shadow-md shadow-emerald-500/30 tracking-wide">
+            <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
             PASSED
           </span>
         );
       case 'yellow':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold text-white bg-[#D97706] shadow-sm">
-            <AlertTriangle className="w-3.5 h-3.5" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-black text-slate-950 bg-gradient-to-r from-amber-400 to-yellow-500 border border-amber-200 shadow-md shadow-amber-500/30 tracking-wide">
+            <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5] text-slate-950" />
             REVIEW
           </span>
         );
       case 'red':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold text-white bg-[#DC2626] shadow-sm">
-            <XCircle className="w-3.5 h-3.5" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-black text-white bg-gradient-to-r from-rose-500 to-red-600 border border-rose-300/80 shadow-md shadow-rose-500/30 tracking-wide">
+            <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
             REJECTED
           </span>
         );
@@ -431,60 +431,73 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         </div>
 
         {/* Green / Passed */}
-        <div className="bg-slate-900 border border-emerald-900/40 rounded-xl p-4 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-[#059669]" />
-          <div className="text-[11px] font-medium text-emerald-400 uppercase tracking-wider flex items-center justify-between">
-            <span>{t.kpiPassed}</span>
-            <span className="font-mono text-emerald-300 font-bold">
+        <div className="bg-gradient-to-br from-emerald-950/80 via-slate-900 to-emerald-950/40 border-2 border-emerald-500/60 rounded-xl p-4 shadow-lg shadow-emerald-950/50 flex flex-col justify-between relative overflow-hidden group">
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-400 via-green-400 to-emerald-500 shadow-[0_0_14px_rgba(16,185,129,0.8)]" />
+          <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              {t.kpiPassed}
+            </span>
+            <span className="font-mono text-emerald-950 bg-emerald-400 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
               {stats.totalIncoming > 0 ? ((stats.greenCount / stats.totalIncoming) * 100).toFixed(1) : 0}%
             </span>
           </div>
-          <div className="mt-2 text-2xl sm:text-3xl font-bold text-emerald-400 font-mono tabular-nums">
+          <div className="mt-2 text-3xl sm:text-4xl font-black text-emerald-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(16,185,129,0.35)]">
             {stats.greenCount.toLocaleString()}
           </div>
-          <div className="mt-1 text-[11px] text-slate-400">Solid Green status</div>
+          <div className="mt-1 text-[11px] text-emerald-400/90 font-medium">Vibrant Green passed</div>
         </div>
 
         {/* Yellow / Review */}
-        <div className="bg-slate-900 border border-amber-900/40 rounded-xl p-4 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-[#D97706]" />
-          <div className="text-[11px] font-medium text-amber-400 uppercase tracking-wider flex items-center justify-between">
-            <span>{t.kpiReview}</span>
-            <span className="font-mono text-amber-300 font-bold">
+        <div className="bg-gradient-to-br from-amber-950/80 via-slate-900 to-amber-950/40 border-2 border-amber-500/60 rounded-xl p-4 shadow-lg shadow-amber-950/50 flex flex-col justify-between relative overflow-hidden group">
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 shadow-[0_0_14px_rgba(245,158,11,0.8)]" />
+          <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              {t.kpiReview}
+            </span>
+            <span className="font-mono text-slate-950 bg-amber-400 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
               {stats.totalIncoming > 0 ? ((stats.yellowCount / stats.totalIncoming) * 100).toFixed(1) : 0}%
             </span>
           </div>
-          <div className="mt-2 text-2xl sm:text-3xl font-bold text-amber-400 font-mono tabular-nums">
+          <div className="mt-2 text-3xl sm:text-4xl font-black text-amber-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(245,158,11,0.35)]">
             {stats.yellowCount.toLocaleString()}
           </div>
-          <div className="mt-1 text-[11px] text-slate-400">Solid Amber status</div>
+          <div className="mt-1 text-[11px] text-amber-400/90 font-medium">Vibrant Amber review</div>
         </div>
 
         {/* Red / Rejected */}
-        <div className="bg-slate-900 border border-rose-900/40 rounded-xl p-4 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-[#DC2626]" />
-          <div className="text-[11px] font-medium text-rose-400 uppercase tracking-wider flex items-center justify-between">
-            <span>{t.kpiRejected}</span>
-            <span className="font-mono text-rose-300 font-bold">
+        <div className="bg-gradient-to-br from-rose-950/80 via-slate-900 to-rose-950/40 border-2 border-rose-500/60 rounded-xl p-4 shadow-lg shadow-rose-950/50 flex flex-col justify-between relative overflow-hidden group">
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-rose-500 via-red-500 to-rose-600 shadow-[0_0_14px_rgba(244,63,94,0.8)]" />
+          <div className="text-[11px] font-bold text-rose-400 uppercase tracking-wider flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
+              {t.kpiRejected}
+            </span>
+            <span className="font-mono text-white bg-rose-600 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
               {stats.totalIncoming > 0 ? ((stats.redCount / stats.totalIncoming) * 100).toFixed(1) : 0}%
             </span>
           </div>
-          <div className="mt-2 text-2xl sm:text-3xl font-bold text-rose-400 font-mono tabular-nums">
+          <div className="mt-2 text-3xl sm:text-4xl font-black text-rose-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(244,63,94,0.35)]">
             {stats.redCount.toLocaleString()}
           </div>
-          <div className="mt-1 text-[11px] text-slate-400">Solid Crimson status</div>
+          <div className="mt-1 text-[11px] text-rose-400/90 font-medium">Vibrant Crimson rejected</div>
         </div>
 
-        {/* Key Match Rate */}
-        <div className="col-span-2 sm:col-span-1 bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm flex flex-col justify-between">
-          <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider flex items-center justify-between">
-            <span>{t.kpiMatchRate}</span>
-            <Percent className="w-3.5 h-3.5 text-slate-400" />
+        {/* Blue / Key Match Rate */}
+        <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-blue-950/80 via-slate-900 to-indigo-950/40 border-2 border-blue-500/60 rounded-xl p-4 shadow-lg shadow-blue-950/50 flex flex-col justify-between relative overflow-hidden group">
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-400 via-cyan-400 to-indigo-500 shadow-[0_0_14px_rgba(59,130,246,0.8)]" />
+          <div className="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+              {t.kpiMatchRate}
+            </span>
+            <Percent className="w-3.5 h-3.5 text-blue-400 stroke-[2.5]" />
           </div>
-          <div className="mt-2 text-2xl sm:text-3xl font-bold text-sky-400 font-mono tabular-nums">
+          <div className="mt-2 text-3xl sm:text-4xl font-black text-blue-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(59,130,246,0.35)]">
             {stats.matchRate}%
           </div>
-          <div className="mt-1 text-[11px] text-slate-400 font-mono">
+          <div className="mt-1 text-[11px] text-blue-300 font-mono font-medium">
             {stats.matchedCount} matched · {stats.unmatchedCount} new
           </div>
         </div>
@@ -513,13 +526,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 setActiveFilter('green');
                 setPage(1);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'green'
-                  ? 'bg-[#059669] text-white shadow-sm'
-                  : 'text-emerald-400 hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white font-black shadow-lg shadow-emerald-500/30 border border-emerald-300'
+                  : 'text-emerald-400 hover:bg-emerald-950/70 border border-emerald-900/50'
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
               <span>{t.filterGreen} ({stats.greenCount})</span>
             </button>
             <button
@@ -527,13 +540,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 setActiveFilter('yellow');
                 setPage(1);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'yellow'
-                  ? 'bg-[#D97706] text-white shadow-sm'
-                  : 'text-amber-400 hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black shadow-lg shadow-amber-500/30 border border-amber-200'
+                  : 'text-amber-400 hover:bg-amber-950/70 border border-amber-900/50'
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)]" />
               <span>{t.filterYellow} ({stats.yellowCount})</span>
             </button>
             <button
@@ -541,13 +554,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 setActiveFilter('red');
                 setPage(1);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'red'
-                  ? 'bg-[#DC2626] text-white shadow-sm'
-                  : 'text-rose-400 hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-rose-500 to-red-600 text-white font-black shadow-lg shadow-rose-500/30 border border-rose-300'
+                  : 'text-rose-400 hover:bg-rose-950/70 border border-rose-900/50'
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-rose-400" />
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.9)]" />
               <span>{t.filterRed} ({stats.redCount})</span>
             </button>
             <button
@@ -555,13 +568,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 setActiveFilter('unmatched');
                 setPage(1);
               }}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'unmatched'
-                  ? 'bg-slate-800 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black shadow-lg shadow-blue-500/30 border border-blue-400'
+                  : 'text-blue-400 hover:bg-blue-950/70 border border-blue-900/50'
               }`}
             >
-              {t.filterUnmatched} ({stats.unmatchedCount})
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.9)]" />
+              <span>{t.filterUnmatched} ({stats.unmatchedCount})</span>
             </button>
           </div>
 
@@ -582,19 +596,19 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
             <button
               onClick={handleExportExcel}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm shadow-emerald-950 transition-colors whitespace-nowrap shrink-0"
+              className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 border border-emerald-400/50 rounded-lg shadow-md shadow-emerald-950 transition-all whitespace-nowrap shrink-0"
               title="Export clean professional Excel workbook retaining solid Green, Yellow, and Red fills for selected columns"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+              <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
               <span>{t.exportExcel}</span>
             </button>
 
             <button
               onClick={handleExportCsv}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors whitespace-nowrap shrink-0"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border border-blue-400/50 rounded-lg shadow-md shadow-blue-950 transition-all whitespace-nowrap shrink-0"
               title="Export selected columns to CSV"
             >
-              <Download className="w-3.5 h-3.5" />
+              <Download className="w-3.5 h-3.5 text-blue-100" />
               <span>{t.exportCsv}</span>
             </button>
           </div>
@@ -695,65 +709,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         </div>
       </div>
 
-      {/* 3.5. UNMATCHED RECORDS DIAGNOSTIC SUMMARY BANNER */}
-      {stats.unmatchedCount > 0 && (
-        <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-amber-950/30 border border-amber-800/50 rounded-xl p-4 shadow-sm space-y-2.5 animate-in fade-in duration-150">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-amber-900/60 border border-amber-700/60 text-amber-400">
-                <AlertTriangle className="w-4 h-4" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                  <span>Unmatched Records Analysis</span>
-                  <span className="font-mono text-[11px] px-2 py-0.2 rounded-full bg-amber-950 text-amber-300 border border-amber-700/80">
-                    {stats.unmatchedCount} incoming items not matched
-                  </span>
-                </h4>
-                <p className="text-[11px] text-slate-400">
-                  Click any unmatched item badge below to inspect exactly why it is unmatched and view differing fields.
-                </p>
-              </div>
-            </div>
 
-            {activeFilter !== 'unmatched' && (
-              <button
-                onClick={() => {
-                  setActiveFilter('unmatched');
-                  setPage(1);
-                }}
-                className="self-start sm:self-auto text-xs font-semibold px-3 py-1 rounded-lg bg-amber-950/80 hover:bg-amber-900 text-amber-300 border border-amber-800/80 transition-colors shrink-0"
-              >
-                Filter only Unmatched ({stats.unmatchedCount})
-              </button>
-            )}
-          </div>
-
-          {/* Unmatched Identifier Pills */}
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {stats.unmatchedItems?.slice(0, 30).map((item) => (
-              <button
-                key={item.rowIndex}
-                onClick={() => {
-                  const targetRow = results.find((r) => r.rowIndex === item.rowIndex);
-                  if (targetRow) setSelectedRow(targetRow);
-                }}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono bg-slate-950 hover:bg-amber-950/80 border border-amber-900/60 hover:border-amber-600 text-amber-300 transition-colors shadow-sm group select-none"
-                title={`Row #${item.rowIndex}: ${item.reason}`}
-              >
-                <span className="text-slate-500 font-sans text-[10px]">Row #{item.rowIndex}</span>
-                <span className="font-bold group-hover:underline">{item.identifier}</span>
-                <Eye className="w-3 h-3 text-amber-400/80 group-hover:scale-110 transition-transform" />
-              </button>
-            ))}
-            {stats.unmatchedItems && stats.unmatchedItems.length > 30 && (
-              <span className="px-2 py-1 text-xs text-slate-500 font-mono">
-                + {stats.unmatchedItems.length - 30} more
-              </span>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* 4. Main Data Table with Dynamic Column Visibility & Real-Time Search Match Highlighting */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col">
@@ -799,15 +755,15 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   <th
                     key={refHeader}
                     onClick={() => handleSort(refHeader)}
-                    className="py-3 px-4 border-r border-slate-800 whitespace-nowrap cursor-pointer hover:bg-slate-900/60 font-mono text-purple-300 bg-purple-950/20"
+                    className="py-3 px-4 border-r border-slate-800 whitespace-nowrap cursor-pointer hover:bg-slate-900/60 font-mono text-blue-300 bg-blue-950/40"
                   >
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] px-1 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800/60 font-sans">
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-950 text-blue-300 border border-blue-700/80 font-sans shadow-sm">
                         Ref
                       </span>
                       <span>{refHeader.replace('[Ref] ', '')}</span>
                       {sortColumn === refHeader ? (
-                        sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-400" /> : <ArrowDown className="w-3 h-3 text-purple-400" />
+                        sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-400" /> : <ArrowDown className="w-3 h-3 text-blue-400" />
                       ) : (
                         <ArrowUpDown className="w-3 h-3 text-slate-600" />
                       )}
@@ -912,19 +868,19 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   return (
                     <tr
                       key={row.id}
-                      className={`hover:bg-slate-800/60 transition-colors ${
+                      className={`transition-colors ${
                         isGreen
-                          ? 'bg-emerald-950/20'
+                          ? 'bg-emerald-950/35 hover:bg-emerald-900/50 border-l-4 border-l-emerald-400'
                           : isYellow
-                          ? 'bg-amber-950/20'
+                          ? 'bg-amber-950/35 hover:bg-amber-900/50 border-l-4 border-l-amber-400'
                           : isRed
-                          ? 'bg-rose-950/20'
-                          : ''
+                          ? 'bg-rose-950/35 hover:bg-rose-900/50 border-l-4 border-l-rose-500'
+                          : 'hover:bg-slate-800/60 border-l-4 border-l-transparent'
                       }`}
                     >
                       {/* Row # */}
                       {isTableColVisible('rowIndex') && (
-                        <td className="py-2.5 px-3 border-r border-slate-800/80 text-center text-slate-500 font-mono tabular-nums text-[11px]">
+                        <td className="py-2.5 px-3 border-r border-slate-800/80 text-center text-slate-400 font-mono tabular-nums text-[11px] font-bold">
                           {highlightText(row.rowIndex, searchTerm)}
                         </td>
                       )}
@@ -941,7 +897,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             key={header}
                             className={`py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap font-mono text-xs ${
                               isWaiveOrAccept
-                                ? 'text-emerald-300 font-bold bg-emerald-950/30'
+                                ? 'text-emerald-300 font-bold bg-emerald-950/50 border-emerald-800/50'
                                 : 'text-slate-200'
                             }`}
                           >
@@ -957,7 +913,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         return (
                           <td
                             key={refHeader}
-                            className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap text-purple-200 font-mono text-xs bg-purple-950/10"
+                            className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap text-blue-200 font-mono text-xs bg-blue-950/25"
                           >
                             {highlightText(val, searchTerm)}
                           </td>
@@ -976,8 +932,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       {isTableColVisible('matchStatus') && (
                         <td className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap">
                           {row.isMatched ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/50">
-                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-200 bg-blue-950/80 px-2.5 py-1 rounded-md border border-blue-500/60 shadow-sm shadow-blue-500/25">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0 stroke-[2.5]" />
                               Matched
                             </span>
                           ) : (

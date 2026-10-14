@@ -795,8 +795,8 @@ export function processMatching(
 export function exportStyledExcel(
   results: MatchedRow[],
   compHeaders: string[],
-  stats: MatchingStats,
-  baseFilename: string,
+  _stats?: MatchingStats,
+  baseFilename: string = 'Excel_Matching_Output',
   exportColumnIds?: string[]
 ): void {
   const wb = XLSXStyle.utils.book_new();
@@ -813,108 +813,7 @@ export function exportStyledExcel(
     return exportColumnIds.includes(id) || exportColumnIds.includes(label);
   };
 
-  // 1. Audit Summary Worksheet
-  const summaryAoa: any[][] = [
-    ['EXCELMATCH PRO — AUDIT & DECISION VERIFICATION REPORT'],
-    [`Generated: ${new Date().toLocaleString()} | Source: ${baseFilename}`],
-    [],
-    ['KEY PERFORMANCE METRIC', 'COUNT', 'SHARE (%)', 'STATUS / BENCHMARK'],
-    ['Total Incoming Records', stats.totalIncoming, '100.0%', 'Evaluated'],
-    ['Key Matched with Reference', stats.matchedCount, `${stats.matchRate}%`, 'High Confidence Match'],
-    ['Unmatched New Records', stats.unmatchedCount, `${(100 - stats.matchRate).toFixed(1)}%`, 'New / Discrepancy'],
-    [],
-    ['DECISION STATUS BREAKDOWN', 'COUNT', 'PROPORTION', 'CLASSIFICATION'],
-    ['Passed / Accepted Items', stats.greenCount, `${((stats.greenCount / (stats.totalIncoming || 1)) * 100).toFixed(1)}%`, 'PASSED (GREEN)'],
-    ['Review Required / Postponed', stats.yellowCount, `${((stats.yellowCount / (stats.totalIncoming || 1)) * 100).toFixed(1)}%`, 'REVIEW (AMBER)'],
-    ['Rejected / Defective Items', stats.redCount, `${((stats.redCount / (stats.totalIncoming || 1)) * 100).toFixed(1)}%`, 'REJECTED (RED)'],
-    ['Uncategorized / No Rule Matched', stats.otherCount, `${((stats.otherCount / (stats.totalIncoming || 1)) * 100).toFixed(1)}%`, 'NO ACTION'],
-  ];
-
-  const wsSummary = XLSXStyle.utils.aoa_to_sheet(summaryAoa);
-  wsSummary['!cols'] = [{ wch: 36 }, { wch: 16 }, { wch: 18 }, { wch: 24 }];
-
-  // Style Title Row (A1)
-  if (wsSummary['A1']) {
-    wsSummary['A1'].s = {
-      font: { name: 'Calibri', sz: 14, bold: true, color: { rgb: 'FFFFFF' } },
-      fill: { patternType: 'solid', fgColor: { rgb: '0F172A' } },
-      alignment: { vertical: 'center', horizontal: 'left' },
-    };
-  }
-
-  // Style Subtitle Row (A2)
-  if (wsSummary['A2']) {
-    wsSummary['A2'].s = {
-      font: { name: 'Calibri', sz: 9, italic: true, color: { rgb: '94A3B8' } },
-      fill: { patternType: 'solid', fgColor: { rgb: '1E293B' } },
-      alignment: { vertical: 'center', horizontal: 'left' },
-    };
-  }
-
-  // Style Table Headers (Row 4 & Row 9)
-  [3, 8].forEach((rIdx) => {
-    for (let c = 0; c < 4; c++) {
-      const cRef = XLSXStyle.utils.encode_cell({ r: rIdx, c });
-      if (wsSummary[cRef]) {
-        wsSummary[cRef].s = {
-          font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: 'FFFFFF' } },
-          fill: { patternType: 'solid', fgColor: { rgb: '1E293B' } },
-          alignment: { vertical: 'center', horizontal: c === 0 ? 'left' : 'center' },
-          border: thinBorder('0F172A'),
-        };
-      }
-    }
-  });
-
-  // Style Metric Data rows in Summary
-  for (let r = 4; r <= 6; r++) {
-    for (let c = 0; c < 4; c++) {
-      const cRef = XLSXStyle.utils.encode_cell({ r, c });
-      if (wsSummary[cRef]) {
-        wsSummary[cRef].s = {
-          font: { name: 'Calibri', sz: 10, bold: c === 1 },
-          fill: { patternType: 'solid', fgColor: { rgb: r % 2 === 0 ? 'F8FAFC' : 'FFFFFF' } },
-          alignment: { vertical: 'center', horizontal: c === 0 ? 'left' : 'center' },
-          border: thinBorder('E2E8F0'),
-        };
-      }
-    }
-  }
-
-  // Style Status Breakdown Rows: Row 10 (Green), Row 11 (Yellow), Row 12 (Red)
-  const statusStyles = [
-    { row: 9, fg: '059669', fontColor: 'FFFFFF', bgTint: 'ECFDF5', borderColor: 'A7F3D0' },
-    { row: 10, fg: 'D97706', fontColor: 'FFFFFF', bgTint: 'FFFBEB', borderColor: 'FDE68A' },
-    { row: 11, fg: 'DC2626', fontColor: 'FFFFFF', bgTint: 'FEF2F2', borderColor: 'FECACA' },
-    { row: 12, fg: '64748B', fontColor: 'FFFFFF', bgTint: 'F8FAFC', borderColor: 'E2E8F0' },
-  ];
-
-  statusStyles.forEach(({ row, fg, fontColor, bgTint, borderColor }) => {
-    for (let c = 0; c < 4; c++) {
-      const cRef = XLSXStyle.utils.encode_cell({ r: row, c });
-      if (wsSummary[cRef]) {
-        if (c === 3) {
-          wsSummary[cRef].s = {
-            font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: fontColor } },
-            fill: { patternType: 'solid', fgColor: { rgb: fg } },
-            alignment: { vertical: 'center', horizontal: 'center' },
-            border: thinBorder(fg),
-          };
-        } else {
-          wsSummary[cRef].s = {
-            font: { name: 'Calibri', sz: 10, bold: c === 1 },
-            fill: { patternType: 'solid', fgColor: { rgb: bgTint } },
-            alignment: { vertical: 'center', horizontal: c === 0 ? 'left' : 'center' },
-            border: thinBorder(borderColor),
-          };
-        }
-      }
-    }
-  });
-
-  XLSXStyle.utils.book_append_sheet(wb, wsSummary, 'Executive Summary');
-
-  // 2. Evaluated Results Sheet (with data columns first, and Decision & System Audit columns placed last)
+  // Evaluated Results Sheet (with data columns first, and Decision & System Audit columns placed last)
   const resultRows = results.map((item) => {
     const rowObj: Record<string, any> = {};
 
@@ -1007,29 +906,29 @@ export function exportStyledExcel(
     const isRed = item.decisionColor === 'red';
 
     const solidColor = isGreen
-      ? '059669' // Solid Emerald
+      ? '10B981' // Vibrant Emerald
       : isYellow
-      ? 'D97706' // Solid Amber
+      ? 'F59E0B' // Vibrant Amber
       : isRed
-      ? 'DC2626' // Solid Crimson
+      ? 'EF4444' // Vibrant Crimson
       : '64748B'; // Slate
 
     const rowBgTint = isGreen
-      ? 'ECFDF5' // Light Green
+      ? 'D1FAE5' // Saturated Light Emerald
       : isYellow
-      ? 'FFFBEB' // Light Amber
+      ? 'FEF3C7' // Saturated Light Amber
       : isRed
-      ? 'FEF2F2' // Light Crimson
+      ? 'FEE2E2' // Saturated Light Crimson
       : rIdx % 2 === 0
       ? 'F8FAFC'
       : 'FFFFFF';
 
     const rowBorderColor = isGreen
-      ? 'A7F3D0'
+      ? '6EE7B7'
       : isYellow
-      ? 'FDE68A'
+      ? 'FCD34D'
       : isRed
-      ? 'FECACA'
+      ? 'FCA5A5'
       : 'E2E8F0';
 
     for (let cIdx = 0; cIdx < dataHeaders.length; cIdx++) {
