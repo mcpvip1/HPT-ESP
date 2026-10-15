@@ -12,9 +12,10 @@ import {
   XCircle,
   FileSpreadsheet,
   AlertCircle,
+  Download,
 } from 'lucide-react';
 import { MatchedRow, MatchingStats, ColumnConfigItem } from '../types';
-import { generatePreviewLink } from '../utils/previewSharing';
+import { generatePreviewLink, exportStandalonePreviewHtml } from '../utils/previewSharing';
 
 interface SharePreviewModalProps {
   isOpen: boolean;
@@ -234,12 +235,33 @@ export const SharePreviewModal: React.FC<SharePreviewModalProps> = ({
               </button>
             </div>
 
-            {isHashTooLong && (
-              <p className="text-[11px] text-amber-400 flex items-center gap-1 mt-1">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                <span>Large dataset. The link uses browser local storage cache for maximum fidelity.</span>
-              </p>
-            )}
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[11px] text-slate-400">
+                Ultra-compressed link (optimized for messaging & email sharing)
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  exportStandalonePreviewHtml({
+                    version: 2,
+                    createdAt: Date.now(),
+                    comparisonWbName,
+                    stats,
+                    results,
+                    filter: includeFilter ? activeFilter : 'all',
+                    searchTerm: includeSearch ? searchTerm : '',
+                    searchColumn: includeSearch ? searchColumn : 'all',
+                    columnConfigs,
+                  });
+                  onShowToast('Standalone HTML preview downloaded! Anyone can open this file in any browser.', 'success');
+                }}
+                className="flex items-center gap-1.5 text-xs text-teal-400 hover:text-teal-300 font-semibold transition-colors"
+                title="Download single-file interactive preview HTML"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Standalone Preview (.html)</span>
+              </button>
+            </div>
           </div>
         </div>
 

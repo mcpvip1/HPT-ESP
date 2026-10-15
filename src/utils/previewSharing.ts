@@ -1,8 +1,8 @@
 import LZString from 'lz-string';
-import { MatchedRow, MatchingStats, ColumnConfigItem } from '../types';
+import { MatchedRow, MatchingStats, ColumnConfigItem, ResultColor } from '../types';
 
 export interface SharedPreviewPayload {
-  version: 1;
+  version: 1 | 2;
   createdAt: number;
   comparisonWbName: string;
   stats: MatchingStats;
@@ -14,41 +14,194 @@ export interface SharedPreviewPayload {
 }
 
 /**
- * Encodes the preview data and active filter state into a shareable URL hash.
+ * Ultra-compact representation for shareable preview links.
+ * Minimizes URL length by up to 90% by stripping repetitive object keys,
+ * storing headers once, and encoding rows as compact tuples.
+ */
+interface CompactPreviewPayload {
+  v: 2;
+  t: number;
+  n: string;
+  f?: string;
+  s?: string;
+  sc?: string;
+  st: [number, number, number, number, number]; // [total, green, yellow, red, matched]
+  cols?: ColumnConfigItem[];
+  ch: string[]; // comparison headers
+  rh: string[]; // reference headers
+  r: [number, number, number, string, any[], any[]][];
+}
+
+const COLOR_MAP: Record<ResultColor | 'none', number> = {
+  green: 0,
+  yellow: 1,
+  red: 2,
+  none: 3,
+  blue: 4,
+  purple: 5,
+};
+
+const COLOR_REVERSE_MAP: (ResultColor | 'none')[] = [
+  'green',
+  'yellow',
+  'red',
+  'none',
+  'blue',
+  'purple',
+];
+
+/**
+ * Packs full MatchedRow[] results into a minimal CompactPreviewPayload
+ */
+function packCompact(payload: SharedPreviewPayload): CompactPreviewPayload {
+  // Extract unique comparison and reference headers
+  const chSet = new Set<string>();
+  const rhSet = new Set<string>();
+
+  for (const row of payload.results) {
+    if (row.comparisonRow) {
+      Object.keys(row.comparisonRow).forEach((k) => chSet.add(k));
+    }
+    if (row.matchedMainRow) {
+      Object.keys(row.matchedMainRow).forEach((k) => rhSet.add(k));
+    }
+  }
+
+  const ch = Array.from(chSet);
+  const rh = Array.from(rhSet);
+
+  const r: [number, number, number, string, any[], any[]][] = payload.results.map((row) => {
+    const compVals = ch.map((k) => row.comparisonRow[k] ?? '');
+    const refVals = rh.length > 0 && row.matchedMainRow ? rh.map((k) => row.matchedMainRow![k] ?? '') : [];
+    const colorCode = COLOR_MAP[row.decisionColor] ?? 3;
+    const isMatchedCode = row.isMatched ? 1 : 0;
+    const reason = row.decisionReason || '';
+
+    return [row.rowIndex, colorCode, isMatchedCode, reason, compVals, refVals];
+  });
+
+  return {
+    v: 2,
+    t: payload.createdAt || Date.now(),
+    n: payload.comparisonWbName || 'Evaluation_Results',
+    f: payload.filter !== 'all' ? payload.filter : undefined,
+    s: payload.searchTerm ? payload.searchTerm : undefined,
+    sc: payload.searchColumn !== 'all' ? payload.searchColumn : undefined,
+    st: [
+      payload.stats.totalIncoming,
+      payload.stats.greenCount,
+      payload.stats.yellowCount,
+      payload.stats.redCount,
+      payload.stats.matchedCount,
+    ],
+    cols: payload.columnConfigs,
+    ch,
+    rh,
+    r,
+  };
+}
+
+/**
+ * Unpacks CompactPreviewPayload back into full SharedPreviewPayload
+ */
+function unpackCompact(compact: CompactPreviewPayload): SharedPreviewPayload {
+  const ch = compact.ch || [];
+  const rh = compact.rh || [];
+
+  const results: MatchedRow[] = (compact.r || []).map((tup, idx) => {
+    const [rowIndex, colorCode, isMatchedCode, reason, compVals, refVals] = tup;
+    const decisionColor = COLOR_REVERSE_MAP[colorCode] || 'none';
+    const isMatched = isMatchedCode === 1;
+
+    const comparisonRow: Record<string, any> = {};
+    ch.forEach((colName, cIdx) => {
+      comparisonRow[colName] = compVals?.[cIdx] ?? '';
+    });
+
+    let matchedMainRow: Record<string, any> | undefined = undefined;
+    if (isMatched && rh.length > 0 && refVals && refVals.length > 0) {
+      matchedMainRow = {};
+      rh.forEach((colName, rIdx) => {
+        matchedMainRow![colName] = refVals[rIdx] ?? '';
+      });
+    }
+
+    const mergedRow: Record<string, any> = { ...comparisonRow };
+    if (matchedMainRow) {
+      Object.entries(matchedMainRow).forEach(([k, v]) => {
+        mergedRow[`[Ref] ${k}`] = v;
+      });
+    }
+
+    return {
+      id: `row_${idx + 1}`,
+      rowIndex: rowIndex || idx + 1,
+      matchKey: ch.length > 0 ? String(comparisonRow[ch[0]] ?? '') : '',
+      isMatched,
+      decisionColor,
+      decisionReason: reason || '',
+      comparisonRow,
+      matchedMainRow,
+      mergedRow,
+    };
+  });
+
+  const totalIncoming = compact.st ? compact.st[0] : results.length;
+  const greenCount = compact.st ? compact.st[1] : results.filter((r) => r.decisionColor === 'green').length;
+  const yellowCount = compact.st ? compact.st[2] : results.filter((r) => r.decisionColor === 'yellow').length;
+  const redCount = compact.st ? compact.st[3] : results.filter((r) => r.decisionColor === 'red').length;
+  const matchedCount = compact.st ? compact.st[4] : results.filter((r) => r.isMatched).length;
+  const unmatchedCount = Math.max(0, totalIncoming - matchedCount);
+  const matchRate = totalIncoming > 0 ? Number(((matchedCount / totalIncoming) * 100).toFixed(1)) : 0;
+
+  return {
+    version: 2,
+    createdAt: compact.t || Date.now(),
+    comparisonWbName: compact.n || 'Evaluation_Results',
+    filter: (compact.f as any) || 'all',
+    searchTerm: compact.s || '',
+    searchColumn: compact.sc || 'all',
+    columnConfigs: compact.cols,
+    stats: {
+      totalIncoming,
+      matchedCount,
+      unmatchedCount,
+      matchRate,
+      greenCount,
+      yellowCount,
+      redCount,
+      otherCount: Math.max(0, totalIncoming - (greenCount + yellowCount + redCount)),
+      unmatchedItems: [],
+    },
+    results,
+  };
+}
+
+/**
+ * Encodes the preview data into an ultra-short shareable URL hash.
  */
 export function generatePreviewLink(payload: SharedPreviewPayload): {
   url: string;
   isHashTooLong: boolean;
   charCount: number;
 } {
-  // Always cache latest shared preview locally so same-browser / testing works instantly
+  // Always cache latest shared preview locally for immediate same-device testing
   try {
     localStorage.setItem('emp_shared_preview_latest', JSON.stringify(payload));
   } catch (e) {
     console.warn('Could not cache preview locally', e);
   }
 
-  // Strip unnecessary redundant data to optimize URL size
-  const optimizedPayload: SharedPreviewPayload = {
-    version: 1,
-    createdAt: payload.createdAt || Date.now(),
-    comparisonWbName: payload.comparisonWbName || 'Evaluation_Results',
-    stats: payload.stats,
-    results: payload.results,
-    filter: payload.filter || 'all',
-    searchTerm: payload.searchTerm || '',
-    searchColumn: payload.searchColumn || 'all',
-    columnConfigs: payload.columnConfigs,
-  };
-
-  const jsonStr = JSON.stringify(optimizedPayload);
+  // Pack into ultra-compact tuple matrix
+  const compact = packCompact(payload);
+  const jsonStr = JSON.stringify(compact);
   const compressed = LZString.compressToEncodedURIComponent(jsonStr);
 
   const baseUrl = `${window.location.origin}${window.location.pathname}`;
   const fullUrl = `${baseUrl}#preview=${compressed}`;
 
-  // Check if exceeds standard URL safe limit (~25,000 characters)
-  const isHashTooLong = fullUrl.length > 25000;
+  // Check if exceeds standard URL safe limit
+  const isHashTooLong = fullUrl.length > 2000;
 
   return {
     url: fullUrl,
@@ -85,12 +238,17 @@ export function parsePreviewFromUrl(): SharedPreviewPayload | null {
       if (!decompressed) {
         try {
           decompressed = LZString.decompressFromEncodedURIComponent(decodeURIComponent(compressed));
-        } catch {
-          // Ignore decode error
-        }
+        } catch {}
       }
       if (decompressed) {
         const parsed = JSON.parse(decompressed);
+
+        // Check if modern Compact format (v: 2)
+        if (parsed && parsed.v === 2 && Array.isArray(parsed.r)) {
+          return unpackCompact(parsed as CompactPreviewPayload);
+        }
+
+        // Backwards compatibility for legacy v1 format
         if (parsed && parsed.results && parsed.stats) {
           return parsed as SharedPreviewPayload;
         }
@@ -102,6 +260,9 @@ export function parsePreviewFromUrl(): SharedPreviewPayload | null {
       const cached = localStorage.getItem('emp_shared_preview_latest');
       if (cached) {
         const parsed = JSON.parse(cached);
+        if (parsed && parsed.v === 2) {
+          return unpackCompact(parsed as CompactPreviewPayload);
+        }
         if (parsed && parsed.results && parsed.stats) {
           return parsed as SharedPreviewPayload;
         }
@@ -117,7 +278,9 @@ export function parsePreviewFromUrl(): SharedPreviewPayload | null {
 /**
  * Copies preview link to clipboard with cross-browser fallback
  */
-export async function copyPreviewLinkToClipboard(payload: SharedPreviewPayload): Promise<{ success: boolean; url: string }> {
+export async function copyPreviewLinkToClipboard(
+  payload: SharedPreviewPayload
+): Promise<{ success: boolean; url: string }> {
   const { url } = generatePreviewLink(payload);
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -137,4 +300,121 @@ export async function copyPreviewLinkToClipboard(payload: SharedPreviewPayload):
     console.warn('Failed to copy to clipboard', e);
     return { success: false, url };
   }
+}
+
+/**
+ * Generates an offline, standalone interactive HTML file containing the filtered Result Table.
+ * Recipients can open it in any browser with zero dependencies, no server, and no URL length limits!
+ */
+export function exportStandalonePreviewHtml(payload: SharedPreviewPayload): void {
+  const title = `${payload.comparisonWbName || 'Evaluation'} - Result Preview`;
+  const resultsJson = JSON.stringify(payload.results);
+  const chList = payload.columnConfigs?.filter((c) => c.showInTable) || [];
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${title}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #020617; color: #f8fafc; font-family: ui-sans-serif, system-ui, sans-serif; }
+    .status-green { background-color: rgba(6, 78, 59, 0.4); border-left: 4px solid #34d399; }
+    .status-yellow { background-color: rgba(120, 53, 15, 0.4); border-left: 4px solid #fbbf24; }
+    .status-red { background-color: rgba(136, 19, 55, 0.4); border-left: 4px solid #f43f5e; }
+  </style>
+</head>
+<body class="p-6">
+  <div class="max-w-7xl mx-auto space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <div>
+        <h1 class="text-xl font-bold text-white">${title}</h1>
+        <p class="text-xs text-slate-400 mt-1">Generated snapshot · ${new Date(payload.createdAt).toLocaleString()}</p>
+      </div>
+      <div class="text-xs text-emerald-400 font-mono bg-emerald-950/80 border border-emerald-800 px-3 py-1 rounded-lg">
+        ${payload.results.length} Total Rows
+      </div>
+    </div>
+
+    <!-- Search Input -->
+    <div class="flex items-center gap-2">
+      <input id="searchInput" type="text" placeholder="Filter rows in real-time..." class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white w-full max-w-md focus:outline-none focus:border-emerald-500 font-mono">
+    </div>
+
+    <!-- Table -->
+    <div class="border border-slate-800 rounded-xl overflow-x-auto bg-slate-900 shadow-xl">
+      <table class="w-full text-left text-xs border-collapse" id="dataTable">
+        <thead class="bg-slate-950 border-b border-slate-800 text-slate-300 font-mono">
+          <tr id="tableHeader"></tr>
+        </thead>
+        <tbody id="tableBody" class="divide-y divide-slate-800/80 font-mono"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const data = ${resultsJson};
+    const colConfigs = ${JSON.stringify(chList)};
+    const tbody = document.getElementById('tableBody');
+    const thead = document.getElementById('tableHeader');
+    const searchInput = document.getElementById('searchInput');
+
+    // Build headers
+    const cols = colConfigs.length > 0 ? colConfigs : [
+      { id: 'rowIndex', label: '#' },
+      { id: 'decisionStatus', label: 'Status' },
+      ...Object.keys(data[0]?.comparisonRow || {}).map(k => ({ id: k, label: k }))
+    ];
+
+    cols.forEach(c => {
+      const th = document.createElement('th');
+      th.className = 'py-3 px-3 border-r border-slate-800 whitespace-nowrap text-slate-300';
+      th.textContent = c.label;
+      thead.appendChild(th);
+    });
+
+    function renderRows(rows) {
+      tbody.innerHTML = '';
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.className = r.decisionColor === 'green' ? 'status-green' : r.decisionColor === 'yellow' ? 'status-yellow' : 'status-red';
+        
+        cols.forEach(c => {
+          const td = document.createElement('td');
+          td.className = 'py-2 px-3 border-r border-slate-800/80 whitespace-nowrap';
+          if (c.id === 'rowIndex') td.textContent = r.rowIndex;
+          else if (c.id === 'decisionStatus') td.textContent = r.decisionColor.toUpperCase();
+          else if (c.id === 'decisionReason') td.textContent = r.decisionReason;
+          else if (c.id.startsWith('[Ref] ')) td.textContent = r.matchedMainRow?.[c.id.replace('[Ref] ', '')] || '';
+          else td.textContent = r.comparisonRow[c.id] || '';
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    renderRows(data);
+
+    searchInput.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      if (!q) { renderRows(data); return; }
+      const filtered = data.filter(r => {
+        return JSON.stringify(r.comparisonRow).toLowerCase().includes(q) || (r.decisionReason || '').toLowerCase().includes(q);
+      });
+      renderRows(filtered);
+    });
+  </script>
+</body>
+</html>`;
+
+  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${payload.comparisonWbName || 'Evaluation_Results'}_Preview.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

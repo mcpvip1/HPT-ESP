@@ -460,21 +460,7 @@ export default function App() {
 
             {/* Filtered Results & Table Section (Immediately shown below after import) */}
             {results.length > 0 && stats && (
-              <div className="pt-2 border-t border-slate-800/80 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                      <span>{t.step3Title || 'Evaluation Results'}</span>
-                      <span className="text-xs font-mono font-normal text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/60">
-                        {stats.totalIncoming.toLocaleString()} rows
-                      </span>
-                    </h2>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Filtered results based on your Rules & Logic Setting. Reorder columns, filter, and share preview links.
-                    </p>
-                  </div>
-                </div>
-
+              <div className="pt-2 border-t border-slate-800/80">
                 <ResultsDashboard
                   results={results}
                   stats={stats}
@@ -509,21 +495,7 @@ export default function App() {
         onShowToast={showToast}
       />
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-950 mt-auto py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-400">ExcelMatch Pro</span>
-            <span aria-hidden="true">·</span>
-            <span>Enterprise Multi-Column Auto-Sorting & Decision Engine</span>
-          </div>
-          <div className="flex items-center gap-4 text-slate-500">
-            <span>Client-side Secure Processing</span>
-            <span aria-hidden="true">·</span>
-            <span>Zero Data Leakage</span>
-          </div>
-        </div>
-      </footer>
+
 
       {/* Global Data Preview Modal */}
       <DataPreviewModal

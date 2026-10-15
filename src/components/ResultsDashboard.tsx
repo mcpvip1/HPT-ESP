@@ -115,6 +115,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   // Excel-style column filters: mapping colId -> allowed string values
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
   const [openFilterColId, setOpenFilterColId] = useState<string | null>(null);
+  const [filterAnchorRect, setFilterAnchorRect] = useState<DOMRect | null>(null);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -696,97 +697,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      {/* 1. Summary KPI Cards (Hidden in Preview Mode to show ONLY the Table) */}
-      {!isPreviewMode && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-          {/* Total Incoming Rows */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm flex flex-col justify-between">
-            <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-              {t.kpiTotalRows}
-            </div>
-            <div className="mt-2 text-2xl sm:text-3xl font-bold text-white font-mono tabular-nums">
-              {stats.totalIncoming.toLocaleString()}
-            </div>
-            <div className="mt-1 text-[11px] text-slate-500">Evaluated dataset</div>
-          </div>
-
-          {/* Green / Passed */}
-          <div className="bg-gradient-to-br from-emerald-950/80 via-slate-900 to-emerald-950/40 border-2 border-emerald-500/70 rounded-xl p-4 shadow-lg shadow-emerald-950/50 flex flex-col justify-between relative overflow-hidden group">
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-400 via-green-400 to-emerald-500 shadow-[0_0_14px_rgba(16,185,129,0.8)]" />
-            <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                {t.kpiPassed}
-              </span>
-              <span className="font-mono text-emerald-950 bg-emerald-400 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
-                {stats.totalIncoming > 0 ? ((stats.greenCount / stats.totalIncoming) * 100).toFixed(1) : 0}%
-              </span>
-            </div>
-            <div className="mt-2 text-3xl sm:text-4xl font-black text-emerald-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(16,185,129,0.35)]">
-              {stats.greenCount.toLocaleString()}
-            </div>
-            <div className="mt-1 text-[11px] text-emerald-400 font-medium">Vibrant Green passed</div>
-          </div>
-
-          {/* Yellow / Review */}
-          <div className="bg-gradient-to-br from-amber-950/80 via-slate-900 to-amber-950/40 border-2 border-amber-500/70 rounded-xl p-4 shadow-lg shadow-amber-950/50 flex flex-col justify-between relative overflow-hidden group">
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 shadow-[0_0_14px_rgba(245,158,11,0.8)]" />
-            <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                {t.kpiReview}
-              </span>
-              <span className="font-mono text-slate-950 bg-amber-400 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
-                {stats.totalIncoming > 0 ? ((stats.yellowCount / stats.totalIncoming) * 100).toFixed(1) : 0}%
-              </span>
-            </div>
-            <div className="mt-2 text-3xl sm:text-4xl font-black text-amber-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(245,158,11,0.35)]">
-              {stats.yellowCount.toLocaleString()}
-            </div>
-            <div className="mt-1 text-[11px] text-amber-400 font-medium">Vibrant Amber review</div>
-          </div>
-
-          {/* Red / Rejected */}
-          <div className="bg-gradient-to-br from-rose-950/80 via-slate-900 to-rose-950/40 border-2 border-rose-500/70 rounded-xl p-4 shadow-lg shadow-rose-950/50 flex flex-col justify-between relative overflow-hidden group">
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-rose-500 via-red-500 to-rose-600 shadow-[0_0_14px_rgba(244,63,94,0.8)]" />
-            <div className="text-[11px] font-bold text-rose-400 uppercase tracking-wider flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <XCircle className="w-3.5 h-3.5 text-rose-400" />
-                {t.kpiRejected}
-              </span>
-              <span className="font-mono text-white bg-rose-600 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
-                {stats.totalIncoming > 0 ? ((stats.redCount / stats.totalIncoming) * 100).toFixed(1) : 0}%
-              </span>
-            </div>
-            <div className="mt-2 text-3xl sm:text-4xl font-black text-rose-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(244,63,94,0.35)]">
-              {stats.redCount.toLocaleString()}
-            </div>
-            <div className="mt-1 text-[11px] text-rose-400 font-medium">Vibrant Crimson rejected</div>
-          </div>
-
-          {/* Blue / Key Match Rate */}
-          <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-blue-950/80 via-slate-900 to-indigo-950/40 border-2 border-blue-500/70 rounded-xl p-4 shadow-lg shadow-blue-950/50 flex flex-col justify-between relative overflow-hidden group">
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-400 via-cyan-400 to-indigo-500 shadow-[0_0_14px_rgba(59,130,246,0.8)]" />
-            <div className="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Percent className="w-3.5 h-3.5 text-blue-400 stroke-[2.5]" />
-                {t.kpiMatchRate}
-              </span>
-              <span className="font-mono text-white bg-blue-600 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
-                {stats.matchRate}%
-              </span>
-            </div>
-            <div className="mt-2 text-3xl sm:text-4xl font-black text-blue-300 font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(59,130,246,0.35)]">
-              {stats.matchRate}%
-            </div>
-            <div className="mt-1 text-[11px] text-blue-300 font-mono font-medium">
-              {stats.matchedCount} matched · {stats.unmatchedCount} new
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 2. Interactive Control Bar (Filters & Clean Professional Export) */}
+      {/* 1. Interactive Control Bar (Filters & Clean Professional Export) */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Segmented Filter Buttons */}
@@ -1176,6 +1087,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                setFilterAnchorRect(rect);
                                 setOpenFilterColId((prev) => (prev === col.id ? null : col.id));
                               }}
                               className={`p-1 rounded transition-colors ${
@@ -1195,6 +1108,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                 columnLabel={col.label}
                                 uniqueValues={getColumnUniqueValues(col.id)}
                                 selectedValues={columnFilters[col.id]}
+                                anchorRect={filterAnchorRect}
                                 onApply={(newVals) => {
                                   setColumnFilters((prev) => {
                                     const next = { ...prev };
@@ -1463,48 +1377,68 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
         {/* 5. Table Pagination Footer */}
         <div className="px-6 py-3.5 border-t border-slate-800 bg-slate-950 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
-          <div>
-            {t.showingRows}{' '}
-            <strong className="text-slate-200 font-mono tabular-nums">
-              {filteredRows.length > 0 ? (page - 1) * pageSize + 1 : 0}
-            </strong>{' '}
-            -{' '}
-            <strong className="text-slate-200 font-mono tabular-nums">
-              {Math.min(page * pageSize, filteredRows.length)}
-            </strong>{' '}
-            {t.of}{' '}
-            <strong className="text-slate-200 font-mono tabular-nums">
-              {filteredRows.length.toLocaleString()}
-            </strong>{' '}
-            rows
-            {searchTerm.trim() && (
-              <span className="text-slate-500 ml-2">
-                (filtered from {results.length.toLocaleString()} total)
-              </span>
-            )}
-          </div>
+          {isPreviewMode ? (
+            <div className="w-full flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-200 font-mono">
+                  Showing all {currentPageRows.length.toLocaleString()} rows
+                </span>
+                {results.length !== currentPageRows.length && (
+                  <span className="text-slate-500">
+                    (filtered from {results.length.toLocaleString()} total)
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-teal-400 font-mono font-medium">
+                Full Result View
+              </div>
+            </div>
+          ) : (
+            <>
+              <div>
+                {t.showingRows}{' '}
+                <strong className="text-slate-200 font-mono tabular-nums">
+                  {filteredRows.length > 0 ? (page - 1) * pageSize + 1 : 0}
+                </strong>{' '}
+                -{' '}
+                <strong className="text-slate-200 font-mono tabular-nums">
+                  {Math.min(page * pageSize, filteredRows.length)}
+                </strong>{' '}
+                {t.of}{' '}
+                <strong className="text-slate-200 font-mono tabular-nums">
+                  {filteredRows.length.toLocaleString()}
+                </strong>{' '}
+                rows
+                {searchTerm.trim() && (
+                  <span className="text-slate-500 ml-2">
+                    (filtered from {results.length.toLocaleString()} total)
+                  </span>
+                )}
+              </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-              <span>{t.prevPage}</span>
-            </button>
-            <span className="px-2 font-mono text-slate-300 tabular-nums">
-              {page} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              <span>{t.nextPage}</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>{t.prevPage}</span>
+                </button>
+                <span className="px-2 font-mono text-slate-300 tabular-nums">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <span>{t.nextPage}</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

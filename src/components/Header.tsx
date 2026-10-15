@@ -67,14 +67,8 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* Zone 2: Subtitle or Mode Tag */}
-          {!isPreviewMode ? (
-            <div className="hidden md:flex items-center gap-2 text-xs text-slate-400">
-              <span className="text-slate-200 font-medium">Enterprise Excel Evaluation</span>
-              <span className="text-slate-600">·</span>
-              <span>Automated Rules & Filtered Results</span>
-            </div>
-          ) : (
+          {/* Zone 2: Mode Tag if in Preview */}
+          {isPreviewMode && (
             <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
               <span className="w-2 h-2 rounded-full bg-teal-400" />
               <span>Result Preview</span>

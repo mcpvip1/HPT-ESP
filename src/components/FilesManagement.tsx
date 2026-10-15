@@ -115,13 +115,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
-      {/* Step Header */}
-      <div className="border-b border-slate-800 pb-5">
-        <h2 className="text-xl font-bold text-white tracking-tight">{t.step1Title}</h2>
-        <p className="text-sm text-slate-400 mt-1">{t.step1Desc}</p>
-      </div>
-
+    <div className="space-y-6 animate-in fade-in duration-200">
       {/* 2-Column Split: Reference File vs Incoming Comparison File */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
         {/* Card 1: Reference Workbook (Main File) */}

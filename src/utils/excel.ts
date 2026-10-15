@@ -688,13 +688,27 @@ export function processMatching(
   const mainCols = mappings.map((m) => m.mainCol);
   const compCols = mappings.map((m) => m.comparisonCol);
 
-  // Build key map for reference workbook
+  // Build key map for reference workbook (preferring Accept/Waive rows on duplicates)
   const mainKeyMap = new Map<string, ExcelRow>();
   for (let i = 0; i < mainWb.rows.length; i++) {
     const row = mainWb.rows[i];
     const key = generateRowKey(row, mainCols, normalization);
-    if (key && !mainKeyMap.has(key)) {
+    if (!key) continue;
+    const existing = mainKeyMap.get(key);
+    if (!existing) {
       mainKeyMap.set(key, row);
+    } else {
+      const rowHasAccept = Object.values(row).some((v) => {
+        const s = String(v ?? '').toLowerCase();
+        return s.includes('accept') || s.includes('waive');
+      });
+      const existingHasAccept = Object.values(existing).some((v) => {
+        const s = String(v ?? '').toLowerCase();
+        return s.includes('accept') || s.includes('waive');
+      });
+      if (rowHasAccept && !existingHasAccept) {
+        mainKeyMap.set(key, row);
+      }
     }
   }
 
@@ -759,6 +773,78 @@ export function processMatching(
       decisionLayerName: evaluation.layerName,
       mergedRow,
     });
+  }
+
+  // Duplicate Key Resolution:
+  // If multiple incoming rows share the exact same matchKey, and ANY row for that key is Accept / Green,
+  // then all duplicate rows for that key must take Accept and show Green!
+  const keyGroups = new Map<string, MatchedRow[]>();
+  for (const r of results) {
+    if (r.matchKey && r.matchKey.trim() !== '') {
+      if (!keyGroups.has(r.matchKey)) {
+        keyGroups.set(r.matchKey, []);
+      }
+      keyGroups.get(r.matchKey)!.push(r);
+    }
+  }
+
+  for (const [, groupRows] of keyGroups.entries()) {
+    if (groupRows.length > 1) {
+      // Check if ANY row in this duplicate group has Accept / Green
+      const acceptRow = groupRows.find((r) => {
+        if (r.decisionColor === 'green') return true;
+        const inReason = (r.decisionReason || '').toLowerCase();
+        if (inReason.includes('accept') || inReason.includes('waive') || inReason.includes('green')) return true;
+        return Object.values(r.comparisonRow).some((v) => {
+          const s = String(v ?? '').toLowerCase();
+          return s.includes('accept') || s.includes('waive');
+        });
+      });
+
+      if (acceptRow) {
+        // Find which column holds the decision text (e.g. 'Postpone', 'Accept')
+        let statusColName: string | null = null;
+        for (const [colName, val] of Object.entries(acceptRow.comparisonRow)) {
+          const s = String(val ?? '').toLowerCase();
+          if (s.includes('accept') || s.includes('waive')) {
+            statusColName = colName;
+            break;
+          }
+        }
+
+        // Apply Accept and Green to all duplicate rows for this key
+        for (const r of groupRows) {
+          r.decisionColor = 'green';
+          r.decisionReason = acceptRow.decisionReason || 'Accept (Duplicate key: Accept status takes precedence)';
+          r.decisionLayerName = acceptRow.decisionLayerName;
+
+          if (statusColName) {
+            const currentVal = String(r.comparisonRow[statusColName] ?? '').toLowerCase();
+            if (currentVal.includes('postpone') || !currentVal.includes('accept')) {
+              r.comparisonRow = {
+                ...r.comparisonRow,
+                [statusColName]: acceptRow.comparisonRow[statusColName] || 'Accept',
+              };
+              if (r.mergedRow) {
+                r.mergedRow[statusColName] = acceptRow.comparisonRow[statusColName] || 'Accept';
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Recalculate stats accurately after duplicate resolution
+  greenCount = 0;
+  yellowCount = 0;
+  redCount = 0;
+  otherCount = 0;
+  for (const r of results) {
+    if (r.decisionColor === 'green') greenCount++;
+    else if (r.decisionColor === 'yellow') yellowCount++;
+    else if (r.decisionColor === 'red') redCount++;
+    else otherCount++;
   }
 
   const totalIncoming = compWb.rows.length;
