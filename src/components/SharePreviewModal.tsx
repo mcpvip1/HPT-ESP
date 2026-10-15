@@ -98,8 +98,7 @@ export const SharePreviewModal: React.FC<SharePreviewModalProps> = ({
   };
 
   const handleOpenPreview = () => {
-    window.location.hash = url.split('#')[1] || 'preview';
-    window.location.reload();
+    window.location.href = url;
   };
 
   const filterLabels: Record<string, { label: string; colorClass: string }> = {

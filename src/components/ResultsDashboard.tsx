@@ -488,7 +488,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       const val = row.matchedMainRow?.[rawKey];
       return val !== undefined && val !== null && String(val).trim() !== '' ? String(val) : '(Blanks)';
     }
-    const val = row.comparisonRow[colId];
+    let val = row.comparisonRow[colId];
+    if (row.decisionColor === 'green' && typeof val === 'string' && val.toLowerCase().includes('postpone')) {
+      val = 'Accept';
+    }
     return val !== undefined && val !== null && String(val).trim() !== '' ? String(val) : '(Blanks)';
   };
 
@@ -667,21 +670,21 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     switch (color) {
       case 'green':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-black text-white bg-gradient-to-r from-emerald-500 to-green-600 border border-emerald-300/80 shadow-md shadow-emerald-500/30 tracking-wide">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold text-white bg-emerald-600 border border-emerald-400/50 shadow-sm tracking-wide">
             <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
             PASSED
           </span>
         );
       case 'yellow':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-black text-slate-950 bg-gradient-to-r from-amber-400 to-yellow-500 border border-amber-200 shadow-md shadow-amber-500/30 tracking-wide">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold text-slate-950 bg-amber-400 border border-amber-300 shadow-sm tracking-wide">
             <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5] text-slate-950" />
             REVIEW
           </span>
         );
       case 'red':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-black text-white bg-gradient-to-r from-rose-500 to-red-600 border border-rose-300/80 shadow-md shadow-rose-500/30 tracking-wide">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold text-white bg-rose-600 border border-rose-400/50 shadow-sm tracking-wide">
             <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
             REJECTED
           </span>
@@ -698,16 +701,16 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* 1. Interactive Control Bar (Filters & Clean Professional Export) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm space-y-4">
+      <div className="bg-slate-900/90 backdrop-blur-sm border border-slate-800 rounded-2xl p-4 shadow-md space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Segmented Filter Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-950 rounded-lg border border-slate-800">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-950/80 rounded-xl border border-slate-800">
             <button
               onClick={() => {
                 setActiveFilter('all');
                 setPage(1);
               }}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'all'
                   ? 'bg-slate-800 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
@@ -720,13 +723,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 setActiveFilter('green');
                 setPage(1);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'green'
-                  ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white font-black shadow-lg shadow-emerald-500/30 border border-emerald-300'
-                  : 'text-emerald-400 hover:bg-emerald-950/70 border border-emerald-900/50'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm font-black'
+                  : 'text-emerald-400 hover:bg-emerald-950/50'
               }`}
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
               <span>{t.filterGreen} ({stats.greenCount})</span>
             </button>
             <button
@@ -734,13 +737,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 setActiveFilter('yellow');
                 setPage(1);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'yellow'
-                  ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black shadow-lg shadow-amber-500/30 border border-amber-200'
-                  : 'text-amber-400 hover:bg-amber-950/70 border border-amber-900/50'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm font-black'
+                  : 'text-amber-400 hover:bg-amber-950/50'
               }`}
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)]" />
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
               <span>{t.filterYellow} ({stats.yellowCount})</span>
             </button>
             <button
@@ -748,13 +751,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 setActiveFilter('red');
                 setPage(1);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'red'
-                  ? 'bg-gradient-to-r from-rose-500 to-red-600 text-white font-black shadow-lg shadow-rose-500/30 border border-rose-300'
-                  : 'text-rose-400 hover:bg-rose-950/70 border border-rose-900/50'
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm font-black'
+                  : 'text-rose-400 hover:bg-rose-950/50'
               }`}
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.9)]" />
+              <span className="w-2 h-2 rounded-full bg-rose-400" />
               <span>{t.filterRed} ({stats.redCount})</span>
             </button>
             <button
@@ -762,13 +765,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 setActiveFilter('unmatched');
                 setPage(1);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'unmatched'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black shadow-lg shadow-blue-500/30 border border-blue-400'
-                  : 'text-blue-400 hover:bg-blue-950/70 border border-blue-900/50'
+                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm font-black'
+                  : 'text-blue-400 hover:bg-blue-950/50'
               }`}
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.9)]" />
+              <span className="w-2 h-2 rounded-full bg-blue-400" />
               <span>{t.filterUnmatched} ({stats.unmatchedCount})</span>
             </button>
           </div>
@@ -816,23 +819,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             </button>
 
             {/* In Preview Mode: Keep page clean to ONLY show Result Table */}
-            {isPreviewMode ? (
-              onExitPreview && (
-                <button
-                  onClick={onExitPreview}
-                  className="px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition-colors whitespace-nowrap shrink-0"
-                  title="Open the full ExcelMatch Pro studio"
-                >
-                  Open Studio
-                </button>
-              )
-            ) : (
+            {!isPreviewMode && (
               <>
                 {/* Quick 1-Click Copy Preview Link */}
                 <button
                   onClick={handleQuickCopyPreviewLink}
                   className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-teal-300 hover:text-white bg-slate-800 hover:bg-slate-750 active:bg-slate-900 border border-teal-500/50 hover:border-teal-400 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none group"
-                  title="Quick copy preview link with current active filter and column layout"
+                  title="Quick copy preview link (clean short link)"
                 >
                   {quickCopied ? (
                     <>
@@ -882,40 +875,42 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         {/* 3. DEDICATED REAL-TIME SEARCH BAR & SCOPE SELECTOR */}
         <div className="pt-3 border-t border-slate-800/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           <div className="flex flex-1 items-center gap-2 max-w-2xl">
-            {/* Search Scope Dropdown */}
-            <div className="relative shrink-0">
-              <select
-                value={searchColumn}
-                onChange={(e) => {
-                  setSearchColumn(e.target.value);
-                  setPage(1);
-                }}
-                className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 hover:text-white focus:outline-none focus:border-emerald-500 transition-colors"
-                title="Search Scope"
-              >
-                <option value="all">All Columns (Real-time)</option>
-                <option value="outcome">Decision Outcome</option>
-                <option value="reason">Evaluation Reason</option>
-                <option value="unmatched">Unmatched Discrepancy</option>
-                <option value="matchKey">Match Key</option>
-                <optgroup label="Comparison Data Columns">
-                  {compHeaders.map((col) => (
-                    <option key={col} value={col}>
-                      {col}
-                    </option>
-                  ))}
-                </optgroup>
-                {refHeaders.length > 0 && (
-                  <optgroup label="Reference Data Columns">
-                    {refHeaders.map((ref) => (
-                      <option key={ref} value={ref}>
-                        {ref}
+            {/* Search Scope Dropdown (Hidden in Preview mode per user request: "remove All Columns (Real-time) in preview page") */}
+            {!isPreviewMode && (
+              <div className="relative shrink-0">
+                <select
+                  value={searchColumn}
+                  onChange={(e) => {
+                    setSearchColumn(e.target.value);
+                    setPage(1);
+                  }}
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 hover:text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                  title="Search Scope"
+                >
+                  <option value="all">All Columns (Real-time)</option>
+                  <option value="outcome">Decision Outcome</option>
+                  <option value="reason">Evaluation Reason</option>
+                  <option value="unmatched">Unmatched Discrepancy</option>
+                  <option value="matchKey">Match Key</option>
+                  <optgroup label="Comparison Data Columns">
+                    {compHeaders.map((col) => (
+                      <option key={col} value={col}>
+                        {col}
                       </option>
                     ))}
                   </optgroup>
-                )}
-              </select>
-            </div>
+                  {refHeaders.length > 0 && (
+                    <optgroup label="Reference Data Columns">
+                      {refHeaders.map((ref) => (
+                        <option key={ref} value={ref}>
+                          {ref}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+            )}
 
             {/* Real-time Search Input Field */}
             <div className="relative flex-1">
@@ -1027,10 +1022,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
 
       {/* 4. Main Data Table with Dynamic Column Visibility & Real-Time Search Match Highlighting */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col">
+      <div className="bg-slate-900/90 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden shadow-xl flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-950 border-b border-slate-800 text-slate-300 font-semibold select-none">
+            <thead className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur-sm border-b border-slate-700 text-slate-300 font-semibold select-none">
               <tr>
                 {visibleTableColumns.map((col, idx) => {
                   const isFirst = idx === 0;
@@ -1051,8 +1046,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   return (
                     <th
                       key={col.id}
-                      className={`py-3 px-3 border-r border-slate-800 whitespace-nowrap group/th transition-colors relative ${
-                        col.category === 'reference' ? 'text-blue-300 bg-blue-950/30' : 'text-slate-300'
+                      className={`py-3.5 px-3 border-r border-slate-800/80 whitespace-nowrap group/th transition-colors relative ${
+                        col.category === 'reference' ? 'text-blue-300 bg-blue-950/40' : 'text-slate-300'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -1093,7 +1088,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                               }}
                               className={`p-1 rounded transition-colors ${
                                 isColFiltered
-                                  ? 'text-emerald-300 bg-emerald-950 border border-emerald-500/70 shadow-sm'
+                                  ? 'text-emerald-300 bg-emerald-500/20 border border-emerald-500/50 shadow-sm'
                                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
                               }`}
                               title={`Filter ${col.label} like Excel (multi-select checklist & search)`}
@@ -1225,14 +1220,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   return (
                     <tr
                       key={row.id}
-                      className={`transition-colors ${
+                      className={`transition-colors border-b border-slate-800/70 ${
                         isGreen
-                          ? 'bg-emerald-950/35 hover:bg-emerald-900/50 border-l-4 border-l-emerald-400'
+                          ? 'bg-emerald-950/20 hover:bg-emerald-950/35 border-l-[3px] border-l-emerald-400'
                           : isYellow
-                          ? 'bg-amber-950/35 hover:bg-amber-900/50 border-l-4 border-l-amber-400'
+                          ? 'bg-amber-950/20 hover:bg-amber-950/35 border-l-[3px] border-l-amber-400'
                           : isRed
-                          ? 'bg-rose-950/35 hover:bg-rose-900/50 border-l-4 border-l-rose-500'
-                          : 'hover:bg-slate-800/60 border-l-4 border-l-transparent'
+                          ? 'bg-rose-950/20 hover:bg-rose-950/35 border-l-[3px] border-l-rose-500'
+                          : 'even:bg-slate-900/40 hover:bg-slate-800/60 border-l-[3px] border-l-transparent'
                       }`}
                     >
                       {visibleTableColumns.map((col) => {
@@ -1309,19 +1304,36 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
                         if (col.id.startsWith('[Ref] ')) {
                           const rawKey = col.id.replace('[Ref] ', '');
-                          const val = row.matchedMainRow?.[rawKey];
+                          let valStr = String(row.matchedMainRow?.[rawKey] ?? '');
+                          if (row.decisionColor === 'green' && valStr.toLowerCase().includes('postpone')) {
+                            valStr = 'Accept';
+                          }
+                          const isWaiveOrAccept =
+                            valStr.toLowerCase().includes('waive') ||
+                            valStr.toLowerCase().includes('accept');
                           return (
                             <td
                               key={col.id}
-                              className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap text-blue-200 font-mono text-xs bg-blue-950/25"
+                              className={`py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap font-mono text-xs ${
+                                isWaiveOrAccept ? 'text-emerald-300 font-bold bg-emerald-950/30' : 'text-blue-200 bg-blue-950/20'
+                              }`}
                             >
-                              {highlightText(val, searchTerm)}
+                              {isWaiveOrAccept ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30">
+                                  {valStr}
+                                </span>
+                              ) : (
+                                highlightText(valStr, searchTerm)
+                              )}
                             </td>
                           );
                         }
 
                         // Default: Comparison column
-                        const valStr = String(row.comparisonRow[col.id] ?? '');
+                        let valStr = String(row.comparisonRow[col.id] ?? '');
+                        if (row.decisionColor === 'green' && valStr.toLowerCase().includes('postpone')) {
+                          valStr = 'Accept';
+                        }
                         const isWaiveOrAccept =
                           valStr.toLowerCase().includes('waive') ||
                           valStr.toLowerCase().includes('accept');
@@ -1331,11 +1343,17 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             key={col.id}
                             className={`py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap font-mono text-xs ${
                               isWaiveOrAccept
-                                ? 'text-emerald-300 font-bold bg-emerald-950/50 border-emerald-800/50'
+                                ? 'text-emerald-300 font-bold bg-emerald-950/30'
                                 : 'text-slate-200'
                             }`}
                           >
-                            {highlightText(row.comparisonRow[col.id], searchTerm)}
+                            {isWaiveOrAccept ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30">
+                                {valStr}
+                              </span>
+                            ) : (
+                              highlightText(valStr, searchTerm)
+                            )}
                           </td>
                         );
                       })}

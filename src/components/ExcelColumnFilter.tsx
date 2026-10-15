@@ -56,7 +56,7 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
     }
   }, [isOpen, selectedValues, allValuesList]);
 
-  // Click outside or window scroll to close
+  // Click outside, escape, or window scroll to close
   useEffect(() => {
     if (!isOpen) return;
 
@@ -70,12 +70,20 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
       if (e.key === 'Escape') onClose();
     };
 
+    const handleScroll = (e: Event) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', handleScroll, true);
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleScroll, true);
     };
   }, [isOpen, onClose]);
 
@@ -93,18 +101,21 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
       };
     }
 
-    // Default: position below button
     let top = anchorRect.bottom + 6;
 
-    // Flip above if not enough room below
-    if (top + popoverEstimatedHeight > window.innerHeight && anchorRect.top > popoverEstimatedHeight + 20) {
-      top = Math.max(12, anchorRect.top - popoverEstimatedHeight - 6);
+    // Flip above or clamp if not enough room below
+    if (top + popoverEstimatedHeight > window.innerHeight) {
+      if (anchorRect.top > popoverEstimatedHeight + 20) {
+        top = Math.max(12, anchorRect.top - popoverEstimatedHeight - 6);
+      } else {
+        top = Math.max(12, window.innerHeight - popoverEstimatedHeight - 12);
+      }
     }
 
-    // Align left with button, but CLAMP so it never clips past left (min 12px) or right (window.innerWidth - width - 12)
-    let left = anchorRect.left - 30;
+    // Align left with button, clamped between 12px and (window.innerWidth - width - 12)
+    let left = anchorRect.left - 20;
     if (left < 12) {
-      left = 12; // Prevents left-edge clipping shown in user screenshot
+      left = 12; // Prevents left-edge clipping
     } else if (left + popoverWidth > window.innerWidth - 12) {
       left = Math.max(12, window.innerWidth - popoverWidth - 12);
     }
@@ -114,6 +125,7 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
       top: `${Math.round(top)}px`,
       left: `${Math.round(left)}px`,
       width: `${popoverWidth}px`,
+      maxHeight: 'calc(100vh - 24px)',
       zIndex: 99999,
     };
   }, [anchorRect]);

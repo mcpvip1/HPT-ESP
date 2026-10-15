@@ -51,12 +51,19 @@ export default function App() {
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
 
-  // Live Preview Mode State (activated via #preview=... or ?preview=...)
+  // Live Preview Mode State (activated via /preview route, #preview, or ?preview)
   const [isPreviewMode, setIsPreviewMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
       const hash = window.location.hash;
       const search = window.location.search;
-      return hash.includes('preview') || search.includes('preview');
+      return (
+        path.endsWith('/preview') ||
+        path.endsWith('/preview/') ||
+        hash.startsWith('#/preview') ||
+        hash.includes('preview') ||
+        search.includes('preview')
+      );
     }
     return false;
   });
@@ -144,11 +151,40 @@ export default function App() {
 
     async function loadSavedState() {
       try {
-        // Priority 1: Check if page was loaded via a Live Preview Link (#preview=... or ?preview=...)
-        const previewData = parsePreviewFromUrl();
-        if (previewData && isMounted) {
-          const applied = checkAndApplyPreview(previewData);
-          if (applied) {
+        const isPreviewRoute =
+          window.location.pathname.endsWith('/preview') ||
+          window.location.pathname.endsWith('/preview/') ||
+          window.location.hash.startsWith('#/preview') ||
+          window.location.hash.includes('preview') ||
+          window.location.search.includes('preview');
+
+        // Priority 1: Check if page was loaded via a Live Preview Link (/preview, #preview=..., or ?preview=...)
+        if (isPreviewRoute) {
+          setIsPreviewMode(true);
+          const previewData = parsePreviewFromUrl();
+          if (previewData && isMounted) {
+            const applied = checkAndApplyPreview(previewData);
+            if (applied) {
+              clearTimeout(safetyTimer);
+              setIsStorageLoading(false);
+              return;
+            }
+          }
+
+          // Fallback if no preview in storage yet: evaluate demo dataset so preview is never blank
+          const demo = generateSampleDatasets();
+          const auto = autoMapColumns(demo.reference.headers, demo.comparison.headers);
+          const { results: evaluatedResults, stats: evaluatedStats } = processMatching(
+            demo.reference,
+            demo.comparison,
+            auto,
+            defaultNormalizationRules,
+            defaultDecisionLayers
+          );
+          if (isMounted) {
+            setResults(evaluatedResults);
+            setStats(evaluatedStats);
+            setComparisonWb(demo.comparison);
             clearTimeout(safetyTimer);
             setIsStorageLoading(false);
             return;
@@ -199,22 +235,30 @@ export default function App() {
 
     loadSavedState();
 
-    // Listen to hash changes (e.g. clicking shared links or exiting preview)
-    const handleHashChange = () => {
+    // Listen to URL changes (e.g. clicking shared links, back/forward button, or route changes)
+    const handleUrlChange = () => {
       const pData = parsePreviewFromUrl();
       if (pData) {
         checkAndApplyPreview(pData);
-      } else if (!window.location.hash.includes('preview') && !window.location.search.includes('preview')) {
-        setIsPreviewMode(false);
+      } else {
+        const isPreviewRoute =
+          window.location.pathname.endsWith('/preview') ||
+          window.location.pathname.endsWith('/preview/') ||
+          window.location.hash.startsWith('#/preview') ||
+          window.location.hash.includes('preview') ||
+          window.location.search.includes('preview');
+        setIsPreviewMode(isPreviewRoute);
       }
     };
 
-    window.addEventListener('hashchange', handleHashChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    window.addEventListener('popstate', handleUrlChange);
 
     return () => {
       isMounted = false;
       clearTimeout(safetyTimer);
-      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+      window.removeEventListener('popstate', handleUrlChange);
     };
   }, []);
 
@@ -362,6 +406,26 @@ export default function App() {
 
         setResults(evaluatedResults);
         setStats(evaluatedStats);
+
+        // Keep local preview cache in sync for immediate /preview viewing
+        try {
+          localStorage.setItem(
+            'emp_shared_preview_latest',
+            JSON.stringify({
+              version: 2,
+              createdAt: Date.now(),
+              comparisonWbName: comp.name || 'Evaluation_Results',
+              stats: evaluatedStats,
+              results: evaluatedResults,
+              filter: 'all',
+              searchTerm: '',
+              searchColumn: 'all',
+            })
+          );
+        } catch (e) {
+          console.warn('Could not cache preview locally', e);
+        }
+
         if (notifySuccess) {
           showToast(
             `Evaluated ${evaluatedStats.totalIncoming} rows: ${evaluatedStats.greenCount} passed, ${evaluatedStats.yellowCount} review, ${evaluatedStats.redCount} rejected.`,
@@ -381,7 +445,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
       {/* 1. Header (Adapts cleanly to Studio or Preview mode) */}
       <Header
         language={language}
@@ -421,24 +485,16 @@ export default function App() {
                 }}
               />
             ) : (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center space-y-4">
-                <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 mx-auto">
-                  <FileSpreadsheet className="w-6 h-6 text-emerald-400" />
+              <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-4 shadow-sm">
+                <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 mx-auto">
+                  <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
                 </div>
-                <h3 className="text-base font-semibold text-white">
+                <h3 className="text-base font-semibold text-slate-900">
                   No Matching Results Yet
                 </h3>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
                   The shared result preview link does not contain results data, or the link expired.
                 </p>
-                <div className="flex items-center justify-center gap-3 pt-2">
-                  <button
-                    onClick={handleExitPreview}
-                    className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors"
-                  >
-                    Open Studio Mode
-                  </button>
-                </div>
               </div>
             )}
           </div>
@@ -460,7 +516,7 @@ export default function App() {
 
             {/* Filtered Results & Table Section (Immediately shown below after import) */}
             {results.length > 0 && stats && (
-              <div className="pt-2 border-t border-slate-800/80">
+              <div className="pt-2 border-t border-slate-200">
                 <ResultsDashboard
                   results={results}
                   stats={stats}

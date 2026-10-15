@@ -91,6 +91,7 @@ export interface MatchedRow {
   decisionReason: string;
   decisionLayerName?: string;
   mergedRow: ExcelRow;
+  supersededByAccept?: boolean;
 }
 
 export interface MatchingStats {

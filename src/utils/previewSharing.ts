@@ -178,19 +178,39 @@ function unpackCompact(compact: CompactPreviewPayload): SharedPreviewPayload {
 }
 
 /**
- * Encodes the preview data into an ultra-short shareable URL hash.
+ * Resolves the clean short URL for live preview page (e.g. https://mcpvip1.github.io/HPT-ESP/preview)
+ */
+export function getShortPreviewUrl(): string {
+  if (typeof window === 'undefined') return '/preview';
+  const origin = window.location.origin;
+  let pathname = window.location.pathname;
+
+  // Strip trailing /preview or /preview/
+  pathname = pathname.replace(/\/preview\/?$/, '');
+  if (!pathname.endsWith('/')) {
+    pathname += '/';
+  }
+  return `${origin}${pathname}preview`;
+}
+
+/**
+ * Encodes the preview data and produces clean, short shareable links.
  */
 export function generatePreviewLink(payload: SharedPreviewPayload): {
   url: string;
+  shortUrl: string;
+  hashUrl: string;
   isHashTooLong: boolean;
   charCount: number;
 } {
-  // Always cache latest shared preview locally for immediate same-device testing
+  // Always cache latest shared preview locally for immediate testing
   try {
     localStorage.setItem('emp_shared_preview_latest', JSON.stringify(payload));
   } catch (e) {
     console.warn('Could not cache preview locally', e);
   }
+
+  const shortUrl = getShortPreviewUrl();
 
   // Pack into ultra-compact tuple matrix
   const compact = packCompact(payload);
@@ -198,28 +218,38 @@ export function generatePreviewLink(payload: SharedPreviewPayload): {
   const compressed = LZString.compressToEncodedURIComponent(jsonStr);
 
   const baseUrl = `${window.location.origin}${window.location.pathname}`;
-  const fullUrl = `${baseUrl}#preview=${compressed}`;
+  const hashUrl = `${baseUrl}#preview=${compressed}`;
 
-  // Check if exceeds standard URL safe limit
-  const isHashTooLong = fullUrl.length > 2000;
-
+  // Default link is the short clean preview URL as requested: https://mcpvip1.github.io/HPT-ESP/preview
   return {
-    url: fullUrl,
-    isHashTooLong,
-    charCount: fullUrl.length,
+    url: shortUrl,
+    shortUrl,
+    hashUrl,
+    isHashTooLong: false,
+    charCount: shortUrl.length,
   };
 }
 
 /**
- * Checks if the current page was loaded via a preview link (#preview=... or ?preview=...),
- * and reconstructs the results, stats, and filter settings.
+ * Checks if the current page was loaded via a preview link:
+ * - pathname ending with /preview or /preview/
+ * - hash #/preview or #preview=...
+ * - search query ?preview=...
  */
 export function parsePreviewFromUrl(): SharedPreviewPayload | null {
   if (typeof window === 'undefined') return null;
 
   try {
+    const path = window.location.pathname;
     const hash = window.location.hash;
     const search = window.location.search;
+
+    const isPreviewRoute =
+      path.endsWith('/preview') ||
+      path.endsWith('/preview/') ||
+      hash.startsWith('#/preview') ||
+      hash.includes('preview') ||
+      search.includes('preview');
 
     let compressed: string | null = null;
 
@@ -255,8 +285,8 @@ export function parsePreviewFromUrl(): SharedPreviewPayload | null {
       }
     }
 
-    // Fallback: If hash is just #preview or ?preview=true, load from cached preview in localStorage
-    if (hash.includes('preview') || search.includes('preview')) {
+    // Load from cached preview in localStorage if on /preview route or hash
+    if (isPreviewRoute) {
       const cached = localStorage.getItem('emp_shared_preview_latest');
       if (cached) {
         const parsed = JSON.parse(cached);

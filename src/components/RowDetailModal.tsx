@@ -72,9 +72,9 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
         {!row.isMatched ? (
           <div className="p-4 mx-5 sm:mx-6 mt-4 rounded-xl bg-amber-950/30 border border-amber-800/60 text-slate-200 shrink-0 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-900/40 pb-2">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-amber-900/60 text-amber-400">
-                  <AlertTriangle className="w-5 h-5" />
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-300 shadow-inner shrink-0">
+                  <AlertTriangle className="w-5 h-5 stroke-[2.2]" />
                 </div>
                 <div>
                   <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">

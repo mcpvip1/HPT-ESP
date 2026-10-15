@@ -49,50 +49,50 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800">
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-6 h-16">
-          {/* Zone 1: Single text element wordmark with icon */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-sm shadow-emerald-500/20">
-              <FileSpreadsheet className="w-4 h-4" />
+          {/* Brand Wordmark with Modern Clean Icon */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200/90 flex items-center justify-center text-emerald-600 shadow-xs">
+              <FileSpreadsheet className="w-4 h-4 stroke-[2.2]" />
             </div>
             <button
               onClick={() => {
                 if (!isPreviewMode && onSelectStep) onSelectStep(1);
               }}
-              className="text-lg font-bold tracking-tight text-white hover:text-emerald-400 transition-colors whitespace-nowrap shrink-0 focus:outline-none"
+              className="text-base font-bold tracking-tight text-slate-900 hover:text-emerald-600 transition-colors whitespace-nowrap shrink-0 focus:outline-none"
             >
               ExcelMatch Pro
             </button>
           </div>
 
-          {/* Zone 2: Mode Tag if in Preview */}
+          {/* Mode Tag if in Preview */}
           {isPreviewMode && (
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
-              <span className="w-2 h-2 rounded-full bg-teal-400" />
+            <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>Result Preview</span>
-              <span className="hidden sm:inline text-slate-500 font-normal font-sans">
-                (Read-Only Table View)
+              <span className="hidden sm:inline text-slate-500 font-normal">
+                · Live Interactive Table
               </span>
             </div>
           )}
 
-          {/* Zone 3: Language Selector & Actions */}
+          {/* Language Selector & Actions */}
           <div className="flex items-center gap-2.5 shrink-0">
             {/* Language Switcher Dropdown */}
             <div className="relative" ref={langRef}>
               <button
                 onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-lg border border-slate-700 transition-colors whitespace-nowrap shrink-0"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors whitespace-nowrap shrink-0 shadow-xs"
                 aria-label="Select Language"
               >
-                <Globe className="w-3.5 h-3.5 text-slate-400" />
+                <Globe className="w-3.5 h-3.5 text-slate-500" />
                 <span>{languageLabels[language].native}</span>
               </button>
 
               {langDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-36 rounded-lg bg-slate-900 border border-slate-700 shadow-2xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute right-0 mt-2 w-36 rounded-xl bg-white border border-slate-200 shadow-xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
                   {(Object.keys(languageLabels) as Language[]).map((langKey) => (
                     <button
                       key={langKey}
@@ -102,12 +102,12 @@ export const Header: React.FC<HeaderProps> = ({
                       }}
                       className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors ${
                         language === langKey
-                          ? 'bg-emerald-950/60 text-emerald-400 font-semibold'
-                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                          ? 'bg-emerald-50 text-emerald-700 font-semibold'
+                          : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
                       <span>{languageLabels[langKey].native}</span>
-                      <span className="text-slate-500 text-[10px] uppercase font-mono">
+                      <span className="text-slate-400 text-[10px] uppercase font-mono">
                         {languageLabels[langKey].code}
                       </span>
                     </button>
@@ -116,21 +116,11 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            {/* In preview mode, show Exit / Open Full App. Otherwise show Rules & Logic Setting */}
-            {isPreviewMode ? (
-              onExitPreview && (
-                <button
-                  onClick={onExitPreview}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 active:bg-slate-900 rounded-lg border border-slate-700 transition-all shadow-sm whitespace-nowrap shrink-0"
-                  title="Exit live preview and return to full app editor"
-                >
-                  <span>Open Full App</span>
-                </button>
-              )
-            ) : (
+            {/* In preview mode, do not show editor action buttons per user request */}
+            {!isPreviewMode && (
               <button
                 onClick={onOpenRulesSetting}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-100 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-600 transition-all shadow-sm whitespace-nowrap shrink-0 group focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 active:bg-slate-950 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 group focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                 title="Configure mapping keys and decision rules (saved permanently in browser)"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-12 transition-transform" />

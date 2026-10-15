@@ -775,58 +775,164 @@ export function processMatching(
     });
   }
 
-  // Duplicate Key Resolution:
-  // If multiple incoming rows share the exact same matchKey, and ANY row for that key is Accept / Green,
-  // then all duplicate rows for that key must take Accept and show Green!
+  // Postpone vs Accept Same-Key Inspection Logic:
+  // "when filter if found postpone in Inspection Status or Inspection Result row if the data see the postpone
+  // need to check another row have same key but Inspection Status or Inspection Result row have accept
+  // only take accept no need to show yellow only show yellow when accept no have"
   const keyGroups = new Map<string, MatchedRow[]>();
-  for (const r of results) {
+
+  const getRowKeys = (r: MatchedRow): string[] => {
+    const keys: string[] = [];
     if (r.matchKey && r.matchKey.trim() !== '') {
-      if (!keyGroups.has(r.matchKey)) {
-        keyGroups.set(r.matchKey, []);
+      keys.push(`mk:${r.matchKey.trim().toLowerCase()}`);
+    }
+    // Also extract primary PO / Item / Material / Lot identifiers from comparisonRow
+    for (const [colName, val] of Object.entries(r.comparisonRow)) {
+      const cleanCol = colName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (
+        cleanCol === 'po' ||
+        cleanCol === 'ponumber' ||
+        cleanCol === 'purchaseorder' ||
+        cleanCol === 'orderid' ||
+        cleanCol === 'material' ||
+        cleanCol === 'materialcode' ||
+        cleanCol === 'item' ||
+        cleanCol === 'itemcode' ||
+        cleanCol === 'partnumber' ||
+        cleanCol === 'lot' ||
+        cleanCol === 'lotno' ||
+        cleanCol === 'lotnumber'
+      ) {
+        const strVal = String(val ?? '').trim().toLowerCase();
+        if (strVal && strVal !== '-') {
+          keys.push(`${cleanCol}:${strVal}`);
+        }
       }
-      keyGroups.get(r.matchKey)!.push(r);
+    }
+    return keys;
+  };
+
+  const hasInspectionTerm = (rowObj: ExcelRow | undefined, term: string): boolean => {
+    if (!rowObj) return false;
+    const target = term.toLowerCase();
+    for (const [colName, val] of Object.entries(rowObj)) {
+      const cleanCol = colName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (
+        cleanCol.includes('inspection') ||
+        cleanCol.includes('status') ||
+        cleanCol.includes('result') ||
+        cleanCol.includes('decision')
+      ) {
+        const valStr = String(val ?? '').toLowerCase();
+        if (valStr.includes(target)) return true;
+      }
+    }
+    return false;
+  };
+
+  for (const r of results) {
+    const rKeys = getRowKeys(r);
+    for (const k of rKeys) {
+      if (!keyGroups.has(k)) {
+        keyGroups.set(k, []);
+      }
+      if (!keyGroups.get(k)!.includes(r)) {
+        keyGroups.get(k)!.push(r);
+      }
     }
   }
 
-  for (const [, groupRows] of keyGroups.entries()) {
-    if (groupRows.length > 1) {
-      // Check if ANY row in this duplicate group has Accept / Green
-      const acceptRow = groupRows.find((r) => {
-        if (r.decisionColor === 'green') return true;
-        const inReason = (r.decisionReason || '').toLowerCase();
-        if (inReason.includes('accept') || inReason.includes('waive') || inReason.includes('green')) return true;
-        return Object.values(r.comparisonRow).some((v) => {
-          const s = String(v ?? '').toLowerCase();
-          return s.includes('accept') || s.includes('waive');
-        });
-      });
+  // Evaluate each row for the Postpone / Accept rule
+  for (const r of results) {
+    const rKeys = getRowKeys(r);
+    const hasPostpone =
+      hasInspectionTerm(r.comparisonRow, 'postpone') ||
+      hasInspectionTerm(r.matchedMainRow, 'postpone') ||
+      (r.decisionReason && r.decisionReason.toLowerCase().includes('postpone'));
 
-      if (acceptRow) {
-        // Find which column holds the decision text (e.g. 'Postpone', 'Accept')
-        let statusColName: string | null = null;
-        for (const [colName, val] of Object.entries(acceptRow.comparisonRow)) {
-          const s = String(val ?? '').toLowerCase();
-          if (s.includes('accept') || s.includes('waive')) {
-            statusColName = colName;
+    if (hasPostpone) {
+      // Find all peer rows with the same key
+      const peerRows = new Set<MatchedRow>();
+      for (const k of rKeys) {
+        const peers = keyGroups.get(k) || [];
+        for (const peer of peers) {
+          if (peer !== r) peerRows.add(peer);
+        }
+      }
+
+      // Check if ANY peer row or matched reference has Accept or Waive
+      let hasAcceptInGroup = false;
+
+      // Check matched reference row
+      if (
+        hasInspectionTerm(r.matchedMainRow, 'accept') ||
+        hasInspectionTerm(r.matchedMainRow, 'waive')
+      ) {
+        hasAcceptInGroup = true;
+      }
+
+      // Check peer comparison rows
+      if (!hasAcceptInGroup) {
+        for (const peer of peerRows) {
+          if (
+            peer.decisionColor === 'green' ||
+            hasInspectionTerm(peer.comparisonRow, 'accept') ||
+            hasInspectionTerm(peer.comparisonRow, 'waive') ||
+            hasInspectionTerm(peer.matchedMainRow, 'accept') ||
+            hasInspectionTerm(peer.matchedMainRow, 'waive')
+          ) {
+            hasAcceptInGroup = true;
             break;
           }
         }
+      }
 
-        // Apply Accept and Green to all duplicate rows for this key
+      if (hasAcceptInGroup) {
+        // "only take accept no need to show yellow"
+        r.decisionColor = 'green';
+        r.decisionReason = 'Accept (Duplicate key: Accept status takes precedence; Postpone overridden)';
+        r.supersededByAccept = true;
+
+        // Replace any postpone status in comparisonRow and mergedRow with Accept
+        for (const [colName, val] of Object.entries(r.comparisonRow)) {
+          const s = String(val ?? '').toLowerCase();
+          if (s.includes('postpone')) {
+            r.comparisonRow[colName] = 'Accept';
+            if (r.mergedRow) {
+              r.mergedRow[colName] = 'Accept';
+            }
+          }
+        }
+      } else {
+        // "only show yellow when accept no have"
+        r.decisionColor = 'yellow';
+        r.decisionReason = 'Postpone (Review required: No Accept record found for this key)';
+      }
+    }
+  }
+
+  // Also resolve any general duplicate key groups where ANY row has Accept
+  for (const [, groupRows] of keyGroups.entries()) {
+    if (groupRows.length > 1) {
+      const anyAccept = groupRows.some((r) => {
+        if (r.decisionColor === 'green') return true;
+        const inReason = (r.decisionReason || '').toLowerCase();
+        if (inReason.includes('accept') || inReason.includes('waive') || inReason.includes('green') || inReason.includes('pass')) return true;
+        return hasInspectionTerm(r.comparisonRow, 'accept') || hasInspectionTerm(r.matchedMainRow, 'accept');
+      });
+
+      if (anyAccept) {
         for (const r of groupRows) {
-          r.decisionColor = 'green';
-          r.decisionReason = acceptRow.decisionReason || 'Accept (Duplicate key: Accept status takes precedence)';
-          r.decisionLayerName = acceptRow.decisionLayerName;
-
-          if (statusColName) {
-            const currentVal = String(r.comparisonRow[statusColName] ?? '').toLowerCase();
-            if (currentVal.includes('postpone') || !currentVal.includes('accept')) {
-              r.comparisonRow = {
-                ...r.comparisonRow,
-                [statusColName]: acceptRow.comparisonRow[statusColName] || 'Accept',
-              };
-              if (r.mergedRow) {
-                r.mergedRow[statusColName] = acceptRow.comparisonRow[statusColName] || 'Accept';
+          if (r.decisionColor !== 'red') {
+            r.decisionColor = 'green';
+            r.decisionReason = 'Accept (Duplicate key: Accept status takes precedence)';
+            for (const [colName, val] of Object.entries(r.comparisonRow)) {
+              const s = String(val ?? '').toLowerCase();
+              if (s.includes('postpone') || s.includes('pending') || s.includes('hold')) {
+                r.comparisonRow[colName] = 'Accept';
+                if (r.mergedRow) {
+                  r.mergedRow[colName] = 'Accept';
+                }
               }
             }
           }
@@ -1229,6 +1335,8 @@ export function generateSampleDatasets(): {
     { 'PO Number': 'PO-8808', 'Part Number': 'CMP-108-H', 'Batch Number': 'LOT-2026-08', 'Supplier Name': 'Titan Fasteners Corp', 'Unit Cost': 65.5, 'Target Tolerance': '±0.08mm', 'Inspection Status': 'Hold', 'Quality Grade': 'Fail', 'Warehouse Location': 'Quarantine-02' },
     { 'PO Number': 'PO-8809', 'Part Number': 'CMP-109-I', 'Batch Number': 'LOT-2026-09', 'Supplier Name': 'Vertex Dynamics', 'Unit Cost': 195.0, 'Target Tolerance': '±0.03mm', 'Inspection Status': 'Accept', 'Quality Grade': 'Grade A', 'Warehouse Location': 'Bay-04-B' },
     { 'PO Number': 'PO-8810', 'Part Number': 'CMP-110-J', 'Batch Number': 'LOT-2026-10', 'Supplier Name': 'Precision Micro LLC', 'Unit Cost': 78.4, 'Target Tolerance': '±0.04mm', 'Inspection Status': 'Hold', 'Quality Grade': 'Grade B', 'Warehouse Location': 'Bay-05-A' },
+    { 'PO Number': 'PO-8816', 'Part Number': 'CMP-116-P', 'Batch Number': 'LOT-2026-16', 'Supplier Name': 'Apex Industrial Co.', 'Unit Cost': 165.0, 'Target Tolerance': '±0.02mm', 'Inspection Status': 'Accept', 'Quality Grade': 'Grade A', 'Warehouse Location': 'Bay-06-A' },
+    { 'PO Number': 'PO-8817', 'Part Number': 'CMP-117-Q', 'Batch Number': 'LOT-2026-17', 'Supplier Name': 'Precision Micro LLC', 'Unit Cost': 92.0, 'Target Tolerance': '±0.05mm', 'Inspection Status': 'Postpone', 'Quality Grade': 'Grade B', 'Warehouse Location': 'Bay-06-B' },
   ];
 
   const compRows: ExcelRow[] = [
@@ -1247,6 +1355,9 @@ export function generateSampleDatasets(): {
     { 'Purchase Order': 'PO-8813', 'Item Code': 'CMP-113-M', 'Lot No': 'LOT-2026-13', 'Vendor': 'Nordic Aero Parts', 'Received Qty': 65, 'Inspection Status': 'Waive', 'Inspection Result': 'Fast Track Waive', 'Quality Grade': 'Grade A', 'Inspector': 'M. Rossi' },
     { 'Purchase Order': 'PO-8814', 'Item Code': 'CMP-114-N', 'Lot No': 'LOT-2026-14', 'Vendor': 'Titan Fasteners Corp', 'Received Qty': 3200, 'Inspection Status': 'Verified', 'Inspection Result': 'Accept', 'Quality Grade': 'Grade A', 'Inspector': 'A. Patel' },
     { 'Purchase Order': 'PO-8815', 'Item Code': 'CMP-115-O', 'Lot No': 'LOT-2026-15', 'Vendor': 'Vertex Dynamics', 'Received Qty': 550, 'Inspection Status': 'Pending', 'Inspection Result': 'Re-test Scheduled', 'Quality Grade': 'Grade B', 'Inspector': 'S. Chen' },
+    { 'Purchase Order': 'PO-8816', 'Item Code': 'CMP-116-P', 'Lot No': 'LOT-2026-16', 'Vendor': 'Apex Industrial Co.', 'Received Qty': 450, 'Inspection Status': 'Postpone', 'Inspection Result': 'Postponed - Pending Re-check', 'Quality Grade': 'Grade B', 'Inspector': 'J. Miller' },
+    { 'Purchase Order': 'PO-8816', 'Item Code': 'CMP-116-P', 'Lot No': 'LOT-2026-16', 'Vendor': 'Apex Industrial Co.', 'Received Qty': 450, 'Inspection Status': 'Accept', 'Inspection Result': 'Accept - Re-inspection Passed', 'Quality Grade': 'Grade A', 'Inspector': 'A. Patel' },
+    { 'Purchase Order': 'PO-8817', 'Item Code': 'CMP-117-Q', 'Lot No': 'LOT-2026-17', 'Vendor': 'Precision Micro LLC', 'Received Qty': 280, 'Inspection Status': 'Postpone', 'Inspection Result': 'Postponed - Awaiting Waiver', 'Quality Grade': 'Grade B', 'Inspector': 'S. Chen' },
   ];
 
   const reference: WorkbookData = {

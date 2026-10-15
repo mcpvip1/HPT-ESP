@@ -119,20 +119,20 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
       {/* 2-Column Split: Reference File vs Incoming Comparison File */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
         {/* Card 1: Reference Workbook (Main File) */}
-        <div className="flex flex-col bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm relative">
+        <div className="flex flex-col bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm relative">
           <div className="flex items-center justify-between gap-4 mb-4">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
-                <Database className="w-5 h-5" />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200/90 flex items-center justify-center text-emerald-600 shadow-xs shrink-0">
+                <Database className="w-5 h-5 stroke-[2.2]" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white">{t.referenceFile}</h3>
-                <p className="text-xs text-slate-400">Master baseline dataset</p>
+                <h3 className="text-sm font-bold text-slate-900 tracking-tight">{t.referenceFile}</h3>
+                <p className="text-xs text-slate-500">Master baseline dataset</p>
               </div>
             </div>
 
             {referenceWb && !loadingRef && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-700/50">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <CheckCircle className="w-3.5 h-3.5" />
                 {t.savedLocally}
               </span>
@@ -142,14 +142,14 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
           {loadingRef ? (
             /* Progress State */
             <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-4">
-              <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-10 h-10 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
               <div className="text-center">
-                <div className="text-xs font-semibold text-slate-200">
+                <div className="text-xs font-semibold text-slate-700">
                   {refProgress?.text || 'Processing spreadsheet...'}
                 </div>
-                <div className="w-52 bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden mx-auto">
+                <div className="w-52 bg-slate-200 rounded-full h-1.5 mt-3 overflow-hidden mx-auto">
                   <div
-                    className="bg-emerald-500 h-full transition-all duration-200"
+                    className="bg-emerald-600 h-full transition-all duration-200"
                     style={{ width: `${refProgress?.percent || 20}%` }}
                   />
                 </div>
@@ -162,24 +162,24 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
             /* Populated Reference Card */
             <div className="flex-1 flex flex-col justify-between pt-2">
               <div className="space-y-4">
-                <div className="p-4 rounded-lg bg-slate-950/60 border border-slate-800">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span className="text-sm font-semibold text-slate-100 truncate block">
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span className="text-sm font-semibold text-slate-900 truncate block">
                           {referenceWb.name}
                         </span>
                       </div>
-                      <div className="text-xs text-slate-400 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <div className="text-xs text-slate-600 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span>
-                          {t.totalRows}: <strong className="text-slate-200 font-mono tabular-nums">{referenceWb.rows.length.toLocaleString()}</strong>
+                          {t.totalRows}: <strong className="text-slate-900 font-mono tabular-nums">{referenceWb.rows.length.toLocaleString()}</strong>
                         </span>
-                        <span aria-hidden="true" className="text-slate-600">·</span>
+                        <span aria-hidden="true" className="text-slate-300">·</span>
                         <span>
-                          {t.totalCols}: <strong className="text-slate-200 font-mono tabular-nums">{referenceWb.headers.length}</strong>
+                          {t.totalCols}: <strong className="text-slate-900 font-mono tabular-nums">{referenceWb.headers.length}</strong>
                         </span>
-                        <span aria-hidden="true" className="text-slate-600">·</span>
+                        <span aria-hidden="true" className="text-slate-300">·</span>
                         <span>{formatFileSize(referenceWb.size)}</span>
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1 font-mono">
@@ -189,9 +189,9 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                   </div>
                 </div>
 
-                <div className="text-xs text-slate-400">
-                  <span className="font-medium text-slate-300">Columns Detected: </span>
-                  <span className="text-slate-400 font-mono text-[11px]">
+                <div className="text-xs text-slate-600">
+                  <span className="font-medium text-slate-700">Columns Detected: </span>
+                  <span className="text-slate-500 font-mono text-[11px]">
                     {referenceWb.headers.slice(0, 5).join(', ')}
                     {referenceWb.headers.length > 5 ? ` +${referenceWb.headers.length - 5} more` : ''}
                   </span>
@@ -199,10 +199,10 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2 mt-6 pt-4 border-t border-slate-800">
+              <div className="flex items-center gap-2 mt-6 pt-4 border-t border-slate-200">
                 <button
                   onClick={() => onPreviewWb(referenceWb, t.referenceFile)}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 shadow-xs transition-colors"
                 >
                   <Eye className="w-3.5 h-3.5" />
                   {t.previewData}
@@ -210,7 +210,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
 
                 <button
                   onClick={() => refFileInputRef.current?.click()}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition-colors"
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 shadow-xs transition-colors"
                   title={t.replaceFile}
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
@@ -219,7 +219,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
 
                 <button
                   onClick={() => setShowResetDialog(true)}
-                  className="p-2 text-slate-400 hover:text-rose-400 bg-slate-800 hover:bg-rose-950/40 rounded-lg border border-slate-700 hover:border-rose-900/50 transition-colors"
+                  className="p-2 text-slate-400 hover:text-rose-600 bg-white hover:bg-rose-50 rounded-lg border border-slate-200 hover:border-rose-200 shadow-xs transition-colors"
                   title={t.resetReference}
                   aria-label={t.resetReference}
                 >
@@ -244,21 +244,21 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
               }}
               className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 text-center transition-all ${
                 isDraggingRef
-                  ? 'border-emerald-500 bg-emerald-950/20'
-                  : 'border-slate-800 hover:border-slate-700 bg-slate-950/30'
+                  ? 'border-emerald-500 bg-emerald-50/40'
+                  : 'border-slate-300 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/20'
               }`}
             >
-              <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 mb-3">
-                <Upload className="w-6 h-6 text-emerald-400" />
+              <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center text-emerald-600 mb-3">
+                <Upload className="w-6 h-6 text-emerald-600" />
               </div>
-              <h4 className="text-sm font-semibold text-slate-200">{t.uploadRefPrompt}</h4>
-              <p className="text-xs text-slate-400 mt-1 max-w-xs">{t.dropFileHere}</p>
-              <p className="text-[11px] text-slate-500 mt-1">{t.supportedFormats}</p>
+              <h4 className="text-sm font-semibold text-slate-800">{t.uploadRefPrompt}</h4>
+              <p className="text-xs text-slate-500 mt-1 max-w-xs">{t.dropFileHere}</p>
+              <p className="text-[11px] text-slate-400 mt-1">{t.supportedFormats}</p>
 
               <button
                 onClick={() => refFileInputRef.current?.click()}
                 disabled={loadingRef}
-                className="mt-4 px-4 py-2 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                className="mt-4 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors shadow-sm disabled:opacity-50"
               >
                 {t.browseFiles}
               </button>
@@ -279,20 +279,20 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
         </div>
 
         {/* Card 2: Incoming Workbook (Comparison File) */}
-        <div className="flex flex-col bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm relative">
+        <div className="flex flex-col bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm relative">
           <div className="flex items-center justify-between gap-4 mb-4">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-sky-950/60 text-sky-400 border border-sky-800/40">
-                <FileUp className="w-5 h-5" />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200/90 flex items-center justify-center text-blue-600 shadow-xs shrink-0">
+                <FileUp className="w-5 h-5 stroke-[2.2]" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white">{t.incomingFile}</h3>
-                <p className="text-xs text-slate-400">Dynamic file to inspect & classify</p>
+                <h3 className="text-sm font-bold text-slate-900 tracking-tight">{t.incomingFile}</h3>
+                <p className="text-xs text-slate-500">Dynamic file to inspect & classify</p>
               </div>
             </div>
 
             {comparisonWb && !loadingComp && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-sky-950/80 text-sky-400 border border-sky-700/50">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                 READY TO EVALUATE
               </span>
             )}
@@ -301,14 +301,14 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
           {loadingComp ? (
             /* Progress State */
             <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-4">
-              <div className="w-10 h-10 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
               <div className="text-center">
-                <div className="text-xs font-semibold text-slate-200">
+                <div className="text-xs font-semibold text-slate-700">
                   {compProgress?.text || 'Processing spreadsheet...'}
                 </div>
-                <div className="w-52 bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden mx-auto">
+                <div className="w-52 bg-slate-200 rounded-full h-1.5 mt-3 overflow-hidden mx-auto">
                   <div
-                    className="bg-sky-500 h-full transition-all duration-200"
+                    className="bg-blue-600 h-full transition-all duration-200"
                     style={{ width: `${compProgress?.percent || 20}%` }}
                   />
                 </div>
@@ -321,24 +321,24 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
             /* Populated Comparison Card */
             <div className="flex-1 flex flex-col justify-between pt-2">
               <div className="space-y-4">
-                <div className="p-4 rounded-lg bg-slate-950/60 border border-slate-800">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <FileSpreadsheet className="w-4 h-4 text-sky-400 shrink-0" />
-                        <span className="text-sm font-semibold text-slate-100 truncate block">
+                        <FileSpreadsheet className="w-4 h-4 text-blue-600 shrink-0" />
+                        <span className="text-sm font-semibold text-slate-900 truncate block">
                           {comparisonWb.name}
                         </span>
                       </div>
-                      <div className="text-xs text-slate-400 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <div className="text-xs text-slate-600 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span>
-                          {t.totalRows}: <strong className="text-slate-200 font-mono tabular-nums">{comparisonWb.rows.length.toLocaleString()}</strong>
+                          {t.totalRows}: <strong className="text-slate-900 font-mono tabular-nums">{comparisonWb.rows.length.toLocaleString()}</strong>
                         </span>
-                        <span aria-hidden="true" className="text-slate-600">·</span>
+                        <span aria-hidden="true" className="text-slate-300">·</span>
                         <span>
-                          {t.totalCols}: <strong className="text-slate-200 font-mono tabular-nums">{comparisonWb.headers.length}</strong>
+                          {t.totalCols}: <strong className="text-slate-900 font-mono tabular-nums">{comparisonWb.headers.length}</strong>
                         </span>
-                        <span aria-hidden="true" className="text-slate-600">·</span>
+                        <span aria-hidden="true" className="text-slate-300">·</span>
                         <span>{formatFileSize(comparisonWb.size)}</span>
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1 font-mono">
@@ -348,9 +348,9 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                   </div>
                 </div>
 
-                <div className="text-xs text-slate-400">
-                  <span className="font-medium text-slate-300">Columns Detected: </span>
-                  <span className="text-slate-400 font-mono text-[11px]">
+                <div className="text-xs text-slate-600">
+                  <span className="font-medium text-slate-700">Columns Detected: </span>
+                  <span className="text-slate-500 font-mono text-[11px]">
                     {comparisonWb.headers.slice(0, 5).join(', ')}
                     {comparisonWb.headers.length > 5 ? ` +${comparisonWb.headers.length - 5} more` : ''}
                   </span>
@@ -358,10 +358,10 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2 mt-6 pt-4 border-t border-slate-800">
+              <div className="flex items-center gap-2 mt-6 pt-4 border-t border-slate-200">
                 <button
                   onClick={() => onPreviewWb(comparisonWb, t.incomingFile)}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 shadow-xs transition-colors"
                 >
                   <Eye className="w-3.5 h-3.5" />
                   {t.previewData}
@@ -369,7 +369,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
 
                 <button
                   onClick={() => compFileInputRef.current?.click()}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition-colors"
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 shadow-xs transition-colors"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>{t.replaceFile}</span>
@@ -377,7 +377,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
 
                 <button
                   onClick={() => onSetComparisonWb(null)}
-                  className="p-2 text-slate-400 hover:text-rose-400 bg-slate-800 hover:bg-rose-950/40 rounded-lg border border-slate-700 hover:border-rose-900/50 transition-colors"
+                  className="p-2 text-slate-400 hover:text-rose-600 bg-white hover:bg-rose-50 rounded-lg border border-slate-200 hover:border-rose-200 shadow-xs transition-colors"
                   title={t.clearAll}
                   aria-label={t.clearAll}
                 >
@@ -402,21 +402,21 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
               }}
               className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 text-center transition-all ${
                 isDraggingComp
-                  ? 'border-sky-500 bg-sky-950/20'
-                  : 'border-slate-800 hover:border-slate-700 bg-slate-950/30'
+                  ? 'border-blue-500 bg-blue-50/40'
+                  : 'border-slate-300 hover:border-blue-500 bg-slate-50/50 hover:bg-blue-50/20'
               }`}
             >
-              <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 mb-3">
-                <Upload className="w-6 h-6 text-sky-400" />
+              <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center text-blue-600 mb-3">
+                <Upload className="w-6 h-6 text-blue-600" />
               </div>
-              <h4 className="text-sm font-semibold text-slate-200">{t.uploadCompPrompt}</h4>
-              <p className="text-xs text-slate-400 mt-1 max-w-xs">{t.dropFileHere}</p>
-              <p className="text-[11px] text-slate-500 mt-1">{t.supportedFormats}</p>
+              <h4 className="text-sm font-semibold text-slate-800">{t.uploadCompPrompt}</h4>
+              <p className="text-xs text-slate-500 mt-1 max-w-xs">{t.dropFileHere}</p>
+              <p className="text-[11px] text-slate-400 mt-1">{t.supportedFormats}</p>
 
               <button
                 onClick={() => compFileInputRef.current?.click()}
                 disabled={loadingComp}
-                className="mt-4 px-4 py-2 text-xs font-medium text-white bg-sky-600 hover:bg-sky-500 rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                className="mt-4 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors shadow-sm disabled:opacity-50"
               >
                 {t.browseFiles}
               </button>
@@ -437,18 +437,16 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
         </div>
       </div>
 
-
-
       {/* Confirmation Dialog for Resetting Reference File */}
       {showResetDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-100">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-md w-full p-6 shadow-2xl">
-            <h3 className="text-base font-semibold text-white">{t.confirmReset}</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">{t.confirmResetDesc}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-100">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h3 className="text-base font-semibold text-slate-900">{t.confirmReset}</h3>
+            <p className="text-xs text-slate-600 mt-2 leading-relaxed">{t.confirmResetDesc}</p>
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setShowResetDialog(false)}
-                className="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 rounded-lg border border-slate-700 transition-colors"
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 transition-colors"
               >
                 {t.cancel}
               </button>
@@ -458,7 +456,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                   setShowResetDialog(false);
                   onShowToast(t.toastRefReset, 'info');
                 }}
-                className="px-3 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-500 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 rounded-lg shadow-sm transition-colors"
               >
                 {t.confirm}
               </button>
