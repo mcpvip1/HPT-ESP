@@ -82,6 +82,7 @@ export interface TranslationDict {
   filterYellow: string;
   filterRed: string;
   filterUnmatched: string;
+  filterBlue: string;
   searchPlaceholder: string;
   exportExcel: string;
   exportCsv: string;
@@ -150,6 +151,7 @@ export interface TranslationDict {
   shareFilterYellow: string;
   shareFilterRed: string;
   shareFilterUnmatched: string;
+  shareFilterBlue: string;
   shareIncludeSearch: string;
   shareLinkLabel: string;
   shareChars: string;
@@ -262,6 +264,7 @@ export interface TranslationDict {
   badgeReview: string;
   badgeRejected: string;
   badgeNoRule: string;
+  badgeHold: string;
   dashValueMatched: string;
   dashValueUnmatched: string;
   dashValueEmpty: string;
@@ -271,6 +274,13 @@ export interface TranslationDict {
   dashOnlyAccept: string;
   dashRefreshTitle: string;
   dashRefresh: string;
+  dashHoldKeys: string;
+  dashHoldKeysTitle: string;
+  dashHoldKeysDialogTitle: string;
+  dashHoldKeysDialogDesc: string;
+  dashHoldKeysPlaceholder: string;
+  dashHoldKeysClear: string;
+  dashHoldKeysSave: string;
   dashSaveViewTitle: string;
   dashSaveSyncView: string;
   dashSaveView: string;
@@ -607,6 +617,7 @@ export const translations: Record<Language, TranslationDict> = {
     filterYellow: "Amber (Review)",
     filterRed: "Red (Reject)",
     filterUnmatched: "Unmatched Only",
+    filterBlue: "Hold",
     searchPlaceholder: "Search across all columns and fields...",
     exportExcel: "Export Styled Excel (.xlsx)",
     exportCsv: "Export CSV",
@@ -674,7 +685,8 @@ export const translations: Record<Language, TranslationDict> = {
     shareFilterGreen: "Passed Rows (Green)",
     shareFilterYellow: "Review Rows (Yellow)",
     shareFilterRed: "Rejected Rows (Red)",
-    shareFilterUnmatched: "Unmatched Rows (Blue)",
+    shareFilterUnmatched: "Unmatched Rows (Violet)",
+    shareFilterBlue: "Hold Rows (Blue)",
     shareIncludeSearch: "Include active search query:",
     shareLinkLabel: "Shareable Preview Link",
     shareChars: "characters",
@@ -873,6 +885,7 @@ export const translations: Record<Language, TranslationDict> = {
     filterYellow: "ဝါရောင် (သုံးသပ်ရန်)",
     filterRed: "အနီ (ပယ်ချ)",
     filterUnmatched: "မကိုက်ညီသော အတန်းများ",
+    filterBlue: "ထိန်း",
     searchPlaceholder: "ကော်လံအားလုံးတွင် ရှာဖွေရန်...",
     exportExcel: "Excel ဖိုင် ထုတ်ယူရန် (.xlsx)",
     exportCsv: "CSV ထုတ်ယူရန်",
@@ -940,7 +953,8 @@ export const translations: Record<Language, TranslationDict> = {
     shareFilterGreen: "အောင်မြင်သော အတန်းများ (အစိမ်း)",
     shareFilterYellow: "ပြန်လည်သုံးသပ်ရန် အတန်းများ (အဝါ)",
     shareFilterRed: "ပယ်ချထားသော အတန်းများ (အနီ)",
-    shareFilterUnmatched: "မကိုက်ညီသော အတန်းများ (အပြာ)",
+    shareFilterUnmatched: "မကိုက်ညီသော အတန်းများ (ခရမ်း)",
+    shareFilterBlue: "ထိန်းထားသော အတန်းများ (အပြာ)",
     shareIncludeSearch: "လက်ရှိ ရှာဖွေမှုကို ထည့်သွင်းရန်:",
     shareLinkLabel: "မျှဝေနိုင်သော အစမ်းကြည့်လင့်ခ်",
     shareChars: "စာလုံးရေ",
@@ -1139,6 +1153,7 @@ export const translations: Record<Language, TranslationDict> = {
     filterYellow: "สีเหลือง (รอตรวจ)",
     filterRed: "สีแดง (ปฏิเสธ)",
     filterUnmatched: "ไม่พบข้อมูลอ้างอิง",
+    filterBlue: "พักไว้",
     searchPlaceholder: "ค้นหาข้อมูลในทุกคอลัมน์...",
     exportExcel: "ส่งออกไฟล์ Excel (.xlsx)",
     exportCsv: "ส่งออก CSV",
@@ -1206,7 +1221,8 @@ export const translations: Record<Language, TranslationDict> = {
     shareFilterGreen: "แถวที่ผ่าน (สีเขียว)",
     shareFilterYellow: "แถวที่ต้องตรวจสอบ (สีเหลือง)",
     shareFilterRed: "แถวที่ถูกปฏิเสธ (สีแดง)",
-    shareFilterUnmatched: "แถวที่ไม่ตรงกัน (สีน้ำเงิน)",
+    shareFilterUnmatched: "แถวที่ไม่ตรงกัน (สีม่วง)",
+    shareFilterBlue: "แถวที่พักไว้ (สีน้ำเงิน)",
     shareIncludeSearch: "รวมคำค้นหาที่ใช้งานอยู่:",
     shareLinkLabel: "ลิงก์ตัวอย่างที่แชร์ได้",
     shareChars: "อักขระ",
@@ -1405,6 +1421,7 @@ export const translations: Record<Language, TranslationDict> = {
     filterYellow: "黄色（审核）",
     filterRed: "红色（拒绝）",
     filterUnmatched: "未匹配基准行",
+    filterBlue: "暂存",
     searchPlaceholder: "全字段关键词快速搜索...",
     exportExcel: "导出带样式 Excel (.xlsx)",
     exportCsv: "导出 CSV 文件",
@@ -1472,7 +1489,8 @@ export const translations: Record<Language, TranslationDict> = {
     shareFilterGreen: "通过的行（绿色）",
     shareFilterYellow: "待复核的行（黄色）",
     shareFilterRed: "被拒绝的行（红色）",
-    shareFilterUnmatched: "未匹配的行（蓝色）",
+    shareFilterUnmatched: "未匹配的行（紫色）",
+    shareFilterBlue: "暂存的行（蓝色）",
     shareIncludeSearch: "包含当前搜索词：",
     shareLinkLabel: "可分享的预览链接",
     shareChars: "字符",
