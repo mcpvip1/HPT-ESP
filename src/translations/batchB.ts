@@ -21,6 +21,7 @@ export interface BatchBKeys {
   badgeReview: string;
   badgeRejected: string;
   badgeNoRule: string;
+  badgeHold: string;
   dashValueMatched: string;
   dashValueUnmatched: string;
   dashValueEmpty: string;
@@ -30,6 +31,13 @@ export interface BatchBKeys {
   dashOnlyAccept: string;
   dashRefreshTitle: string;
   dashRefresh: string;
+  dashHoldKeys: string;
+  dashHoldKeysTitle: string;
+  dashHoldKeysDialogTitle: string;
+  dashHoldKeysDialogDesc: string;
+  dashHoldKeysPlaceholder: string;
+  dashHoldKeysClear: string;
+  dashHoldKeysSave: string;
   dashSaveViewTitle: string;
   dashSaveSyncView: string;
   dashSaveView: string;
@@ -130,6 +138,7 @@ export const batchB: Record<Language, BatchBKeys> = {
     badgeReview: "REVIEW",
     badgeRejected: "REJECTED",
     badgeNoRule: "NO RULE",
+    badgeHold: "HOLD",
     dashValueMatched: "Matched",
     dashValueUnmatched: "Unmatched",
     dashValueEmpty: "(Empty)",
@@ -139,6 +148,13 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashOnlyAccept: "Only Accept",
     dashRefreshTitle: "Refresh results data",
     dashRefresh: "Refresh",
+    dashHoldKeys: "Hold Keys",
+    dashHoldKeysTitle: "Filter rows by key into the Hold tab",
+    dashHoldKeysDialogTitle: "Hold Keys",
+    dashHoldKeysDialogDesc: "One key per line. Any row containing a key moves to the Hold tab and shows blue — even if all keys match.",
+    dashHoldKeysPlaceholder: "e.g. PO-8801\nCMP-101-A",
+    dashHoldKeysClear: "Clear",
+    dashHoldKeysSave: "Save",
     dashSaveViewTitle: "Save custom column order and visibility (syncs to preview links)",
     dashSaveSyncView: "Save & Sync View",
     dashSaveView: "Save View",
@@ -237,6 +253,7 @@ export const batchB: Record<Language, BatchBKeys> = {
     badgeReview: "ပြန်လည်သုံးသပ်ရန်",
     badgeRejected: "ပယ်ချထားသည်",
     badgeNoRule: "စည်းမျဉ်းမရှိ",
+    badgeHold: "ထိန်း",
     dashValueMatched: "ကိုက်ညီသည်",
     dashValueUnmatched: "မကိုက်ညီပါ",
     dashValueEmpty: "(မရှိ)",
@@ -246,6 +263,13 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashOnlyAccept: "Accept သာ",
     dashRefreshTitle: "ရလဒ်ဒေတာကို ပြန်လည်ရယူရန်",
     dashRefresh: "ပြန်လည်ရယူရန်",
+    dashHoldKeys: "ထိန်းထားမည့် သော့များ",
+    dashHoldKeysTitle: "သော့ဖြင့် အတန်းများကို ထိန်းထားသည့် တက်ဘ်သို့ စစ်ထုတ်ရန်",
+    dashHoldKeysDialogTitle: "ထိန်းထားမည့် သော့များ",
+    dashHoldKeysDialogDesc: "တစ်ကြောင်းလျှင် သော့တစ်ခု။ သော့ပါဝင်သော အတန်းတိုင်းသည် ထိန်းထားသည့် တက်ဘ်သို့ ရွှေ့ပြီး အပြာရောင်ဖြင့် ပြမည် — သော့များအားလုံး ကိုက်ညီလျှင်ပင်။",
+    dashHoldKeysPlaceholder: "ဥပမာ PO-8801\nCMP-101-A",
+    dashHoldKeysClear: "ရှင်းလင်းရန်",
+    dashHoldKeysSave: "သိမ်းရန်",
     dashSaveViewTitle: "စိတ်ကြိုက် ကော်လံအစီအစဉ်နှင့် မြင်နိုင်မှုကို သိမ်းဆည်းရန် (အစမ်းကြည့်လင့်ခ်များသို့ ထပ်တူညီမည်)",
     dashSaveSyncView: "မြင်ကွင်းကို သိမ်းဆည်း & ထပ်တူညီရန်",
     dashSaveView: "မြင်ကွင်း သိမ်းဆည်းရန်",
@@ -344,6 +368,7 @@ export const batchB: Record<Language, BatchBKeys> = {
     badgeReview: "ตรวจสอบ",
     badgeRejected: "ปฏิเสธ",
     badgeNoRule: "ไม่มีกฎ",
+    badgeHold: "พักไว้",
     dashValueMatched: "ตรงกัน",
     dashValueUnmatched: "ไม่ตรงกัน",
     dashValueEmpty: "(ว่างเปล่า)",
@@ -353,6 +378,13 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashOnlyAccept: "เฉพาะที่ยอมรับ",
     dashRefreshTitle: "รีเฟรชข้อมูลผลลัพธ์",
     dashRefresh: "รีเฟรช",
+    dashHoldKeys: "คีย์ที่พักไว้",
+    dashHoldKeysTitle: "กรองแถวตามคีย์ไปยังแท็บพักไว้",
+    dashHoldKeysDialogTitle: "คีย์ที่พักไว้",
+    dashHoldKeysDialogDesc: "หนึ่งคีย์ต่อหนึ่งบรรทัด แถวใดที่มีคีย์จะถูกย้ายไปยังแท็บพักไว้และแสดงเป็นสีน้ำเงิน — แม้ว่าคีย์ทั้งหมดจะตรงกัน",
+    dashHoldKeysPlaceholder: "เช่น PO-8801\nCMP-101-A",
+    dashHoldKeysClear: "ล้าง",
+    dashHoldKeysSave: "บันทึก",
     dashSaveViewTitle: "บันทึกลำดับและการมองเห็นคอลัมน์ที่กำหนดเอง (ซิงค์ไปยังลิงก์ตัวอย่าง)",
     dashSaveSyncView: "บันทึก & ซิงค์มุมมอง",
     dashSaveView: "บันทึกมุมมอง",
@@ -451,6 +483,7 @@ export const batchB: Record<Language, BatchBKeys> = {
     badgeReview: "复核",
     badgeRejected: "拒绝",
     badgeNoRule: "无规则",
+    badgeHold: "暂存",
     dashValueMatched: "已匹配",
     dashValueUnmatched: "未匹配",
     dashValueEmpty: "(空)",
@@ -460,6 +493,13 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashOnlyAccept: "仅接受",
     dashRefreshTitle: "刷新结果数据",
     dashRefresh: "刷新",
+    dashHoldKeys: "暂存键",
+    dashHoldKeysTitle: "按关键字将行过滤到暂存选项卡",
+    dashHoldKeysDialogTitle: "暂存键",
+    dashHoldKeysDialogDesc: "每行一个关键字。包含关键字的任何行都会移至暂存选项卡并显示为蓝色 — 即使所有关键字都匹配。",
+    dashHoldKeysPlaceholder: "例如 PO-8801\nCMP-101-A",
+    dashHoldKeysClear: "清除",
+    dashHoldKeysSave: "保存",
     dashSaveViewTitle: "保存自定义列顺序和可见性（同步到预览链接）",
     dashSaveSyncView: "保存并同步视图",
     dashSaveView: "保存视图",
