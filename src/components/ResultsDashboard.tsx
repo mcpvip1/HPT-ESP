@@ -71,6 +71,7 @@ interface ResultsDashboardProps {
   cloudUser?: User | null;
   holdReason?: string;
   onReleaseHoldKey?: (key: string) => Promise<{ key: string; green: number; yellow: number; total: number }>;
+  onViewStateChange?: (v: { activeFilter: FilterType; searchTerm: string; searchColumn: string; onlyAccept: boolean }) => void;
 }
 
 type FilterType = 'all' | 'green' | 'yellow' | 'red' | 'blue' | 'unmatched';
@@ -118,6 +119,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   cloudUser,
   holdReason = '',
   onReleaseHoldKey,
+  onViewStateChange,
 }) => {
   const t = translations[language];
 
@@ -142,10 +144,25 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [sortColumn, setSortColumn] = useState<string>('rowIndex');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRow, setSelectedRow] = useState<MatchedRow | null>(null);
+
   const [releaseTarget, setReleaseTarget] = useState<{ key: string; count: number } | null>(null);
   const [supervisorConfirmed, setSupervisorConfirmed] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
   const [hideSupersededPostpone, setHideSupersededPostpone] = useState<boolean>(true);
+  // Report the current view state (filter tab, search, Only Accept) so the
+  // studio can sync it to the cloud; debounced to avoid chatter on typing.
+  useEffect(() => {
+    if (isPreviewMode || !onViewStateChange) return;
+    const timer = setTimeout(() => {
+      onViewStateChange({
+        activeFilter,
+        searchTerm,
+        searchColumn,
+        onlyAccept: hideSupersededPostpone,
+      });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [activeFilter, searchTerm, searchColumn, hideSupersededPostpone, isPreviewMode, onViewStateChange]);
 
   // Excel-style column filters: mapping colId -> allowed string values
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
