@@ -725,7 +725,8 @@ export function processMatching(
   mappings: ColumnMapping[],
   normalization: NormalizationRules,
   layers: DecisionLayer[],
-  holdKeys: string[] = []
+  holdKeys: string[] = [],
+  releasedRowIds: string[] = []
 ): {
   results: MatchedRow[];
   stats: MatchingStats;
@@ -1071,6 +1072,20 @@ export function processMatching(
         r.holdKey = term;
         // Hold takes precedence: never hide a held row under "Only Accept"
         r.supersededByAccept = false;
+      }
+    }
+  }
+
+  // Supervisor release: rows released from hold that did not pass go to
+  // Review (yellow) instead of their natural color; released rows that pass
+  // keep their green. Hold (blue) still wins if another key holds the row.
+  if (releasedRowIds.length > 0) {
+    const releasedSet = new Set(releasedRowIds);
+    for (const r of results) {
+      if (releasedSet.has(r.id) && !r.isHold && r.decisionColor !== 'green') {
+        r.decisionColor = 'yellow';
+        r.decisionReason = 'Released from hold — pending review';
+        r.releasedFromHold = true;
       }
     }
   }
