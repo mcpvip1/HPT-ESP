@@ -918,6 +918,7 @@ export default function App() {
 
       {/* Global Data Preview Modal */}
       <DataPreviewModal
+        language={language}
         workbook={previewModal.workbook}
         isOpen={previewModal.isOpen}
         onClose={() =>

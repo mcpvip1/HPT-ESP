@@ -1751,6 +1751,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         row={selectedRow}
         isOpen={!!selectedRow}
         onClose={() => setSelectedRow(null)}
+        language={language}
       />
 
       {/* Column Customization Modal (Table & Export) */}
@@ -1763,6 +1764,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         syncExportWithTable={syncExportWithTable}
         onToggleSync={handleToggleSyncExport}
         onResetDefaults={handleResetDefaultColumns}
+        language={language}
       />
 
       {/* Share Result Preview Modal */}
@@ -1777,6 +1779,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         searchColumn={searchColumn}
         columnConfigs={columnConfigs}
         onShowToast={onShowToast}
+        language={language}
+        onlyAccept={hideSupersededPostpone}
       />
     </div>
   );
