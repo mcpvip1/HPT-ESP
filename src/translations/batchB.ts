@@ -31,22 +31,29 @@ export interface BatchBKeys {
   dashOnlyAccept: string;
   dashRefreshTitle: string;
   dashRefresh: string;
-  dashHoldKeys: string;
-  dashHoldKeysTitle: string;
-  dashHoldKeysDialogTitle: string;
-  dashHoldKeysDialogDesc: string;
-  dashHoldKeysPlaceholder: string;
-  dashHoldKeysClear: string;
-  dashHoldKeysSave: string;
+
   dashHoldReasonLabel: string;
   dashHoldReasonPlaceholder: string;
-  dashConfirmRelease: string;
-  dashConfirmReleaseTitle: string;
-  dashReleaseTitle: string;
+
   dashReleaseDesc: string;
   dashReleaseSupervisor: string;
   dashReleaseNoReason: string;
-  dashReleasedToast: string;
+  dashRemoveFromHold: string;
+  dashRemoveFromHoldTitle: string;
+  dashReleaseOutcomeToast: string;
+  toastHoldFound: string;
+  rulesTabHold: string;
+  rulesHoldColumnLabel: string;
+  rulesHoldColumnLegacy: string;
+  rulesHoldValuesLabel: string;
+  rulesHoldValuesSearch: string;
+  rulesHoldSelectAll: string;
+  rulesHoldClearSel: string;
+  rulesHoldLegacyLabel: string;
+  rulesHoldLegacyDesc: string;
+  rulesHoldLegacyPlaceholder: string;
+  rulesHoldNoValues: string;
+  rulesHoldNoData: string;
   dashSaveViewTitle: string;
   dashSaveSyncView: string;
   dashSaveView: string;
@@ -157,22 +164,27 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashOnlyAccept: "Only Accept",
     dashRefreshTitle: "Refresh results data",
     dashRefresh: "Refresh",
-    dashHoldKeys: "Hold Keys",
-    dashHoldKeysTitle: "Filter rows by key into the Hold tab",
-    dashHoldKeysDialogTitle: "Hold Keys",
-    dashHoldKeysDialogDesc: "One key per line. Any row containing a key moves to the Hold tab and shows blue — even if all keys match.",
-    dashHoldKeysPlaceholder: "e.g. PO-8801\nCMP-101-A",
-    dashHoldKeysClear: "Clear",
-    dashHoldKeysSave: "Save",
     dashHoldReasonLabel: "Why are these items on hold?",
     dashHoldReasonPlaceholder: "e.g. Waiting for supplier confirmation",
-    dashConfirmRelease: "Confirm",
-    dashConfirmReleaseTitle: "Confirm release with supervisor",
-    dashReleaseTitle: "Release from Hold",
     dashReleaseDesc: "Release key \"{key}\"? {n} row(s) are currently on hold. Rows that matched and passed will turn green; the rest will turn yellow for review.",
     dashReleaseSupervisor: "My supervisor has confirmed this release",
     dashReleaseNoReason: "No reason given",
-    dashReleasedToast: "Key \"{key}\" released - {n} row(s) re-evaluated",
+    dashRemoveFromHold: "Remove from hold",
+    dashRemoveFromHoldTitle: "Remove from hold (supervisor confirmation required)",
+    dashReleaseOutcomeToast: "Key \"{key}\" removed from hold \u2192 {g} green, {y} yellow",
+    toastHoldFound: "Found {n} hold item(s) \u2014 see the Hold tab",
+    rulesTabHold: "Hold",
+    rulesHoldColumnLabel: "Choose column",
+    rulesHoldColumnLegacy: "Key columns (auto-detect)",
+    rulesHoldValuesLabel: "Choose row data",
+    rulesHoldValuesSearch: "Search values...",
+    rulesHoldSelectAll: "Select all",
+    rulesHoldClearSel: "Clear",
+    rulesHoldLegacyLabel: "Hold keys (one per line)",
+    rulesHoldLegacyDesc: "Matched as text within key columns (PO, item, lot, ...).",
+    rulesHoldLegacyPlaceholder: "e.g. PO-8801\\nCMP-101-A",
+    rulesHoldNoValues: "No values found",
+    rulesHoldNoData: "Load the Incoming Workbook to choose hold values.",
     dashSaveViewTitle: "Save custom column order and visibility (syncs to preview links)",
     dashSaveSyncView: "Save & Sync View",
     dashSaveView: "Save View",
@@ -281,22 +293,27 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashOnlyAccept: "Accept သာ",
     dashRefreshTitle: "ရလဒ်ဒေတာကို ပြန်လည်ရယူရန်",
     dashRefresh: "ပြန်လည်ရယူရန်",
-    dashHoldKeys: "ထိန်းထားမည့် သော့များ",
-    dashHoldKeysTitle: "သော့ဖြင့် အတန်းများကို ထိန်းထားသည့် တက်ဘ်သို့ စစ်ထုတ်ရန်",
-    dashHoldKeysDialogTitle: "ထိန်းထားမည့် သော့များ",
-    dashHoldKeysDialogDesc: "တစ်ကြောင်းလျှင် သော့တစ်ခု။ သော့ပါဝင်သော အတန်းတိုင်းသည် ထိန်းထားသည့် တက်ဘ်သို့ ရွှေ့ပြီး အပြာရောင်ဖြင့် ပြမည် — သော့များအားလုံး ကိုက်ညီလျှင်ပင်။",
-    dashHoldKeysPlaceholder: "ဥပမာ PO-8801\nCMP-101-A",
-    dashHoldKeysClear: "ရှင်းလင်းရန်",
-    dashHoldKeysSave: "သိမ်းရန်",
     dashHoldReasonLabel: "ဒီအရာတွေကို ဘာကြောင့် ထိန်းထားတာလဲ?",
     dashHoldReasonPlaceholder: "ဥပမာ ပေးသွင်းသူ အတည်ပြုချက် စောင့်နေသည်",
-    dashConfirmRelease: "အတည်ပြုရန်",
-    dashConfirmReleaseTitle: "ကြီးကြပ်သူနှင့် အတည်ပြုပြီး ထုတ်လွှတ်ရန်",
-    dashReleaseTitle: "ထိန်းထားခြင်းမှ ထုတ်လွှတ်ရန်",
     dashReleaseDesc: "\"{key}\" သော့ကို ထုတ်လွှတ်မလား။ လက်ရှိ ထိန်းထားသော အတန်း {n} ခု ရှိသည်။ ကိုက်ညီပြီး အောင်မြင်သော အတန်းများသည် အစိမ်းရောင် ဖြစ်လာမည်။ ကျန်အတန်းများသည် ပြန်လည်စစ်ဆေးရန် အဝါရောင် ဖြစ်လာမည်။",
     dashReleaseSupervisor: "ကျွန်ုပ်၏ ကြီးကြပ်သူသည် ဤထုတ်လွှတ်မှုကို အတည်ပြုပြီးဖြစ်သည်",
     dashReleaseNoReason: "အကြောင်းရင်း မဖော်ပြထားပါ",
-    dashReleasedToast: "\"{key}\" သော့ကို ထုတ်လွှတ်ပြီးဖြစ်သည် - အတန်း {n} ခုကို ပြန်လည်အကဲဖြတ်ပြီးဖြစ်သည်",
+    dashRemoveFromHold: "ထိန်းထားခြင်းမှ ဖယ်ရှားရန်",
+    dashRemoveFromHoldTitle: "ထိန်းထားခြင်းမှ ဖယ်ရှားရန် (ကြီးကြပ်သူ အတည်ပြုချက် လိုအပ်သည်)",
+    dashReleaseOutcomeToast: "Key \"{key}\" ကို ထိန်းထားခြင်းမှ ဖယ်ရှားပြီးဖြစ်သည် \u2192 အစိမ်း {g} ခု၊ အဝါ {y} ခု",
+    toastHoldFound: "ထိန်းထားသော အရာ {n} ခု တွေ့ရှိသည် \u2014 Hold တက်ဘ်တွင် ကြည့်ပါ",
+    rulesTabHold: "ထိန်း",
+    rulesHoldColumnLabel: "ကော်လံ ရွေးချယ်ရန်",
+    rulesHoldColumnLegacy: "သော့ကော်လံများ (အလိုအလျောက်)",
+    rulesHoldValuesLabel: "အတန်းဒေတာ ရွေးချယ်ရန်",
+    rulesHoldValuesSearch: "တန်ဖိုးများ ရှာဖွေရန်...",
+    rulesHoldSelectAll: "အားလုံး ရွေးရန်",
+    rulesHoldClearSel: "ရှင်းလင်းရန်",
+    rulesHoldLegacyLabel: "ထိန်းထားမည့် သော့များ (တစ်ကြောင်းလျှင် တစ်ခု)",
+    rulesHoldLegacyDesc: "သော့ကော်လံများအတွင်း စာသားအဖြစ် ကိုက်ညီစေသည် (PO, ပစ္စည်း, lot, ...)။",
+    rulesHoldLegacyPlaceholder: "ဥပမာ PO-8801\\nCMP-101-A",
+    rulesHoldNoValues: "တန်ဖိုး မတွေ့ပါ",
+    rulesHoldNoData: "ထိန်းထားမည့် တန်ဖိုးများ ရွေးချယ်ရန် Incoming Workbook ကို ထည့်သွင်းပါ။",
     dashSaveViewTitle: "စိတ်ကြိုက် ကော်လံအစီအစဉ်နှင့် မြင်နိုင်မှုကို သိမ်းဆည်းရန် (အစမ်းကြည့်လင့်ခ်များသို့ ထပ်တူညီမည်)",
     dashSaveSyncView: "မြင်ကွင်းကို သိမ်းဆည်း & ထပ်တူညီရန်",
     dashSaveView: "မြင်ကွင်း သိမ်းဆည်းရန်",
@@ -405,22 +422,27 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashOnlyAccept: "เฉพาะที่ยอมรับ",
     dashRefreshTitle: "รีเฟรชข้อมูลผลลัพธ์",
     dashRefresh: "รีเฟรช",
-    dashHoldKeys: "คีย์ที่พักไว้",
-    dashHoldKeysTitle: "กรองแถวตามคีย์ไปยังแท็บพักไว้",
-    dashHoldKeysDialogTitle: "คีย์ที่พักไว้",
-    dashHoldKeysDialogDesc: "หนึ่งคีย์ต่อหนึ่งบรรทัด แถวใดที่มีคีย์จะถูกย้ายไปยังแท็บพักไว้และแสดงเป็นสีน้ำเงิน — แม้ว่าคีย์ทั้งหมดจะตรงกัน",
-    dashHoldKeysPlaceholder: "เช่น PO-8801\nCMP-101-A",
-    dashHoldKeysClear: "ล้าง",
-    dashHoldKeysSave: "บันทึก",
     dashHoldReasonLabel: "ทำไมรายการเหล่านี้จึงถูกพักไว้?",
     dashHoldReasonPlaceholder: "เช่น รอการยืนยันจากซัพพลายเออร์",
-    dashConfirmRelease: "ยืนยัน",
-    dashConfirmReleaseTitle: "ยืนยันการปล่อยกับหัวหน้างาน",
-    dashReleaseTitle: "ปล่อยจากการพักไว้",
     dashReleaseDesc: "ปล่อยคีย์ \"{key}\" ใช่หรือไม่? มี {n} แถวที่ถูกพักไว้อยู่ แถวที่ตรงกันและผ่านจะเปลี่ยนเป็นสีเขียว ส่วนที่เหลือจะเปลี่ยนเป็นสีเหลืองเพื่อตรวจสอบ",
     dashReleaseSupervisor: "หัวหน้างานของฉันได้ยืนยันการปล่อยนี้แล้ว",
     dashReleaseNoReason: "ไม่ได้ระบุเหตุผล",
-    dashReleasedToast: "ปล่อยคีย์ \"{key}\" แล้ว - ประเมิน {n} แถวใหม่แล้ว",
+    dashRemoveFromHold: "นำออกจากการพักไว้",
+    dashRemoveFromHoldTitle: "นำออกจากการพักไว้ (ต้องได้รับการยืนยันจากหัวหน้างาน)",
+    dashReleaseOutcomeToast: "นำคีย์ \"{key}\" ออกจากการพักไว้แล้ว \u2192 สีเขียว {g} แถว สีเหลือง {y} แถว",
+    toastHoldFound: "พบรายการที่พักไว้ {n} รายการ \u2014 ดูที่แท็บพักไว้",
+    rulesTabHold: "พักไว้",
+    rulesHoldColumnLabel: "เลือกคอลัมน์",
+    rulesHoldColumnLegacy: "คอลัมน์คีย์ (อัตโนมัติ)",
+    rulesHoldValuesLabel: "เลือกข้อมูลแถว",
+    rulesHoldValuesSearch: "ค้นหาค่า...",
+    rulesHoldSelectAll: "เลือกทั้งหมด",
+    rulesHoldClearSel: "ล้าง",
+    rulesHoldLegacyLabel: "คีย์ที่พักไว้ (หนึ่งคีย์ต่อบรรทัด)",
+    rulesHoldLegacyDesc: "จับคู่เป็นข้อความภายในคอลัมน์คีย์ (PO, รายการ, lot, ...)",
+    rulesHoldLegacyPlaceholder: "เช่น PO-8801\\nCMP-101-A",
+    rulesHoldNoValues: "ไม่พบค่า",
+    rulesHoldNoData: "โหลดไฟล์ Incoming Workbook เพื่อเลือกค่าที่พักไว้",
     dashSaveViewTitle: "บันทึกลำดับและการมองเห็นคอลัมน์ที่กำหนดเอง (ซิงค์ไปยังลิงก์ตัวอย่าง)",
     dashSaveSyncView: "บันทึก & ซิงค์มุมมอง",
     dashSaveView: "บันทึกมุมมอง",
@@ -529,22 +551,27 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashOnlyAccept: "仅接受",
     dashRefreshTitle: "刷新结果数据",
     dashRefresh: "刷新",
-    dashHoldKeys: "暂存键",
-    dashHoldKeysTitle: "按关键字将行过滤到暂存选项卡",
-    dashHoldKeysDialogTitle: "暂存键",
-    dashHoldKeysDialogDesc: "每行一个关键字。包含关键字的任何行都会移至暂存选项卡并显示为蓝色 — 即使所有关键字都匹配。",
-    dashHoldKeysPlaceholder: "例如 PO-8801\nCMP-101-A",
-    dashHoldKeysClear: "清除",
-    dashHoldKeysSave: "保存",
     dashHoldReasonLabel: "这些项目为何被暂存？",
     dashHoldReasonPlaceholder: "例如 等待供应商确认",
-    dashConfirmRelease: "确认",
-    dashConfirmReleaseTitle: "与主管确认后释放",
-    dashReleaseTitle: "从暂存中释放",
     dashReleaseDesc: "释放关键字\"{key}\"吗？当前有 {n} 行被暂存。匹配并通过的行将变为绿色，其余将变为黄色以供复核。",
     dashReleaseSupervisor: "我的主管已确认此次释放",
     dashReleaseNoReason: "未填写原因",
-    dashReleasedToast: "关键字\"{key}\"已释放 - 已重新评估 {n} 行",
+    dashRemoveFromHold: "移出暂存",
+    dashRemoveFromHoldTitle: "移出暂存（需要主管确认）",
+    dashReleaseOutcomeToast: "关键字\"{key}\"已移出暂存 \u2192 绿色 {g} 行，黄色 {y} 行",
+    toastHoldFound: "发现 {n} 个暂存项 \u2014 请查看暂存选项卡",
+    rulesTabHold: "暂存",
+    rulesHoldColumnLabel: "选择列",
+    rulesHoldColumnLegacy: "键列（自动）",
+    rulesHoldValuesLabel: "选择行数据",
+    rulesHoldValuesSearch: "搜索值...",
+    rulesHoldSelectAll: "全选",
+    rulesHoldClearSel: "清除",
+    rulesHoldLegacyLabel: "暂存键（每行一个）",
+    rulesHoldLegacyDesc: "在键列中按文本匹配（PO、物料、批次等）。",
+    rulesHoldLegacyPlaceholder: "例如 PO-8801\\nCMP-101-A",
+    rulesHoldNoValues: "未找到值",
+    rulesHoldNoData: "请加载 incoming 工作簿以选择暂存值。",
     dashSaveViewTitle: "保存自定义列顺序和可见性（同步到预览链接）",
     dashSaveSyncView: "保存并同步视图",
     dashSaveView: "保存视图",
