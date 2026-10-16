@@ -24,7 +24,7 @@ interface SharePreviewModalProps {
   results: MatchedRow[];
   stats: MatchingStats;
   comparisonWbName: string;
-  activeFilter: 'all' | 'green' | 'yellow' | 'red' | 'unmatched';
+  activeFilter: 'all' | 'green' | 'yellow' | 'red' | 'blue' | 'unmatched';
   searchTerm: string;
   searchColumn: string;
   columnConfigs?: ColumnConfigItem[];
@@ -113,7 +113,8 @@ export const SharePreviewModal: React.FC<SharePreviewModalProps> = ({
     green: { label: t.shareFilterGreen, colorClass: 'text-emerald-700 font-bold' },
     yellow: { label: t.shareFilterYellow, colorClass: 'text-amber-700 font-bold' },
     red: { label: t.shareFilterRed, colorClass: 'text-rose-700 font-bold' },
-    unmatched: { label: t.shareFilterUnmatched, colorClass: 'text-blue-700 font-bold' },
+    blue: { label: t.shareFilterBlue, colorClass: 'text-blue-700 font-bold' },
+    unmatched: { label: t.shareFilterUnmatched, colorClass: 'text-violet-700 font-bold' },
   };
 
   return (

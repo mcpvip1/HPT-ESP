@@ -49,6 +49,8 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
                   ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.7)]'
                   : row.decisionColor === 'red'
                   ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.7)]'
+                  : row.decisionColor === 'blue'
+                  ? 'bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.7)]'
                   : 'bg-slate-400'
               }`}
             />
