@@ -103,7 +103,50 @@ export interface CloudPreviewMeta {
   ownerUid?: string;
 }
 
-const CHUNK_CHARS = 700_000;
+const CHUNK_BYTES = 700_000; // max UTF-8 bytes per chunk doc (Firestore caps a doc at ~1MiB)
+
+/** UTF-8 byte length of str[start, end) — surrogate-pair aware, no allocation. */
+function utf8ByteLength(str: string, start: number, end: number): number {
+  let bytes = 0;
+  for (let i = start; i < end; i++) {
+    const c = str.charCodeAt(i);
+    if (c < 0x80) bytes += 1;
+    else if (c < 0x800) bytes += 2;
+    else if (c >= 0xd800 && c <= 0xdbff) {
+      bytes += 4;
+      i++; // skip the low surrogate — counted as one code point
+    } else bytes += 3;
+  }
+  return bytes;
+}
+
+/**
+ * Split a string into chunks of at most maxBytes UTF-8 bytes.
+ * Chunking by character count is unsafe: CJK/Myanmar text is 3 bytes per
+ * char, so a 700k-char chunk can exceed Firestore's 1MiB document limit and
+ * fail the whole batch write. Never splits a surrogate pair.
+ */
+function splitIntoByteChunks(str: string, maxBytes: number): string[] {
+  const chunks: string[] = [];
+  const n = str.length;
+  let start = 0;
+  while (start < n) {
+    // Upper bound: every char costs >= 1 byte, so end can be at most start + maxBytes.
+    let end = Math.min(n, start + maxBytes);
+    let bytes = utf8ByteLength(str, start, end);
+    while (bytes > maxBytes && end > start + 1) {
+      // Shrink proportionally; converges in ~2 iterations.
+      end = start + Math.max(1, Math.floor(((end - start) * maxBytes) / bytes));
+      // Never cut a surrogate pair in half.
+      const prev = str.charCodeAt(end - 1);
+      if (prev >= 0xd800 && prev <= 0xdbff) end--;
+      bytes = utf8ByteLength(str, start, end);
+    }
+    chunks.push(str.slice(start, end));
+    start = end;
+  }
+  return chunks;
+}
 
 async function publishChunkedDoc(
   metaRef: DocumentReference,
@@ -112,10 +155,7 @@ async function publishChunkedDoc(
   chunkFields: Record<string, unknown> = {}
 ): Promise<boolean> {
   try {
-    const chunks: string[] = [];
-    for (let i = 0; i < json.length; i += CHUNK_CHARS) {
-      chunks.push(json.slice(i, i + CHUNK_CHARS));
-    }
+    const chunks = splitIntoByteChunks(json, CHUNK_BYTES);
 
     const prevSnap = await getDoc(metaRef).catch(() => null);
     const prevCount =
@@ -147,13 +187,20 @@ async function fetchChunkedDoc(
   try {
     const metaSnap = await getDoc(metaRef);
     if (!metaSnap.exists()) return null;
+    const meta = metaSnap.data() as Record<string, unknown>;
+    const expected = (meta.chunkCount as number) || 0;
+    if (expected === 0) return null;
     const colSnap = await getDocs(collection(metaSnap.ref, 'chunks'));
     const parts: string[] = [];
     colSnap.forEach((d) => {
-      parts[parseInt(d.id, 10)] = (d.data() as { data: string }).data;
+      const idx = parseInt(d.id, 10);
+      if (idx >= 0 && idx < expected) parts[idx] = (d.data() as { data: string }).data;
     });
-    if (parts.length === 0 || parts.some((p) => p === undefined)) return null;
-    return { meta: metaSnap.data() as Record<string, unknown>, json: parts.join('') };
+    // Direct index access (not .some(), which skips holes in sparse arrays).
+    for (let i = 0; i < expected; i++) {
+      if (parts[i] === undefined) return null;
+    }
+    return { meta, json: parts.join('') };
   } catch (e) {
     console.warn('Cloud sync: failed to fetch chunked doc', e);
     return null;
