@@ -10,20 +10,25 @@ import {
   ArrowRight,
   Sparkles,
 } from 'lucide-react';
-import { MatchedRow } from '../types';
+import { Language, MatchedRow } from '../types';
+import { translations } from '../translations';
 
 interface RowDetailModalProps {
   row: MatchedRow | null;
   isOpen: boolean;
   onClose: () => void;
+  language?: Language;
 }
 
 export const RowDetailModal: React.FC<RowDetailModalProps> = ({
   row,
   isOpen,
   onClose,
+  language = 'en',
 }) => {
   if (!isOpen || !row) return null;
+
+  const t = translations[language];
 
   const compKeys = Object.keys(row.comparisonRow);
   const refKeys = row.matchedMainRow ? Object.keys(row.matchedMainRow) : [];
@@ -49,12 +54,12 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
             />
             <div>
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <span>Row #{row.rowIndex} Full Inspection & Discrepancy Breakdown</span>
+                <span>{t.modalRowNum}{row.rowIndex} {t.modalInspectionTitle}</span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                <span>Match Key:</span>
+                <span>{t.modalMatchKey}</span>
                 <span className="font-mono text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                  {row.matchKey || 'N/A'}
+                  {row.matchKey || t.modalNotAvailable}
                 </span>
               </p>
             </div>
@@ -62,7 +67,7 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
           <button
             onClick={onClose}
             className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 transition-colors"
-            title="Close"
+            title={t.close}
           >
             <X className="w-5 h-5" />
           </button>
@@ -78,30 +83,30 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
                 </div>
                 <div>
                   <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
-                    Unmatched Discrepancy Analysis
+                    {t.modalUnmatchedAnalysis}
                   </span>
                   <h4 className="text-sm font-bold text-slate-900 font-mono">
-                    Which one is unmatched:{' '}
+                    {t.modalWhichUnmatched}{' '}
                     <span className="text-amber-800 font-bold underline decoration-amber-400">
-                      {unmatched?.primaryIdentifier || row.matchKey || 'This Record'}
+                      {unmatched?.primaryIdentifier || row.matchKey || t.modalThisRecord}
                     </span>
                   </h4>
                 </div>
               </div>
               <span className="self-start sm:self-auto text-[11px] font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 shrink-0">
                 {unmatched?.matchType === 'partial_mismatch'
-                  ? 'Partial Mismatch (Differing Fields)'
-                  : 'Missing in Reference File'}
+                  ? t.modalPartialMismatch
+                  : t.modalMissingInRef}
               </span>
             </div>
 
             <div className="text-xs text-slate-700 space-y-1">
               <div className="flex items-start gap-1.5">
-                <span className="text-slate-500 font-semibold shrink-0">Reason:</span>
+                <span className="text-slate-500 font-semibold shrink-0">{t.modalReason}</span>
                 <span className="text-slate-900 font-medium">{unmatched?.reason || row.decisionReason}</span>
               </div>
               <div className="flex items-start gap-1.5">
-                <span className="text-slate-500 font-semibold shrink-0">Incoming Key Values:</span>
+                <span className="text-slate-500 font-semibold shrink-0">{t.modalIncomingKeyValues}</span>
                 <span className="font-mono text-amber-800 font-semibold">{unmatched?.unmatchedKeyDisplay || row.matchKey}</span>
               </div>
             </div>
@@ -111,7 +116,7 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
               <div className="pt-2 border-t border-amber-200">
                 <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <GitCompare className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Key Column Comparison Status</span>
+                  <span>{t.modalKeyColStatus}</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                   {unmatched.fieldDiffs.map((diff, i) => (
@@ -127,22 +132,22 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
                         <span>{diff.comparisonCol}</span>
                         {diff.isMatch ? (
                           <span className="text-emerald-700 flex items-center gap-0.5 font-bold">
-                            <CheckCircle2 className="w-3 h-3" /> MATCH
+                            <CheckCircle2 className="w-3 h-3" /> {t.modalMatch}
                           </span>
                         ) : (
                           <span className="text-rose-700 flex items-center gap-0.5 font-bold">
-                            <X className="w-3 h-3" /> DIFFER
+                            <X className="w-3 h-3" /> {t.modalDiffer}
                           </span>
                         )}
                       </div>
                       <div className="space-y-0.5">
                         <div className="text-slate-800 truncate">
-                          <span className="text-slate-500 font-sans text-[10px]">Incoming:</span>{' '}
+                          <span className="text-slate-500 font-sans text-[10px]">{t.modalIncoming}</span>{' '}
                           {String(diff.compValue ?? '—')}
                         </div>
                         <div className="text-slate-800 truncate">
-                          <span className="text-slate-500 font-sans text-[10px]">Reference:</span>{' '}
-                          {String(diff.refValue ?? 'Not Found')}
+                          <span className="text-slate-500 font-sans text-[10px]">{t.modalReference}</span>{' '}
+                          {String(diff.refValue ?? t.modalNotFound)}
                         </div>
                       </div>
                     </div>
@@ -156,10 +161,10 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
             <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 text-emerald-700 font-semibold">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>Matched Successfully with Reference Record (Exact Key Match)</span>
+                <span>{t.modalMatchedSuccess}</span>
               </div>
               <div className="text-slate-700">
-                <span className="text-slate-500 mr-1.5">Decision:</span>
+                <span className="text-slate-500 mr-1.5">{t.modalDecision}</span>
                 <strong className="text-slate-900">{row.decisionReason}</strong>
               </div>
             </div>
@@ -168,18 +173,21 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
               <div className="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-xs">
                 <div className="flex items-center gap-2.5">
                   <span className="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300">
-                    RECONCILED CASE
+                    {t.modalReconciledCase}
                   </span>
                   <div>
-                    <span className="font-bold text-slate-900">Postpone → Accepted Reconciliation</span>
+                    <span className="font-bold text-slate-900">{t.modalReconcileTitle}</span>
                     <p className="text-[11px] text-slate-600 mt-0.5">
-                      This record originally had <strong>{row.reconciledPostponeInfo?.originalPostponeValue || 'Postpone'}</strong> in <em>{row.reconciledPostponeInfo?.originalPostponeColumn || 'Inspection Status'}</em>. Because an <strong>Accepted</strong> record exists with the same key (<span className="font-mono font-bold text-emerald-700">{row.matchKey}</span>), the Accept status takes full precedence: Decision is <strong>PASSED</strong> and Match is <strong>MATCHED</strong>.
+                      {t.modalReconcileBody
+                        .replace('{value}', row.reconciledPostponeInfo?.originalPostponeValue || 'Postpone')
+                        .replace('{column}', row.reconciledPostponeInfo?.originalPostponeColumn || 'Inspection Status')
+                        .replace('{key}', row.matchKey)}
                     </p>
                   </div>
                 </div>
                 {row.reconciledPostponeInfo?.source && (
                   <span className="self-start sm:self-auto px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-white text-emerald-800 border border-emerald-200 shadow-xs whitespace-nowrap">
-                    Overriding Source: {row.reconciledPostponeInfo.source}
+                    {t.modalOverridingSource} {row.reconciledPostponeInfo.source}
                   </span>
                 )}
               </div>
@@ -192,8 +200,8 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
           {/* Comparison File Row */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col">
             <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-3 flex items-center justify-between">
-              <span>Incoming Comparison Record</span>
-              <span className="text-[11px] font-mono text-slate-500">Row #{row.rowIndex}</span>
+              <span>{t.modalIncomingRecord}</span>
+              <span className="text-[11px] font-mono text-slate-500">{t.modalRowNum}{row.rowIndex}</span>
             </h4>
             <div className="space-y-2 text-xs overflow-y-auto flex-1 divide-y divide-slate-200/80">
               {compKeys.map((k) => {
@@ -213,7 +221,7 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
                       <span className="text-slate-500 font-mono text-[11px] font-medium">{k}</span>
                       {isFailedKey && (
                         <span className="text-[10px] px-1 rounded bg-rose-100 text-rose-800 border border-rose-200 font-sans font-bold">
-                          Mismatch
+                          {t.modalMismatch}
                         </span>
                       )}
                     </div>
@@ -231,14 +239,14 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
             <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-3 flex items-center justify-between">
               <span>
                 {row.matchedMainRow
-                  ? 'Matched Reference Record'
+                  ? t.modalMatchedRefRecord
                   : closestRef
-                  ? 'Closest Reference Candidate'
-                  : 'Reference Record'}
+                  ? t.modalClosestCandidate
+                  : t.modalRefRecord}
               </span>
               {closestRef && !row.matchedMainRow && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 font-sans font-bold">
-                  Partial Match
+                  {t.modalPartialMatch}
                 </span>
               )}
             </h4>
@@ -260,7 +268,7 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
             ) : closestRef ? (
               <div className="space-y-2 text-xs overflow-y-auto flex-1 divide-y divide-slate-200/80">
                 <div className="pb-2 text-[11px] text-amber-700 font-medium">
-                  Showing the closest candidate row found in Reference catalog for comparison:
+                  {t.modalClosestDesc}
                 </div>
                 {Object.keys(closestRef).map((k) => {
                   const val = closestRef[k];
@@ -286,12 +294,12 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
                         <span className="text-slate-500 font-mono text-[11px] font-medium">{k}</span>
                         {isMatchingCol && (
                           <span className="text-[10px] px-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 font-sans">
-                            Matched
+                            {t.modalMatchedBadge}
                           </span>
                         )}
                         {isDifferingCol && (
                           <span className="text-[10px] px-1 rounded bg-rose-100 text-rose-800 border border-rose-200 font-sans">
-                            Differs
+                            {t.modalDiffersBadge}
                           </span>
                         )}
                       </div>
@@ -306,12 +314,10 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400 text-xs space-y-2">
                 <FileQuestion className="w-10 h-10 text-slate-300" />
                 <div className="font-semibold text-slate-700">
-                  Zero Matching Records in Reference File
+                  {t.modalZeroMatch}
                 </div>
                 <p className="max-w-xs text-slate-500 text-[11px]">
-                  No row in the Reference dataset contains the key identifier{' '}
-                  <strong className="text-amber-700 font-mono">{unmatched?.primaryIdentifier || row.matchKey}</strong>.
-                  This is a brand new incoming item.
+                  {t.modalZeroMatchDesc.replace('{id}', unmatched?.primaryIdentifier || row.matchKey)}
                 </p>
               </div>
             )}
@@ -321,13 +327,13 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
           <div className="text-xs text-slate-600 font-mono">
-            Status: <span className="text-slate-900 font-bold">{row.isMatched ? 'MATCHED' : 'UNMATCHED (NEW)'}</span> · Layer: <span className="text-emerald-700 font-bold">{row.decisionLayerName || 'Inspection'}</span>
+            {t.modalStatus} <span className="text-slate-900 font-bold">{row.isMatched ? t.modalMatched : t.modalUnmatchedNew}</span> · {t.modalLayer} <span className="text-emerald-700 font-bold">{row.decisionLayerName || 'Inspection'}</span>
           </div>
           <button
             onClick={onClose}
             className="px-5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-xs"
           >
-            Close
+            {t.close}
           </button>
         </div>
       </div>

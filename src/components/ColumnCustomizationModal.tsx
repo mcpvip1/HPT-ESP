@@ -18,7 +18,8 @@ import {
   Save,
   ArrowUpDown,
 } from 'lucide-react';
-import { ColumnConfigItem } from '../types';
+import { ColumnConfigItem, Language } from '../types';
+import { translations } from '../translations';
 
 interface ColumnCustomizationModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ interface ColumnCustomizationModalProps {
   syncExportWithTable: boolean;
   onToggleSync: (sync: boolean) => void;
   onResetDefaults: () => void;
+  language?: Language;
 }
 
 export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> = ({
@@ -40,7 +42,9 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
   syncExportWithTable,
   onToggleSync,
   onResetDefaults,
+  language = 'en',
 }) => {
+  const t = translations[language];
   const [modalSearch, setModalSearch] = useState('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<
     'all' | 'data' | 'reference' | 'system'
@@ -195,7 +199,7 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
               onClick={() => handleMoveUp(col.id)}
               disabled={fullIndex <= 0}
               className="p-1 rounded text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
-              title="Move column earlier / left"
+              title={t.colMoveUp}
             >
               <ChevronUp className="w-3.5 h-3.5" />
             </button>
@@ -203,7 +207,7 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
               onClick={() => handleMoveDown(col.id)}
               disabled={fullIndex >= safeConfigs.length - 1}
               className="p-1 rounded text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
-              title="Move column later / right"
+              title={t.colMoveDown}
             >
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
@@ -225,17 +229,17 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
           {/* Category Tag */}
           {col.category === 'system' && (
             <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 font-bold">
-              Audit
+              {t.colAudit}
             </span>
           )}
           {col.category === 'reference' && (
             <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-blue-50 text-blue-700 border border-blue-200 shrink-0 font-bold">
-              Ref
+              {t.colRef}
             </span>
           )}
           {isInspectionCol && col.category === 'data' && (
             <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-amber-50 text-amber-700 border border-amber-200 shrink-0 font-bold">
-              Key Rule
+              {t.colKeyRule}
             </span>
           )}
         </div>
@@ -255,7 +259,7 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
             ) : (
               <Square className="w-3.5 h-3.5 text-slate-400" />
             )}
-            <span className="hidden sm:inline">Table</span>
+            <span className="hidden sm:inline">{t.colTable}</span>
           </button>
         </div>
 
@@ -274,7 +278,7 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
             ) : (
               <Square className="w-3.5 h-3.5 text-slate-400" />
             )}
-            <span className="hidden sm:inline">Export</span>
+            <span className="hidden sm:inline">{t.colExport}</span>
           </button>
         </div>
       </div>
@@ -292,20 +296,20 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
-                <span>Column View Settings</span>
+                <span>{t.colTitle}</span>
                 <span className="text-[11px] font-semibold font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Move & Visibility
+                  {t.colBadge}
                 </span>
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Reorder columns with ↑ / ↓ arrows and toggle visibility for Results Table and Export.
+                {t.colDesc}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors"
-            title="Close"
+            title={t.close}
           >
             <X className="w-5 h-5" />
           </button>
@@ -321,14 +325,14 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
                 type="text"
                 value={modalSearch}
                 onChange={(e) => setModalSearch(e.target.value)}
-                placeholder="Search column names..."
+                placeholder={t.colSearchPh}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-emerald-500 font-mono shadow-xs"
               />
               {modalSearch && (
                 <button
                   onClick={() => setModalSearch('')}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  title="Clear column search"
+                  title={t.colClearSearch}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -344,7 +348,7 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
                 className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
               />
               <span className="text-xs text-slate-700 font-semibold">
-                Sync Export with Table
+                {t.colSyncExport}
               </span>
             </label>
           </div>
@@ -364,12 +368,12 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
                   }`}
                 >
                   {cat === 'all'
-                    ? 'All Columns'
+                    ? t.colTabAll
                     : cat === 'data'
-                    ? 'Dataset'
+                    ? t.colTabData
                     : cat === 'reference'
-                    ? 'Reference'
-                    : 'Decision & Audit'}
+                    ? t.colTabRef
+                    : t.colTabSystem}
                 </button>
               ))}
             </div>
@@ -383,23 +387,23 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
                 }}
                 className="px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-md transition-colors"
               >
-                Show All
+                {t.colShowAll}
               </button>
               <button
                 onClick={handleSelectDecisionOnly}
                 className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition-colors"
-                title="Keep Decision + Key Columns"
+                title={t.colKeepDecision}
               >
                 <Sparkles className="w-3 h-3 text-emerald-600" />
-                Key Only
+                {t.colKeyOnly}
               </button>
               <button
                 onClick={onResetDefaults}
                 className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-md transition-colors"
-                title="Restore all default columns and initial order"
+                title={t.colRestoreDefaults}
               >
                 <RotateCcw className="w-3 h-3" />
-                Reset
+                {t.colReset}
               </button>
             </div>
           </div>
@@ -409,28 +413,28 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
         <div className="grid grid-cols-12 gap-2 px-5 py-2.5 bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 select-none shrink-0">
           <div className="col-span-6 sm:col-span-7 flex items-center gap-2">
             <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
-            <span>Order & Column Name ({filteredConfigs.length})</span>
+            <span>{t.colOrderName} ({filteredConfigs.length})</span>
           </div>
           <div className="col-span-3 sm:col-span-2 text-center flex items-center justify-center gap-1">
             <Table className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Table</span>
+            <span>{t.colTable}</span>
             <button
               onClick={() => handleSetAllTable(tableVisibleCount < safeConfigs.length)}
               className="ml-1 text-[10px] text-emerald-700 hover:underline font-bold"
-              title="Toggle all in table"
+              title={t.colToggleAllTable}
             >
-              {tableVisibleCount < safeConfigs.length ? 'all' : 'none'}
+              {tableVisibleCount < safeConfigs.length ? t.colAll : t.colNone}
             </button>
           </div>
           <div className="col-span-3 text-center flex items-center justify-center gap-1">
             <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
-            <span>Excel Export</span>
+            <span>{t.colExcelExport}</span>
             <button
               onClick={() => handleSetAllExport(exportVisibleCount < safeConfigs.length)}
               className="ml-1 text-[10px] text-blue-700 hover:underline font-bold"
-              title="Toggle all in export"
+              title={t.colToggleAllExport}
             >
-              {exportVisibleCount < safeConfigs.length ? 'all' : 'none'}
+              {exportVisibleCount < safeConfigs.length ? t.colAll : t.colNone}
             </button>
           </div>
         </div>
@@ -443,8 +447,8 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
             <div className="py-12 text-center space-y-3">
               <p className="text-xs text-slate-500">
                 {modalSearch
-                  ? `No columns match "${modalSearch}"`
-                  : 'No columns are available in this view.'}
+                  ? t.colNoMatch.replace('{q}', modalSearch)
+                  : t.colNoCols}
               </p>
               <div className="flex justify-center gap-2">
                 {modalSearch && (
@@ -452,14 +456,14 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
                     onClick={() => setModalSearch('')}
                     className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
                   >
-                    Clear Filter
+                    {t.colClearFilter}
                   </button>
                 )}
                 <button
                   onClick={onResetDefaults}
                   className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 transition-colors"
                 >
-                  Restore All Default Columns
+                  {t.colRestoreAll}
                 </button>
               </div>
             </div>
@@ -469,22 +473,21 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
         {/* Modal Footer with Save Button */}
         <div className="p-4 sm:px-5 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
           <div className="text-xs text-slate-600 font-medium">
-            Active: <span className="text-emerald-700 font-bold">{tableVisibleCount} columns</span> in table,{' '}
-            <span className="text-blue-700 font-bold">{exportVisibleCount} columns</span> in export
+            {t.colActiveSummary.replace('{t}', String(tableVisibleCount)).replace('{e}', String(exportVisibleCount))}
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <button
               onClick={onClose}
               className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-xs"
             >
-              Cancel
+              {t.cancel}
             </button>
             <button
               onClick={handleSaveAndClose}
               className="flex items-center justify-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-lg shadow-sm transition-all"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>Save & Sync Column View</span>
+              <span>{t.colSaveSync}</span>
             </button>
           </div>
         </div>

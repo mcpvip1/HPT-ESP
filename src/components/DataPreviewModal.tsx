@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { X, Search, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
-import { WorkbookData } from '../types';
+import { Language, WorkbookData } from '../types';
+import { translations } from '../translations';
 
 interface DataPreviewModalProps {
   workbook: WorkbookData | null;
@@ -8,6 +9,7 @@ interface DataPreviewModalProps {
   onClose: () => void;
   title: string;
   onSelectSheet?: (sheetName: string) => void;
+  language?: Language;
 }
 
 export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
@@ -16,7 +18,9 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
   onClose,
   title,
   onSelectSheet,
+  language = 'en',
 }) => {
+  const t = translations[language];
   const [activeSheetState, setActiveSheetState] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
@@ -71,16 +75,16 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
             <div>
               <h3 className="text-base font-bold text-slate-900">{title}</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                {workbook.name} · Sheet: <strong className="text-emerald-700 font-bold">{currentSheetName}</strong> ·{' '}
-                <span className="font-mono tabular-nums text-slate-700 font-semibold">{currentSheetData.rows.length.toLocaleString()}</span> rows ·{' '}
-                <span className="font-mono tabular-nums text-slate-700 font-semibold">{currentSheetData.headers.length}</span> columns
+                {workbook.name} · {t.dpSheet} <strong className="text-emerald-700 font-bold">{currentSheetName}</strong> ·{' '}
+                <span className="font-mono tabular-nums text-slate-700 font-semibold">{currentSheetData.rows.length.toLocaleString()}</span> {t.dpRows} ·{' '}
+                <span className="font-mono tabular-nums text-slate-700 font-semibold">{currentSheetData.headers.length}</span> {t.dpColumns}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
-            aria-label="Close"
+            aria-label={t.close}
           >
             <X className="w-5 h-5" />
           </button>
@@ -90,7 +94,7 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
         {workbook.sheetNames && workbook.sheetNames.length > 1 && (
           <div className="px-6 py-2 bg-slate-100/70 border-b border-slate-200 flex items-center gap-2 overflow-x-auto scrollbar-thin">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 mr-1">
-              Select Sheet:
+              {t.dpSelectSheet}
             </span>
             {workbook.sheetNames.map((sName) => {
               const isSelected = sName === currentSheetName;
@@ -135,12 +139,12 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
                 setSearchTerm(e.target.value);
                 setPage(1);
               }}
-              placeholder="Search data cells..."
+              placeholder={t.searchDataCells}
               className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-xs"
             />
           </div>
           <div className="text-xs text-slate-500">
-            Showing <span className="font-mono font-bold text-slate-800">{filteredRows.length}</span> filtered rows
+            {t.dpShowing.replace('{n}', String(filteredRows.length))}
           </div>
         </div>
 
