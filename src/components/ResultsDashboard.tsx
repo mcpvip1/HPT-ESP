@@ -69,10 +69,8 @@ interface ResultsDashboardProps {
   onExitPreview?: () => void;
   onRefresh?: () => void;
   cloudUser?: User | null;
-  holdKeys?: string[];
   holdReason?: string;
-  onHoldSettingsChange?: (keys: string[], reason: string) => void;
-  onReleaseHoldKey?: (key: string) => Promise<number>;
+  onReleaseHoldKey?: (key: string) => Promise<{ key: string; green: number; yellow: number; total: number }>;
 }
 
 type FilterType = 'all' | 'green' | 'yellow' | 'red' | 'blue' | 'unmatched';
@@ -118,9 +116,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   onExitPreview,
   onRefresh,
   cloudUser,
-  holdKeys = [],
   holdReason = '',
-  onHoldSettingsChange,
   onReleaseHoldKey,
 }) => {
   const t = translations[language];
@@ -146,9 +142,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [sortColumn, setSortColumn] = useState<string>('rowIndex');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRow, setSelectedRow] = useState<MatchedRow | null>(null);
-  const [showHoldKeysDialog, setShowHoldKeysDialog] = useState(false);
-  const [holdKeysDraft, setHoldKeysDraft] = useState('');
-  const [holdReasonDraft, setHoldReasonDraft] = useState('');
   const [releaseTarget, setReleaseTarget] = useState<{ key: string; count: number } | null>(null);
   const [supervisorConfirmed, setSupervisorConfirmed] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
@@ -1012,26 +1005,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               <span>{t.dashRefresh}</span>
             </button>
 
-            {/* Hold Keys filter button (studio only) */}
-            {!isPreviewMode && onHoldSettingsChange && (
-              <button
-                onClick={() => {
-                  setHoldKeysDraft(holdKeys.join('\n'));
-                  setHoldReasonDraft(holdReason);
-                  setShowHoldKeysDialog(true);
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100/80 border border-blue-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0"
-                title={t.dashHoldKeysTitle}
-              >
-                <PauseCircle className="w-3.5 h-3.5" />
-                <span>{t.dashHoldKeys}</span>
-                {holdKeys.length > 0 && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-600 text-white font-bold">
-                    {holdKeys.length}
-                  </span>
-                )}
-              </button>
-            )}
 
             {/* Save Column View & Sync button (Main Results page) */}
             {!isPreviewMode && (
@@ -1707,10 +1680,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                 setSupervisorConfirmed(false);
                               }}
                               className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-md transition-colors"
-                              title={t.dashConfirmReleaseTitle}
+                              title={t.dashRemoveFromHoldTitle}
                             >
                               <Check className="w-3 h-3 stroke-[3]" />
-                              {t.dashConfirmRelease}
+                              {t.dashRemoveFromHold}
                             </button>
                           )}
                           <button
@@ -1814,79 +1787,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         </div>
       </div>
 
-      {/* Hold Keys Dialog */}
-      {showHoldKeysDialog && onHoldSettingsChange && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <PauseCircle className="w-5 h-5 text-blue-600" />
-                <h4 className="text-sm font-bold text-slate-900">{t.dashHoldKeysDialogTitle}</h4>
-              </div>
-              <button
-                onClick={() => setShowHoldKeysDialog(false)}
-                className="text-slate-400 hover:text-slate-700"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500">{t.dashHoldKeysDialogDesc}</p>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">{t.dashHoldReasonLabel}</label>
-              <input
-                value={holdReasonDraft}
-                onChange={(e) => setHoldReasonDraft(e.target.value)}
-                placeholder={t.dashHoldReasonPlaceholder}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            <textarea
-              value={holdKeysDraft}
-              onChange={(e) => setHoldKeysDraft(e.target.value)}
-              placeholder={t.dashHoldKeysPlaceholder}
-              rows={5}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 font-mono"
-              autoFocus
-            />
-
-            <div className="flex justify-between items-center gap-2 pt-3 border-t border-slate-200">
-              <button
-                onClick={() => {
-                  setHoldKeysDraft('');
-                  setHoldReasonDraft('');
-                  onHoldSettingsChange([], '');
-                  setShowHoldKeysDialog(false);
-                }}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 rounded-lg"
-              >
-                {t.dashHoldKeysClear}
-              </button>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowHoldKeysDialog(false)}
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 rounded-lg"
-                >
-                  {t.cancel}
-                </button>
-                <button
-                  onClick={() => {
-                    const keys = holdKeysDraft.split(/\n/).map((k) => k.trim()).filter((k) => k.length > 0);
-                    onHoldSettingsChange(Array.from(new Set(keys)), holdReasonDraft.trim());
-                    setShowHoldKeysDialog(false);
-                  }}
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow-sm"
-                >
-                  {t.dashHoldKeysSave}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Supervisor Release Dialog */}
       {releaseTarget && onReleaseHoldKey && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
@@ -1894,7 +1794,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                <h4 className="text-sm font-bold text-slate-900">{t.dashReleaseTitle}</h4>
+                <h4 className="text-sm font-bold text-slate-900">{t.dashRemoveFromHold}</h4>
               </div>
               <button
                 onClick={() => setReleaseTarget(null)}
@@ -1903,6 +1803,16 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            <label className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-300 cursor-pointer hover:border-amber-400 transition-colors">
+              <input
+                type="checkbox"
+                checked={supervisorConfirmed}
+                onChange={(e) => setSupervisorConfirmed(e.target.checked)}
+                className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="text-xs text-slate-800 font-bold">{t.dashReleaseSupervisor}</span>
+            </label>
 
             <p className="text-xs text-slate-600 leading-relaxed">
               {t.dashReleaseDesc.replace('{key}', releaseTarget.key).replace('{n}', String(releaseTarget.count))}
@@ -1914,16 +1824,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 {holdReason.trim() ? holdReason : t.dashReleaseNoReason}
               </div>
             </div>
-
-            <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:border-slate-300 transition-colors">
-              <input
-                type="checkbox"
-                checked={supervisorConfirmed}
-                onChange={(e) => setSupervisorConfirmed(e.target.checked)}
-                className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="text-xs text-slate-700 font-semibold">{t.dashReleaseSupervisor}</span>
-            </label>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
               <button
@@ -1937,9 +1837,12 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 onClick={async () => {
                   setIsReleasing(true);
                   try {
-                    const n = await onReleaseHoldKey(releaseTarget.key);
+                    const outcome = await onReleaseHoldKey(releaseTarget.key);
                     onShowToast(
-                      t.dashReleasedToast.replace('{key}', releaseTarget.key).replace('{n}', String(n)),
+                      t.dashReleaseOutcomeToast
+                        .replace('{key}', outcome.key)
+                        .replace('{g}', String(outcome.green))
+                        .replace('{y}', String(outcome.yellow)),
                       'success'
                     );
                   } finally {
@@ -1949,7 +1852,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 }}
                 className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {t.dashConfirmRelease}
+                {t.dashRemoveFromHold}
               </button>
             </div>
           </div>
