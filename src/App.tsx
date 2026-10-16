@@ -88,6 +88,7 @@ export default function App() {
   const [shareId, setShareId] = useState<string | null>(() => getShareIdFromUrl());
   const shareRevokedToastShownRef = useRef(false);
   const [previewFilter, setPreviewFilter] = useState<'all' | 'green' | 'yellow' | 'red' | 'unmatched'>('all');
+  const [previewOnlyAccept, setPreviewOnlyAccept] = useState<boolean>(true);
   const [previewSearchTerm, setPreviewSearchTerm] = useState<string>('');
   const [previewSearchColumn, setPreviewSearchColumn] = useState<string>('all');
   const [previewColumnConfigs, setPreviewColumnConfigs] = useState<ColumnConfigItem[] | undefined>(undefined);
@@ -165,6 +166,7 @@ export default function App() {
         rows: pData.results.map((r) => r.comparisonRow || {}),
       });
       if (pData.filter) setPreviewFilter(pData.filter);
+      if (pData.onlyAccept !== undefined) setPreviewOnlyAccept(pData.onlyAccept);
       if (pData.searchTerm !== undefined) setPreviewSearchTerm(pData.searchTerm);
       if (pData.searchColumn) setPreviewSearchColumn(pData.searchColumn);
       if (pData.columnConfigs) setPreviewColumnConfigs(pData.columnConfigs);
@@ -829,6 +831,7 @@ export default function App() {
                 onShowToast={showToast}
                 isPreviewMode={true}
                 initialFilter={previewFilter}
+                initialOnlyAccept={previewOnlyAccept}
                 initialSearchTerm={previewSearchTerm}
                 initialSearchColumn={previewSearchColumn}
                 initialColumnConfigs={previewColumnConfigs}
