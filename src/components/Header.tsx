@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Globe, SlidersHorizontal, FileSpreadsheet, Cloud, LogOut } from 'lucide-react';
+import { Globe, SlidersHorizontal, FileSpreadsheet, Cloud, CloudUpload, LogOut } from 'lucide-react';
 import type { User } from 'firebase/auth';
 import { Language } from '../types';
 import { translations } from '../translations';
@@ -18,6 +18,8 @@ interface HeaderProps {
   cloudUser?: User | null;
   onCloudSignIn?: () => void;
   onCloudSignOut?: () => void;
+  isUploading?: boolean;
+  onOpenSyncPanel?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,6 +35,8 @@ export const Header: React.FC<HeaderProps> = ({
   cloudUser,
   onCloudSignIn,
   onCloudSignOut,
+  isUploading,
+  onOpenSyncPanel,
 }) => {
   const t = translations[language];
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -87,6 +91,17 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Language Selector & Actions */}
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {/* Cloud sync upload status: animated arrow while uploading, opens status & history */}
+            {cloudUser && onOpenSyncPanel && (
+              <button
+                onClick={onOpenSyncPanel}
+                title={t.syncPanelTitle}
+                className="flex items-center gap-1.5 px-2.5 py-2 text-xs font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-lg border border-sky-200 transition-colors whitespace-nowrap shrink-0 shadow-xs"
+              >
+                <CloudUpload className={`w-3.5 h-3.5 ${isUploading ? 'animate-bounce' : ''}`} />
+                <span className="hidden sm:inline">{isUploading ? t.syncUploading : t.syncAllSynced}</span>
+              </button>
+            )}
             {/* Cloud sync: sign in with Google to share rules & live preview across devices */}
             {cloudUser ? (
               <button
