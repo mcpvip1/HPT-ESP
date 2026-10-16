@@ -455,6 +455,19 @@ export async function publishResultsState(
   );
 }
 
+export async function deleteResultsState(uid: string): Promise<void> {
+  try {
+    const metaRef = stateDoc(uid, 'results');
+    const colSnap = await getDocs(collection(metaRef, 'chunks'));
+    const batch = writeBatch(db);
+    colSnap.forEach((d) => batch.delete(d.ref));
+    batch.delete(metaRef);
+    await batch.commit();
+  } catch (e) {
+    console.warn('Cloud sync: failed to delete results state', e);
+  }
+}
+
 export async function fetchResultsState(uid: string): Promise<CloudResultsState | null> {
   const res = await fetchChunkedDoc(stateDoc(uid, 'results'));
   if (!res) return null;
