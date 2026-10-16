@@ -99,6 +99,108 @@ export interface TranslationDict {
   decisionLayer: string;
   viewDetails: string;
   rowDetails: string;
+  modalInspectionTitle: string;
+  modalMatchKey: string;
+  modalNotAvailable: string;
+  modalUnmatchedAnalysis: string;
+  modalWhichUnmatched: string;
+  modalThisRecord: string;
+  modalPartialMismatch: string;
+  modalMissingInRef: string;
+  modalReason: string;
+  modalIncomingKeyValues: string;
+  modalKeyColStatus: string;
+  modalMatch: string;
+  modalDiffer: string;
+  modalIncoming: string;
+  modalReference: string;
+  modalNotFound: string;
+  modalMatchedSuccess: string;
+  modalDecision: string;
+  modalReconciledCase: string;
+  modalReconcileTitle: string;
+  modalReconcileBody: string;
+  modalOverridingSource: string;
+  modalIncomingRecord: string;
+  modalRowNum: string;
+  modalMismatch: string;
+  modalMatchedRefRecord: string;
+  modalClosestCandidate: string;
+  modalRefRecord: string;
+  modalPartialMatch: string;
+  modalClosestDesc: string;
+  modalMatchedBadge: string;
+  modalDiffersBadge: string;
+  modalZeroMatch: string;
+  modalZeroMatchDesc: string;
+  modalStatus: string;
+  modalMatched: string;
+  modalUnmatchedNew: string;
+  modalLayer: string;
+  shareTitle: string;
+  shareDesc: string;
+  shareWhatSee: string;
+  shareBullet1: string;
+  shareBullet2: string;
+  shareBullet3: string;
+  shareFilterConfig: string;
+  sharePreselectFilter: string;
+  shareFilterAll: string;
+  shareFilterGreen: string;
+  shareFilterYellow: string;
+  shareFilterRed: string;
+  shareFilterUnmatched: string;
+  shareIncludeSearch: string;
+  shareLinkLabel: string;
+  shareChars: string;
+  shareCopyLink: string;
+  shareCopied: string;
+  shareCompressedNote: string;
+  shareDownloadHtml: string;
+  shareTestNow: string;
+  shareCopiedToast: string;
+  shareCopyFailToast: string;
+  shareHtmlToast: string;
+  colTitle: string;
+  colBadge: string;
+  colDesc: string;
+  colSearchPh: string;
+  colSyncExport: string;
+  colTabAll: string;
+  colTabData: string;
+  colTabRef: string;
+  colTabSystem: string;
+  colShowAll: string;
+  colKeyOnly: string;
+  colReset: string;
+  colOrderName: string;
+  colTable: string;
+  colExport: string;
+  colExcelExport: string;
+  colAll: string;
+  colNone: string;
+  colNoMatch: string;
+  colNoCols: string;
+  colClearFilter: string;
+  colRestoreAll: string;
+  colActiveSummary: string;
+  colSaveSync: string;
+  colMoveUp: string;
+  colMoveDown: string;
+  colClearSearch: string;
+  colToggleAllTable: string;
+  colToggleAllExport: string;
+  colKeepDecision: string;
+  colRestoreDefaults: string;
+  colAudit: string;
+  colRef: string;
+  colKeyRule: string;
+  dpSheet: string;
+  dpRows: string;
+  dpColumns: string;
+  dpSelectSheet: string;
+  dpShowing: string;
+  searchDataCells: string;
   close: string;
   confirmReset: string;
   confirmResetDesc: string;
@@ -222,6 +324,108 @@ export const translations: Record<Language, TranslationDict> = {
     decisionLayer: "Triggered Layer",
     viewDetails: "Inspect",
     rowDetails: "Row Inspection & Comparison",
+    modalInspectionTitle: "Full Inspection & Discrepancy Breakdown",
+    modalMatchKey: "Match Key:",
+    modalNotAvailable: "N/A",
+    modalUnmatchedAnalysis: "Unmatched Discrepancy Analysis",
+    modalWhichUnmatched: "Which one is unmatched:",
+    modalThisRecord: "This Record",
+    modalPartialMismatch: "Partial Mismatch (Differing Fields)",
+    modalMissingInRef: "Missing in Reference File",
+    modalReason: "Reason:",
+    modalIncomingKeyValues: "Incoming Key Values:",
+    modalKeyColStatus: "Key Column Comparison Status",
+    modalMatch: "MATCH",
+    modalDiffer: "DIFFER",
+    modalIncoming: "Incoming:",
+    modalReference: "Reference:",
+    modalNotFound: "Not Found",
+    modalMatchedSuccess: "Matched Successfully with Reference Record (Exact Key Match)",
+    modalDecision: "Decision:",
+    modalReconciledCase: "RECONCILED CASE",
+    modalReconcileTitle: "Postpone → Accepted Reconciliation",
+    modalReconcileBody: "This record originally had {value} in {column}. Because an Accepted record exists with the same key ({key}), the Accept status takes full precedence: Decision is PASSED and Match is MATCHED.",
+    modalOverridingSource: "Overriding Source:",
+    modalIncomingRecord: "Incoming Comparison Record",
+    modalRowNum: "Row #",
+    modalMismatch: "Mismatch",
+    modalMatchedRefRecord: "Matched Reference Record",
+    modalClosestCandidate: "Closest Reference Candidate",
+    modalRefRecord: "Reference Record",
+    modalPartialMatch: "Partial Match",
+    modalClosestDesc: "Showing the closest candidate row found in Reference catalog for comparison:",
+    modalMatchedBadge: "Matched",
+    modalDiffersBadge: "Differs",
+    modalZeroMatch: "Zero Matching Records in Reference File",
+    modalZeroMatchDesc: "No row in the Reference dataset contains the key identifier {id}. This is a brand new incoming item.",
+    modalStatus: "Status:",
+    modalMatched: "MATCHED",
+    modalUnmatchedNew: "UNMATCHED (NEW)",
+    modalLayer: "Layer:",
+    shareTitle: "Share Live Result Preview",
+    shareDesc: "Share a link for other users to view only the interactive result page.",
+    shareWhatSee: "What other users will see:",
+    shareBullet1: "Opens directly to the Result Page Only (no file editing or settings).",
+    shareBullet2: "Includes full interactive filters, real-time search, column customization, and Excel / CSV export.",
+    shareBullet3: "Your reference file and matching rules are preserved safely.",
+    shareFilterConfig: "Preview Filter Configuration",
+    sharePreselectFilter: "Pre-select current filter:",
+    shareFilterAll: "All Evaluated Rows",
+    shareFilterGreen: "Passed Rows (Green)",
+    shareFilterYellow: "Review Rows (Yellow)",
+    shareFilterRed: "Rejected Rows (Red)",
+    shareFilterUnmatched: "Unmatched Rows (Blue)",
+    shareIncludeSearch: "Include active search query:",
+    shareLinkLabel: "Shareable Preview Link",
+    shareChars: "characters",
+    shareCopyLink: "Copy Link",
+    shareCopied: "Copied!",
+    shareCompressedNote: "Ultra-compressed link (optimized for messaging & email sharing)",
+    shareDownloadHtml: "Download Standalone Preview (.html)",
+    shareTestNow: "Test Live Preview Now",
+    shareCopiedToast: "Live Preview link copied to clipboard!",
+    shareCopyFailToast: "Failed to copy link. Please select and copy manually.",
+    shareHtmlToast: "Standalone HTML preview downloaded! Anyone can open this file in any browser.",
+    colTitle: "Column View Settings",
+    colBadge: "Move & Visibility",
+    colDesc: "Reorder columns with \u2191 / \u2193 arrows and toggle visibility for Results Table and Export.",
+    colSearchPh: "Search column names...",
+    colSyncExport: "Sync Export with Table",
+    colTabAll: "All Columns",
+    colTabData: "Dataset",
+    colTabRef: "Reference",
+    colTabSystem: "Decision & Audit",
+    colShowAll: "Show All",
+    colKeyOnly: "Key Only",
+    colReset: "Reset",
+    colOrderName: "Order & Column Name",
+    colTable: "Table",
+    colExport: "Export",
+    colExcelExport: "Excel Export",
+    colAll: "all",
+    colNone: "none",
+    colNoMatch: 'No columns match "{q}"',
+    colNoCols: "No columns are available in this view.",
+    colClearFilter: "Clear Filter",
+    colRestoreAll: "Restore All Default Columns",
+    colActiveSummary: "Active: {t} columns in table, {e} columns in export",
+    colSaveSync: "Save & Sync Column View",
+    colMoveUp: "Move column earlier / left",
+    colMoveDown: "Move column later / right",
+    colClearSearch: "Clear column search",
+    colToggleAllTable: "Toggle all in table",
+    colToggleAllExport: "Toggle all in export",
+    colKeepDecision: "Keep Decision + Key Columns",
+    colRestoreDefaults: "Restore all default columns and initial order",
+    colAudit: "Audit",
+    colRef: "Ref",
+    colKeyRule: "Key Rule",
+    dpSheet: "Sheet:",
+    dpRows: "rows",
+    dpColumns: "columns",
+    dpSelectSheet: "Select Sheet:",
+    dpShowing: "Showing {n} filtered rows",
+    searchDataCells: "Search data cells...",
     close: "Close",
     confirmReset: "Reset Reference Workbook?",
     confirmResetDesc: "This will remove the saved reference workbook from local storage. You will need to upload a new one.",
@@ -342,6 +546,108 @@ export const translations: Record<Language, TranslationDict> = {
     decisionLayer: "အသုံးပြုခဲ့သော အလွှာ",
     viewDetails: "အသေးစိတ်",
     rowDetails: "အတန်းအချက်အလက် နှိုင်းယှဉ်ချက်",
+    modalInspectionTitle: "အပြည့်အစုံ စစ်ဆေးချက် နှင့် ကွဲလွဲမှု အသေးစိတ်",
+    modalMatchKey: "ကိုက်ညီသောသော့:",
+    modalNotAvailable: "မရှိ",
+    modalUnmatchedAnalysis: "မကိုက်ညီမှု ကွဲလွဲချက် ဆန်းစစ်ချက်",
+    modalWhichUnmatched: "ဘယ်တစ်ခုက မကိုက်ညီသလဲ:",
+    modalThisRecord: "ဤမှတ်တမ်း",
+    modalPartialMismatch: "အစိတ်အပိုင်း ကိုက်ညီမှုမရှိ (ကွဲပြားသော အကွက်များ)",
+    modalMissingInRef: "အခြေခံဖိုင်တွင် မရှိပါ",
+    modalReason: "အကြောင်းရင်း:",
+    modalIncomingKeyValues: "ဝင်လာသော သော့တန်ဖိုးများ:",
+    modalKeyColStatus: "အဓိကကော်လံ နှိုင်းယှဉ်မှု အခြေအနေ",
+    modalMatch: "ကိုက်ညီသည်",
+    modalDiffer: "ကွဲပြားသည်",
+    modalIncoming: "ဝင်လာသည်:",
+    modalReference: "အခြေခံ:",
+    modalNotFound: "မတွေ့ပါ",
+    modalMatchedSuccess: "အခြေခံမှတ်တမ်းနှင့် အောင်မြင်စွာ ကိုက်ညီသည် (သော့အတိအကျ)",
+    modalDecision: "ဆုံးဖြတ်ချက်:",
+    modalReconciledCase: "ပြန်လည်ညှိနှိုင်းထားသော အမှု",
+    modalReconcileTitle: "ရွှေ့ဆိုင်း → လက်ခံခြင်း ပြန်လည်ညှိနှိုင်းမှု",
+    modalReconcileBody: "ဤမှတ်တမ်းတွင် မူလက {column} ၌ {value} ဟု ရှိခဲ့သည်။ တူညီသောသော့ ({key}) ဖြင့် လက်ခံထားသော မှတ်တမ်းတစ်ခု ရှိသောကြောင့် လက်ခံမှုအခြေနေက အပြည့်အဝ ဦးစားပေးသည်- ဆုံးဖြတ်ချက်မှာ အောင်မြင်ပြီး ကိုက်ညီမှုမှာ ကိုက်ညီသည်။",
+    modalOverridingSource: "အစားထိုးရင်းမြစ်:",
+    modalIncomingRecord: "ဝင်လာသော နှိုင်းယှဉ်မှတ်တမ်း",
+    modalRowNum: "အတန်း #",
+    modalMismatch: "မကိုက်ညီမှု",
+    modalMatchedRefRecord: "ကိုက်ညီသော အခြေခံမှတ်တမ်း",
+    modalClosestCandidate: "အနီးစပ်ဆုံး အခြေခံလောင်း",
+    modalRefRecord: "အခြေခံမှတ်တမ်း",
+    modalPartialMatch: "အစိတ်အပိုင်း ကိုက်ညီမှု",
+    modalClosestDesc: "နှိုင်းယှဉ်ရန် အခြေခံကတ်တလောက်တွင် တွေ့ရှိသော အနီးစပ်ဆုံး လောင်းအတန်းကို ပြသထားသည်:",
+    modalMatchedBadge: "ကိုက်ညီသည်",
+    modalDiffersBadge: "ကွဲပြားသည်",
+    modalZeroMatch: "အခြေခံဖိုင်တွင် ကိုက်ညီသော မှတ်တမ်းလုံးဝမရှိပါ",
+    modalZeroMatchDesc: "အခြေခံဒေတာအစုံတွင် သော့အမှတ်အသား {id} ပါဝင်သော အတန်းမရှိပါ။ ၎င်းသည် အသစ်ဝင်လာသော ပစ္စည်းဖြစ်သည်။",
+    modalStatus: "အခြေအနေ:",
+    modalMatched: "ကိုက်ညီသည်",
+    modalUnmatchedNew: "မကိုက်ညီ (အသစ်)",
+    modalLayer: "အလွှာ:",
+    shareTitle: "တိုက်ရိုက် ရလဒ် အစမ်းကြည့်ခြင်း မျှဝေရန်",
+    shareDesc: "အပြန်အလှန် ရလဒ်စာမျက်နှာကိုသာ ကြည့်ရှုနိုင်သော လင့်ခ်ကို အခြားအသုံးပြုသူများအား မျှဝေပါ။",
+    shareWhatSee: "အခြားအသုံးပြုသူများ မြင်ရမည့်အရာများ:",
+    shareBullet1: "ရလဒ်စာမျက်နှာသို့သာ တိုက်ရိုက်ဖွင့်မည် (ဖိုင်ပြင်ဆင်ခြင်း သို့မဟုတ် ဆက်တင်များ မပါဝင်ပါ)။",
+    shareBullet2: "အပြန်အလှန် စစ်ထုတ်မှုများ၊ အချိန်နှင့်တပြေးညီ ရှာဖွေမှု၊ ကော်လံ စိတ်ကြိုက်ပြင်ဆင်မှုနှင့် Excel / CSV ထုတ်ယူမှုများ ပါဝင်သည်။",
+    shareBullet3: "သင့်အခြေခံဖိုင်နှင့် ကိုက်ညီမှုစည်းမျဉ်းများကို လုံခြုံစွာ ထိန်းသိမ်းထားသည်။",
+    shareFilterConfig: "အစမ်းကြည့်မှု စစ်ထုတ်မှု ပြင်ဆင်ချက်",
+    sharePreselectFilter: "လက်ရှိ စစ်ထုတ်မှုကို ကြိုတင်ရွေးချယ်ရန်:",
+    shareFilterAll: "အကဲဖြတ်ပြီး အတန်းအားလုံး",
+    shareFilterGreen: "အောင်မြင်သော အတန်းများ (အစိမ်း)",
+    shareFilterYellow: "ပြန်လည်သုံးသပ်ရန် အတန်းများ (အဝါ)",
+    shareFilterRed: "ပယ်ချထားသော အတန်းများ (အနီ)",
+    shareFilterUnmatched: "မကိုက်ညီသော အတန်းများ (အပြာ)",
+    shareIncludeSearch: "လက်ရှိ ရှာဖွေမှုကို ထည့်သွင်းရန်:",
+    shareLinkLabel: "မျှဝေနိုင်သော အစမ်းကြည့်လင့်ခ်",
+    shareChars: "စာလုံးရေ",
+    shareCopyLink: "လင့်ခ်ကူးယူမည်",
+    shareCopied: "ကူးယူပြီးပြီ!",
+    shareCompressedNote: "အလွန်ချုံ့ထားသော လင့်ခ် (စာတို နှင့် အီးမေးလ်အတွက် အကောင်းဆုံး)",
+    shareDownloadHtml: "သီးခြား အစမ်းကြည့် (.html) ဒေါင်းလုဒ်လုပ်မည်",
+    shareTestNow: "အစမ်းကြည့်မှုကို ယခု စမ်းသပ်မည်",
+    shareCopiedToast: "တိုက်ရိုက် အစမ်းကြည့်လင့်ခ်ကို ကလစ်ဘုတ်သို့ ကူးယူပြီးပြီ!",
+    shareCopyFailToast: "လင့်ခ်ကူးယူ၍ မရပါ။ ကိုယ်တိုင် ရွေးချယ်၍ ကူးယူပါ။",
+    shareHtmlToast: "သီးခြား HTML အစမ်းကြည့်မှုကို ဒေါင်းလုဒ်လုပ်ပြီးပြီ! မည်သူမဆို ဘရောင်ဇာဖြင့် ဖွင့်နိုင်သည်။",
+    colTitle: "ကော်လံ မြင်ကွင်း ဆက်တင်များ",
+    colBadge: "ရွှေ့ပြောင်း & မြင်နိုင်မှု",
+    colDesc: "\u2191 / \u2193 မြှားများဖြင့် ကော်လံများကို ပြန်စီပြီး ရလဒ်ဇယားနှင့် ထုတ်ယူမှုအတွက် မြင်နိုင်မှုကို ဖွင့်/ပိတ်ပါ။",
+    colSearchPh: "ကော်လံအမည်များ ရှာဖွေရန်...",
+    colSyncExport: "ထုတ်ယူမှုကို ဇယားနှင့် ထပ်တူညီစေရန်",
+    colTabAll: "ကော်လံအားလုံး",
+    colTabData: "ဒေတာအစုံ",
+    colTabRef: "အခြေခံ",
+    colTabSystem: "ဆုံးဖြတ်ချက် & စစ်ဆေးမှု",
+    colShowAll: "အားလုံးပြရန်",
+    colKeyOnly: "အဓိကသာ",
+    colReset: "ပြန်လည်သတ်မှတ်ရန်",
+    colOrderName: "အစီအစဉ် & ကော်လံအမည်",
+    colTable: "ဇယား",
+    colExport: "ထုတ်ယူမှု",
+    colExcelExport: "Excel ထုတ်ယူမှု",
+    colAll: "အားလုံး",
+    colNone: "မရှိ",
+    colNoMatch: '"{q}" နှင့် ကိုက်ညီသော ကော်လံမရှိပါ',
+    colNoCols: "ဤမြင်ကွင်းတွင် ကော်လံများ မရှိပါ။",
+    colClearFilter: "စစ်ထုတ်မှုကို ရှင်းရန်",
+    colRestoreAll: "မူလကော်လံအားလုံး ပြန်လည်ရယူရန်",
+    colActiveSummary: "လှုပ်ရှားနေသည်- ဇယားတွင် ကော်လံ {t} ခု၊ ထုတ်ယူမှုတွင် {e} ခု",
+    colSaveSync: "ကော်လံမြင်ကွင်းကို သိမ်းဆည်း & ထပ်တူညီစေရန်",
+    colMoveUp: "ကော်လံကို အစောပိုင်းသို့ ရွှေ့ရန်",
+    colMoveDown: "ကော်လံကို နောက်ပိုင်းသို့ ရွှေ့ရန်",
+    colClearSearch: "ကော်လံရှာဖွေမှုကို ရှင်းရန်",
+    colToggleAllTable: "ဇယားရှိ အားလုံးကို ဖွင့်/ပိတ်ရန်",
+    colToggleAllExport: "ထုတ်ယူမှုရှိ အားလုံးကို ဖွင့်/ပိတ်ရန်",
+    colKeepDecision: "ဆုံးဖြတ်ချက် + အဓိကကော်လံများသာ ထားရန်",
+    colRestoreDefaults: "မူလကော်လံများနှင့် အစီအစဉ်အားလုံး ပြန်လည်ရယူရန်",
+    colAudit: "စစ်ဆေးမှု",
+    colRef: "အခြေခံ",
+    colKeyRule: "အဓိကစည်းမျဉ်း",
+    dpSheet: "စာရွက်:",
+    dpRows: "အတန်းများ",
+    dpColumns: "ကော်လံများ",
+    dpSelectSheet: "စာရွက်ရွေးချယ်ရန်:",
+    dpShowing: "{n} စစ်ထုတ်ထားသော အတန်းများကို ပြသနေသည်",
+    searchDataCells: "ဒေတာဆဲလ်များ ရှာဖွေရန်...",
     close: "ပိတ်ရန်",
     confirmReset: "ပင်မဖိုင်ကို ရှင်းလင်းမည်လား?",
     confirmResetDesc: "စက်ထဲတွင် သိမ်းဆည်းထားသော အချက်အလက်များ ပျက်သွားပါမည်။",
@@ -462,6 +768,108 @@ export const translations: Record<Language, TranslationDict> = {
     decisionLayer: "เลเยอร์ที่ตรวจพบ",
     viewDetails: "ดูรายละเอียด",
     rowDetails: "การตรวจสอบและเปรียบเทียบแถวข้อมูล",
+    modalInspectionTitle: "รายละเอียดการตรวจสอบและความคลาดเคลื่อนแบบเต็ม",
+    modalMatchKey: "คีย์ที่ตรงกัน:",
+    modalNotAvailable: "ไม่มีข้อมูล",
+    modalUnmatchedAnalysis: "วิเคราะห์ความคลาดเคลื่อนที่ไม่ตรงกัน",
+    modalWhichUnmatched: "รายการใดที่ไม่ตรงกัน:",
+    modalThisRecord: "ระเบียนนี้",
+    modalPartialMismatch: "ตรงกันบางส่วน (ฟิลด์ที่แตกต่างกัน)",
+    modalMissingInRef: "ไม่มีในไฟล์อ้างอิง",
+    modalReason: "เหตุผล:",
+    modalIncomingKeyValues: "ค่าคีย์ขาเข้า:",
+    modalKeyColStatus: "สถานะการเปรียบเทียบคอลัมน์หลัก",
+    modalMatch: "ตรงกัน",
+    modalDiffer: "ต่างกัน",
+    modalIncoming: "ขาเข้า:",
+    modalReference: "อ้างอิง:",
+    modalNotFound: "ไม่พบ",
+    modalMatchedSuccess: "จับคู่กับระเบียนอ้างอิงสำเร็จ (คีย์ตรงแบบเป๊ะ)",
+    modalDecision: "การตัดสินใจ:",
+    modalReconciledCase: "กรณีที่ปรับปรุงแล้ว",
+    modalReconcileTitle: "เลื่อน → การปรับยอดที่ยอมรับ",
+    modalReconcileBody: "ระเบียนนี้เดิมมี {value} ใน {column} เนื่องจากมีระเบียนที่ได้รับการยอมรับซึ่งมีคีย์เดียวกัน ({key}) สถานะที่ยอมรับจึงมีผลเหนือกว่าทั้งหมด: การตัดสินใจคือผ่าน และการจับคู่คือตรงกัน",
+    modalOverridingSource: "แหล่งที่มาแทนที่:",
+    modalIncomingRecord: "ระเบียนเปรียบเทียบขาเข้า",
+    modalRowNum: "แถวที่ #",
+    modalMismatch: "ไม่ตรงกัน",
+    modalMatchedRefRecord: "ระเบียนอ้างอิงที่ตรงกัน",
+    modalClosestCandidate: "ตัวเลือกอ้างอิงที่ใกล้เคียงที่สุด",
+    modalRefRecord: "ระเบียนอ้างอิง",
+    modalPartialMatch: "ตรงกันบางส่วน",
+    modalClosestDesc: "แสดงแถวตัวเลือกที่ใกล้เคียงที่สุดที่พบในแค็ตตาล็อกอ้างอิงเพื่อเปรียบเทียบ:",
+    modalMatchedBadge: "ตรงกัน",
+    modalDiffersBadge: "ต่างกัน",
+    modalZeroMatch: "ไม่มีระเบียนที่ตรงกันในไฟล์อ้างอิงเลย",
+    modalZeroMatchDesc: "ไม่มีแถวในชุดข้อมูลอ้างอิงที่มีตัวระบุคีย์ {id} นี่เป็นรายการขาเข้าใหม่",
+    modalStatus: "สถานะ:",
+    modalMatched: "ตรงกัน",
+    modalUnmatchedNew: "ไม่ตรงกัน (ใหม่)",
+    modalLayer: "เลเยอร์:",
+    shareTitle: "แชร์ตัวอย่างผลลัพธ์แบบสด",
+    shareDesc: "แชร์ลิงก์ให้ผู้ใช้อื่นดูเฉพาะหน้าผลลัพธ์แบบโต้ตอบได้",
+    shareWhatSee: "สิ่งที่ผู้ใช้อื่นจะเห็น:",
+    shareBullet1: "เปิดไปที่หน้าผลลัพธ์เท่านั้นโดยตรง (ไม่มีการแก้ไขไฟล์หรือการตั้งค่า)",
+    shareBullet2: "มีตัวกรองแบบโต้ตอบ การค้นหาแบบเรียลไทม์ การปรับแต่งคอลัมน์ และการส่งออก Excel / CSV",
+    shareBullet3: "ไฟล์อ้างอิงและกฎการจับคู่ของคุณจะถูกเก็บรักษาอย่างปลอดภัย",
+    shareFilterConfig: "การกำหนดค่าตัวกรองตัวอย่าง",
+    sharePreselectFilter: "เลือกตัวกรองปัจจุบันไว้ล่วงหน้า:",
+    shareFilterAll: "แถวที่ประเมินทั้งหมด",
+    shareFilterGreen: "แถวที่ผ่าน (สีเขียว)",
+    shareFilterYellow: "แถวที่ต้องตรวจสอบ (สีเหลือง)",
+    shareFilterRed: "แถวที่ถูกปฏิเสธ (สีแดง)",
+    shareFilterUnmatched: "แถวที่ไม่ตรงกัน (สีน้ำเงิน)",
+    shareIncludeSearch: "รวมคำค้นหาที่ใช้งานอยู่:",
+    shareLinkLabel: "ลิงก์ตัวอย่างที่แชร์ได้",
+    shareChars: "อักขระ",
+    shareCopyLink: "คัดลอกลิงก์",
+    shareCopied: "คัดลอกแล้ว!",
+    shareCompressedNote: "ลิงก์ที่บีบอัดเป็นพิเศษ (เหมาะสำหรับการแชร์ทางข้อความและอีเมล)",
+    shareDownloadHtml: "ดาวน์โหลดตัวอย่างแบบสแตนด์อโลน (.html)",
+    shareTestNow: "ทดสอบตัวอย่างสดทันที",
+    shareCopiedToast: "คัดลอกลิงก์ตัวอย่างสดไปยังคลิปบอร์ดแล้ว!",
+    shareCopyFailToast: "คัดลอกลิงก์ไม่สำเร็จ กรุณาเลือกและคัดลอกด้วยตนเอง",
+    shareHtmlToast: "ดาวน์โหลดตัวอย่าง HTML แบบสแตนด์อโลนแล้ว! ใครก็สามารถเปิดในเบราว์เซอร์ใดก็ได้",
+    colTitle: "ตั้งค่ามุมมองคอลัมน์",
+    colBadge: "ย้าย & การมองเห็น",
+    colDesc: "จัดเรียงคอลัมน์ใหม่ด้วยลูกศร \u2191 / \u2193 และเปิด/ปิดการมองเห็นสำหรับตารางผลลัพธ์และการส่งออก",
+    colSearchPh: "ค้นหาชื่อคอลัมน์...",
+    colSyncExport: "ซิงค์การส่งออกกับตาราง",
+    colTabAll: "คอลัมน์ทั้งหมด",
+    colTabData: "ชุดข้อมูล",
+    colTabRef: "อ้างอิง",
+    colTabSystem: "การตัดสินใจ & ตรวจสอบ",
+    colShowAll: "แสดงทั้งหมด",
+    colKeyOnly: "เฉพาะหลัก",
+    colReset: "รีเซ็ต",
+    colOrderName: "ลำดับ & ชื่อคอลัมน์",
+    colTable: "ตาราง",
+    colExport: "ส่งออก",
+    colExcelExport: "ส่งออก Excel",
+    colAll: "ทั้งหมด",
+    colNone: "ไม่มี",
+    colNoMatch: 'ไม่มีคอลัมน์ที่ตรงกับ "{q}"',
+    colNoCols: "ไม่มีคอลัมน์ในมุมมองนี้",
+    colClearFilter: "ล้างตัวกรอง",
+    colRestoreAll: "กู้คืนคอลัมน์เริ่มต้นทั้งหมด",
+    colActiveSummary: "ใช้งาน: {t} คอลัมน์ในตาราง, {e} คอลัมน์ในการส่งออก",
+    colSaveSync: "บันทึก & ซิงค์มุมมองคอลัมน์",
+    colMoveUp: "ย้ายคอลัมน์ไปก่อนหน้า",
+    colMoveDown: "ย้ายคอลัมน์ไปถัดไป",
+    colClearSearch: "ล้างการค้นหาคอลัมน์",
+    colToggleAllTable: "สลับทั้งหมดในตาราง",
+    colToggleAllExport: "สลับทั้งหมดในการส่งออก",
+    colKeepDecision: "เก็บเฉพาะการตัดสินใจ + คอลัมน์หลัก",
+    colRestoreDefaults: "กู้คืนคอลัมน์เริ่มต้นและลำดับทั้งหมด",
+    colAudit: "ตรวจสอบ",
+    colRef: "อ้างอิง",
+    colKeyRule: "กฎหลัก",
+    dpSheet: "ชีต:",
+    dpRows: "แถว",
+    dpColumns: "คอลัมน์",
+    dpSelectSheet: "เลือกชีต:",
+    dpShowing: "กำลังแสดง {n} แถวที่กรองแล้ว",
+    searchDataCells: "ค้นหาเซลล์ข้อมูล...",
     close: "ปิด",
     confirmReset: "ยืนยันการล้างไฟล์หลัก?",
     confirmResetDesc: "การกระทำนี้จะลบไฟล์อ้างอิงที่บันทึกไว้ในเครื่องของคุณ",
@@ -582,6 +990,108 @@ export const translations: Record<Language, TranslationDict> = {
     decisionLayer: "命中决策层",
     viewDetails: "行详情",
     rowDetails: "行数据双表比对详情",
+    modalInspectionTitle: "完整检验与差异明细",
+    modalMatchKey: "匹配键:",
+    modalNotAvailable: "无",
+    modalUnmatchedAnalysis: "未匹配差异分析",
+    modalWhichUnmatched: "哪一条未匹配:",
+    modalThisRecord: "本记录",
+    modalPartialMismatch: "部分匹配（字段不同）",
+    modalMissingInRef: "参考文件中缺失",
+    modalReason: "原因:",
+    modalIncomingKeyValues: "传入键值:",
+    modalKeyColStatus: "关键列对比状态",
+    modalMatch: "匹配",
+    modalDiffer: "不同",
+    modalIncoming: "传入:",
+    modalReference: "参考:",
+    modalNotFound: "未找到",
+    modalMatchedSuccess: "已与参考记录成功匹配（键完全一致）",
+    modalDecision: "判定:",
+    modalReconciledCase: "已调和案例",
+    modalReconcileTitle: "推迟 → 接受调和",
+    modalReconcileBody: "本记录在{column}中原为{value}。由于存在具有相同键（{key}）的已接受记录，接受状态具有完全优先权：判定为通过，匹配为已匹配。",
+    modalOverridingSource: "覆盖来源:",
+    modalIncomingRecord: "传入比对记录",
+    modalRowNum: "行 #",
+    modalMismatch: "不匹配",
+    modalMatchedRefRecord: "已匹配的参考记录",
+    modalClosestCandidate: "最接近的参考候选",
+    modalRefRecord: "参考记录",
+    modalPartialMatch: "部分匹配",
+    modalClosestDesc: "显示在参考目录中找到的最接近候选行以供对比：",
+    modalMatchedBadge: "已匹配",
+    modalDiffersBadge: "不同",
+    modalZeroMatch: "参考文件中没有任何匹配记录",
+    modalZeroMatchDesc: "参考数据集中没有包含键标识 {id} 的行。这是一条全新的传入记录。",
+    modalStatus: "状态:",
+    modalMatched: "已匹配",
+    modalUnmatchedNew: "未匹配（新增）",
+    modalLayer: "层:",
+    shareTitle: "分享实时结果预览",
+    shareDesc: "分享链接，让其他用户仅查看可交互的结果页面。",
+    shareWhatSee: "其他用户将看到：",
+    shareBullet1: "直接打开仅结果页面（无文件编辑或设置）。",
+    shareBullet2: "包含完整的交互式筛选、实时搜索、列自定义以及 Excel / CSV 导出。",
+    shareBullet3: "您的参考文件和匹配规则将得到安全保留。",
+    shareFilterConfig: "预览筛选配置",
+    sharePreselectFilter: "预选当前筛选器：",
+    shareFilterAll: "所有已评估行",
+    shareFilterGreen: "通过的行（绿色）",
+    shareFilterYellow: "待复核的行（黄色）",
+    shareFilterRed: "被拒绝的行（红色）",
+    shareFilterUnmatched: "未匹配的行（蓝色）",
+    shareIncludeSearch: "包含当前搜索词：",
+    shareLinkLabel: "可分享的预览链接",
+    shareChars: "字符",
+    shareCopyLink: "复制链接",
+    shareCopied: "已复制！",
+    shareCompressedNote: "超压缩链接（针对消息和邮件分享进行了优化）",
+    shareDownloadHtml: "下载独立预览 (.html)",
+    shareTestNow: "立即测试实时预览",
+    shareCopiedToast: "实时预览链接已复制到剪贴板！",
+    shareCopyFailToast: "复制链接失败，请手动选择并复制。",
+    shareHtmlToast: "独立 HTML 预览已下载！任何人都可以在任何浏览器中打开。",
+    colTitle: "列视图设置",
+    colBadge: "移动与可见性",
+    colDesc: "使用 \u2191 / \u2193 箭头重新排序列，并切换结果表和导出的可见性。",
+    colSearchPh: "搜索列名...",
+    colSyncExport: "导出与表格同步",
+    colTabAll: "所有列",
+    colTabData: "数据集",
+    colTabRef: "参考",
+    colTabSystem: "判定与审计",
+    colShowAll: "全部显示",
+    colKeyOnly: "仅关键列",
+    colReset: "重置",
+    colOrderName: "顺序 & 列名",
+    colTable: "表格",
+    colExport: "导出",
+    colExcelExport: "Excel 导出",
+    colAll: "全部",
+    colNone: "无",
+    colNoMatch: '没有与 "{q}" 匹配的列',
+    colNoCols: "此视图中没有可用的列。",
+    colClearFilter: "清除筛选",
+    colRestoreAll: "恢复所有默认列",
+    colActiveSummary: "当前：表格中有 {t} 列，导出中有 {e} 列",
+    colSaveSync: "保存并同步列视图",
+    colMoveUp: "将列前移",
+    colMoveDown: "将列后移",
+    colClearSearch: "清除列搜索",
+    colToggleAllTable: "切换表格中的全部",
+    colToggleAllExport: "切换导出中的全部",
+    colKeepDecision: "仅保留判定 + 关键列",
+    colRestoreDefaults: "恢复所有默认列和初始顺序",
+    colAudit: "审计",
+    colRef: "参考",
+    colKeyRule: "关键规则",
+    dpSheet: "工作表:",
+    dpRows: "行",
+    dpColumns: "列",
+    dpSelectSheet: "选择工作表:",
+    dpShowing: "正在显示 {n} 个筛选后的行",
+    searchDataCells: "搜索数据单元格...",
     close: "关闭",
     confirmReset: "确认重置基准工作簿？",
     confirmResetDesc: "此操作将清除浏览器本地保存的基准文件及缓存，需重新上传。",
