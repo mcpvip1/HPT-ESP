@@ -1097,53 +1097,70 @@ export function exportStyledExcel(
     return exportColumnIds.includes(id) || exportColumnIds.includes(label);
   };
 
-  // Evaluated Results Sheet (with data columns first, and Decision & System Audit columns placed last)
-  const resultRows = results.map((item) => {
-    const rowObj: Record<string, any> = {};
-
-    if (shouldInclude('rowIndex', 'Row #')) {
-      rowObj['Row #'] = item.rowIndex;
+  // Column order mirrors the dashboard's customized column sequence
+  // (exportColumnIds), so [Ref] columns land exactly where the user placed
+  // them in the table — e.g. [Ref] Inspection Status right after Inspection Status.
+  const orderedColumns: { id: string; header: string }[] = [];
+  if (exportColumnIds && exportColumnIds.length > 0) {
+    for (const id of exportColumnIds) {
+      if (id === 'rowIndex') orderedColumns.push({ id, header: 'Row #' });
+      else if (id === 'decisionStatus') orderedColumns.push({ id, header: 'Decision Outcome' });
+      else if (id === 'resultColor') orderedColumns.push({ id, header: 'Result Color' });
+      else if (id === 'matchStatus') orderedColumns.push({ id, header: 'Match Status' });
+      else if (id === 'decisionReason') orderedColumns.push({ id, header: 'Evaluation Reason' });
+      else if (id.startsWith('[Ref] ')) orderedColumns.push({ id, header: id });
+      else orderedColumns.push({ id, header: id });
     }
-
-    for (const h of compHeaders) {
-      if (shouldInclude(h, h)) {
-        rowObj[h] = item.comparisonRow[h] ?? '';
-      }
-    }
-
-    if (item.matchedMainRow) {
-      for (const [k, v] of Object.entries(item.matchedMainRow)) {
-        const refKey = `[Ref] ${k}`;
-        if (!compHeaders.includes(k) && shouldInclude(refKey, refKey)) {
-          rowObj[refKey] = v ?? '';
+  } else {
+    // Fallback: dashboard default order (Row #, comparison, [Ref], decisions)
+    orderedColumns.push({ id: 'rowIndex', header: 'Row #' });
+    for (const h of compHeaders) orderedColumns.push({ id: h, header: h });
+    const seenRef = new Set<string>();
+    for (const item of results) {
+      if (item.matchedMainRow) {
+        for (const k of Object.keys(item.matchedMainRow)) {
+          if (!compHeaders.includes(k) && !seenRef.has(k)) {
+            seenRef.add(k);
+            orderedColumns.push({ id: `[Ref] ${k}`, header: `[Ref] ${k}` });
+          }
         }
       }
     }
+    orderedColumns.push({ id: 'decisionStatus', header: 'Decision Outcome' });
+    orderedColumns.push({ id: 'resultColor', header: 'Result Color' });
+    orderedColumns.push({ id: 'matchStatus', header: 'Match Status' });
+    orderedColumns.push({ id: 'decisionReason', header: 'Evaluation Reason' });
+  }
 
-    // Decision & System Audit Columns - Positioned as Last Columns
-    if (shouldInclude('decisionStatus', 'Decision Outcome')) {
-      rowObj['Decision Outcome'] =
-        item.decisionColor === 'green'
-          ? 'PASSED / ACCEPTED'
-          : item.decisionColor === 'yellow'
-          ? 'REVIEW REQUIRED'
-          : item.decisionColor === 'red'
-          ? 'REJECTED'
-          : 'NO ACTION';
+  const cellValueFor = (item: (typeof results)[number], id: string): any => {
+    if (id === 'rowIndex') return item.rowIndex;
+    if (id === 'decisionStatus') {
+      return item.decisionColor === 'green'
+        ? 'PASSED / ACCEPTED'
+        : item.decisionColor === 'yellow'
+        ? 'REVIEW REQUIRED'
+        : item.decisionColor === 'red'
+        ? 'REJECTED'
+        : 'NO ACTION';
     }
-
-    if (shouldInclude('resultColor', 'Result Color')) {
-      rowObj['Result Color'] = item.decisionColor.toUpperCase();
-    }
-
-    if (shouldInclude('matchStatus', 'Match Status')) {
-      rowObj['Match Status'] = item.isMatched
+    if (id === 'resultColor') return item.decisionColor.toUpperCase();
+    if (id === 'matchStatus') {
+      return item.isMatched
         ? 'MATCHED'
         : `UNMATCHED: ${item.unmatchedInfo?.primaryIdentifier || item.matchKey} — ${item.unmatchedInfo?.reason || 'Not in Reference'}`;
     }
+    if (id === 'decisionReason') return item.decisionReason;
+    if (id.startsWith('[Ref] ')) {
+      return item.matchedMainRow?.[id.replace('[Ref] ', '')] ?? '';
+    }
+    return item.comparisonRow[id] ?? '';
+  };
 
-    if (shouldInclude('decisionReason', 'Evaluation Reason')) {
-      rowObj['Evaluation Reason'] = item.decisionReason;
+  // Evaluated Results Sheet
+  const resultRows = results.map((item) => {
+    const rowObj: Record<string, any> = {};
+    for (const col of orderedColumns) {
+      rowObj[col.header] = cellValueFor(item, col.id);
     }
 
     // Safety fallback: if no columns were selected, default to Outcome and Row #
@@ -1168,16 +1185,18 @@ export function exportStyledExcel(
     return { wch: Math.max(header.length + 4, 16) };
   });
 
-  // Style Header Row (Row 0)
+  // Style Header Row (Row 0) — [Ref] columns get a blue fill mirroring the
+  // dashboard's Ref badge/tint so reference data is instantly recognizable.
   dataHeaders.forEach((header, cIdx) => {
     const cellRef = XLSXStyle.utils.encode_cell({ r: 0, c: cIdx });
     if (wsData[cellRef]) {
       const isCenter = ['Row #', 'Decision Outcome', 'Result Color', 'Match Status'].includes(header);
+      const isRefCol = header.startsWith('[Ref] ');
       wsData[cellRef].s = {
         font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: 'FFFFFF' } },
-        fill: { patternType: 'solid', fgColor: { rgb: '1E293B' } },
+        fill: { patternType: 'solid', fgColor: { rgb: isRefCol ? '1D4ED8' : '1E293B' } },
         alignment: { vertical: 'center', horizontal: isCenter ? 'center' : 'left' },
-        border: thinBorder('0F172A'),
+        border: thinBorder(isRefCol ? '1E40AF' : '0F172A'),
       };
     }
   });
@@ -1283,30 +1302,40 @@ export function exportStyledExcel(
       // Data columns with smart cell-level highlight on Waive/Accept/Review/Reject
       else {
         const strVal = String(cell.v ?? '').toLowerCase();
-        const isWaiveOrAccept = strVal.includes('waive') || strVal.includes('accept');
-        const isRejectOrFail = strVal.includes('reject') || strVal.includes('fail');
-        const isReviewOrPending = strVal.includes('review') || strVal.includes('pending') || strVal.includes('hold');
+        const headerLower = colHeader.toLowerCase();
+        // Same "inspection column" rule as the dashboard: status/result/grade
+        // columns render as solid filled badges (white bold text), for both
+        // incoming and [Ref] columns.
+        const isInspectionCol =
+          headerLower.includes('status') || headerLower.includes('result') || headerLower.includes('grade');
+        const badgeGreen =
+          strVal.includes('accept') || strVal.includes('waive') ||
+          strVal.includes('certified ok') || strVal.includes('normal');
+        const badgeAmber =
+          strVal.includes('postpone') || strVal.includes('pending') || strVal.includes('hold') ||
+          strVal.includes('review') || strVal.includes('quarantine');
+        const badgeRed =
+          strVal.includes('reject') || strVal.includes('fail') ||
+          strVal.includes('discrepant') || strVal.includes('out of spec');
 
-        if (isWaiveOrAccept) {
+        if (isInspectionCol && (badgeGreen || badgeAmber || badgeRed)) {
+          const badgeFill = badgeGreen ? '059669' : badgeAmber ? 'D97706' : 'DC2626';
           cell.s = {
-            font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: '065F46' } },
-            fill: { patternType: 'solid', fgColor: { rgb: 'D1FAE5' } },
-            alignment: { vertical: 'center', horizontal: typeof cell.v === 'number' ? 'right' : 'left' },
-            border: thinBorder('059669'),
+            font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: 'FFFFFF' } },
+            fill: { patternType: 'solid', fgColor: { rgb: badgeFill } },
+            alignment: { vertical: 'center', horizontal: 'center' },
+            border: thinBorder(badgeFill),
           };
-        } else if (isRejectOrFail) {
+        } else if (badgeGreen || badgeAmber || badgeRed) {
+          // Non-inspection columns keep the lighter tint treatment
+          const tintFill = badgeGreen ? 'D1FAE5' : badgeAmber ? 'FEF3C7' : 'FEE2E2';
+          const tintText = badgeGreen ? '065F46' : badgeAmber ? '92400E' : '991B1B';
+          const tintBorder = badgeGreen ? '059669' : badgeAmber ? 'D97706' : 'DC2626';
           cell.s = {
-            font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: '991B1B' } },
-            fill: { patternType: 'solid', fgColor: { rgb: 'FEE2E2' } },
+            font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: tintText } },
+            fill: { patternType: 'solid', fgColor: { rgb: tintFill } },
             alignment: { vertical: 'center', horizontal: typeof cell.v === 'number' ? 'right' : 'left' },
-            border: thinBorder('DC2626'),
-          };
-        } else if (isReviewOrPending && isYellow) {
-          cell.s = {
-            font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: '92400E' } },
-            fill: { patternType: 'solid', fgColor: { rgb: 'FEF3C7' } },
-            alignment: { vertical: 'center', horizontal: typeof cell.v === 'number' ? 'right' : 'left' },
-            border: thinBorder('D97706'),
+            border: thinBorder(tintBorder),
           };
         } else {
           cell.s = {
@@ -1350,44 +1379,56 @@ export function exportCsv(
   baseFilename: string,
   exportColumnIds?: string[]
 ): void {
-  const shouldInclude = (id: string, label: string): boolean => {
-    if (!exportColumnIds || exportColumnIds.length === 0) return true;
-    return exportColumnIds.includes(id) || exportColumnIds.includes(label);
-  };
-
-  const resultRows = results.map((item) => {
-    const rowObj: Record<string, any> = {};
-
-    if (shouldInclude('rowIndex', 'Row')) {
-      rowObj['Row'] = item.rowIndex;
-    }
-
-    for (const h of compHeaders) {
-      if (shouldInclude(h, h)) {
-        rowObj[h] = item.comparisonRow[h] ?? '';
-      }
-    }
-
-    if (item.matchedMainRow) {
-      for (const [k, v] of Object.entries(item.matchedMainRow)) {
-        const refKey = `[Ref] ${k}`;
-        if (!compHeaders.includes(k) && shouldInclude(refKey, refKey)) {
-          rowObj[refKey] = v ?? '';
-        }
-      }
-    }
-
-    // Decision & System Audit Columns - Positioned as Last Columns
-    if (shouldInclude('decisionStatus', 'Decision Outcome')) {
-      rowObj['Decision Outcome'] = item.decisionColor.toUpperCase();
-    }
-    if (shouldInclude('matchStatus', 'Reference Match')) {
-      rowObj['Reference Match'] = item.isMatched
+  // Column order mirrors the dashboard's customized column sequence
+  const csvValueFor = (item: (typeof results)[number], id: string): any => {
+    if (id === 'rowIndex') return item.rowIndex;
+    if (id === 'decisionStatus') return item.decisionColor.toUpperCase();
+    if (id === 'matchStatus') {
+      return item.isMatched
         ? 'MATCHED'
         : `UNMATCHED: ${item.unmatchedInfo?.primaryIdentifier || item.matchKey} — ${item.unmatchedInfo?.reason || 'Not in Reference'}`;
     }
-    if (shouldInclude('decisionReason', 'Reason')) {
-      rowObj['Reason'] = item.decisionReason;
+    if (id === 'decisionReason') return item.decisionReason;
+    if (id.startsWith('[Ref] ')) {
+      return item.matchedMainRow?.[id.replace('[Ref] ', '')] ?? '';
+    }
+    return item.comparisonRow[id] ?? '';
+  };
+
+  const csvHeaderFor = (id: string): string => {
+    if (id === 'rowIndex') return 'Row';
+    if (id === 'decisionStatus') return 'Decision Outcome';
+    if (id === 'matchStatus') return 'Reference Match';
+    if (id === 'decisionReason') return 'Reason';
+    return id;
+  };
+
+  const csvColumns: string[] =
+    exportColumnIds && exportColumnIds.length > 0
+      ? exportColumnIds
+      : [
+          'rowIndex',
+          ...compHeaders,
+          ...Array.from(
+            new Set(
+              results.flatMap((r) =>
+                r.matchedMainRow
+                  ? Object.keys(r.matchedMainRow)
+                      .filter((k) => !compHeaders.includes(k))
+                      .map((k) => `[Ref] ${k}`)
+                  : []
+              )
+            )
+          ),
+          'decisionStatus',
+          'matchStatus',
+          'decisionReason',
+        ];
+
+  const resultRows = results.map((item) => {
+    const rowObj: Record<string, any> = {};
+    for (const id of csvColumns) {
+      rowObj[csvHeaderFor(id)] = csvValueFor(item, id);
     }
 
     if (Object.keys(rowObj).length === 0) {
