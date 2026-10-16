@@ -50,7 +50,11 @@ import {
   debounce,
   publishWorkbooks,
   fetchWorkbooks,
+  publishResultsState,
+  fetchResultsState,
+  defaultResultFilters,
 } from './lib/cloudSync';
+import type { ResultFilters } from './lib/cloudSync';
 import {
   FileSpreadsheet,
   CheckCircle2,
@@ -59,6 +63,7 @@ import {
   Check,
   Settings,
   SlidersHorizontal,
+  Cloud,
 } from 'lucide-react';
 
 export default function App() {
@@ -118,6 +123,13 @@ export default function App() {
 
   // Cloud sync (Firebase): one shared workspace across every device
   const [cloudUser, setCloudUser] = useState<User | null>(null);
+  const [authResolved, setAuthResolved] = useState(false);
+  // Synced view state for the results (filter tab, search, Only Accept)
+  const [resultFilters, setResultFilters] = useState<ResultFilters>(defaultResultFilters);
+  // Bumped when cloud results are applied so the dashboard remounts with them
+  const [studioSession, setStudioSession] = useState(0);
+  // Tracks results that came straight from a cloud pull (skip re-publish echo)
+  const pulledResultsRef = useRef<MatchedRow[] | null>(null);
   const rulesStateRef = useRef({ normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds });
   rulesStateRef.current = { normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds };
   const lastRulesPublishRef = useRef<string>('');
@@ -187,6 +199,7 @@ export default function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setCloudUser(u);
+      setAuthResolved(true);
       if (!u) didCloudPullRef.current = false; // allow a fresh pull on the next sign-in
     });
     return () => unsub();
@@ -211,18 +224,20 @@ export default function App() {
   };
 
   // Once local data is loaded and the user is signed in, pull the shared
-  // workspace (rules + workbooks) so every device opens the same files,
-  // mappings, results and history; then regenerate results from that state.
+  // workspace (rules + workbooks + results) so every device opens the same
+  // files, settings and filtered results right after login.
   // First sign-in on the account seeds the cloud with this device's data.
   const didCloudPullRef = useRef(false);
+  const previewHandledRef = useRef(false);
   useEffect(() => {
     if (!cloudUser || !localReady || isPreviewMode || didCloudPullRef.current) return;
     didCloudPullRef.current = true;
     (async () => {
       try {
-        const [cloudRules, cloudWbs] = await Promise.all([
+        const [cloudRules, cloudWbs, cloudResults] = await Promise.all([
           fetchRulesState(cloudUser.uid),
           fetchWorkbooks(cloudUser.uid),
+          fetchResultsState(cloudUser.uid),
         ]);
 
         let effMappings = rulesStateRef.current.mappings;
@@ -330,8 +345,38 @@ export default function App() {
           }
         }
 
-        if (effRef && effComp) {
+        // Results: the cloud copy wins so every device shows the same
+        // evaluated results and view filters right after login. If the synced
+        // files are newer than the synced results (publish race), regenerate
+        // instead of applying stale results.
+        const resultsFresh =
+          cloudResults &&
+          cloudResults.results.length > 0 &&
+          effRef &&
+          effComp &&
+          (!cloudWbs || !cloudWbs.updatedAt || cloudResults.updatedAt >= cloudWbs.updatedAt);
+        if (resultsFresh) {
+          pulledResultsRef.current = cloudResults.results;
+          setResults(cloudResults.results);
+          setStats(cloudResults.stats);
+          const filters = { ...defaultResultFilters, ...(cloudResults.filters || {}) };
+          setResultFilters(filters);
+          await saveToIDB(StorageKeys.RESULTS_STATE, {
+            results: cloudResults.results,
+            stats: cloudResults.stats,
+            filters,
+          });
+          // Remount the dashboard so the synced filter/search state applies
+          setStudioSession((n) => n + 1);
+          showToast(t.toastCloudResultsSynced, 'success');
+        } else if (effRef && effComp) {
           handleExecuteMatching(effRef, effComp, effMappings, false, effHoldValues, effReleased, effHoldColumn);
+        } else {
+          // No files: no results either
+          pulledResultsRef.current = null;
+          setResults([]);
+          setStats(null);
+          await deleteFromIDB(StorageKeys.RESULTS_STATE);
         }
       } catch (e) {
         console.warn('Cloud workspace pull failed', e);
@@ -354,6 +399,44 @@ export default function App() {
     if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current) return;
     debouncedPublishRules(cloudUser.uid, rulesStateRef.current);
   }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds, debouncedPublishRules]);
+
+  // Publish evaluated results (+ view filters) to the cloud whenever they
+  // change, so signing in on another device restores the same results.
+  // Pull-applied results are skipped via pulledResultsRef (no echo).
+  const debouncedPublishResults = useRef(
+    debounce((uid: string, state: { results: MatchedRow[]; stats: MatchingStats; filters: ResultFilters }) => {
+      publishResultsState(uid, state).then((ok) => {
+        if (!ok) console.warn('Cloud sync: results publish failed');
+      });
+      // Keep the local instant-paint cache in step
+      saveToIDB(StorageKeys.RESULTS_STATE, state).catch(() => {});
+    }, 2500)
+  );
+  useEffect(() => {
+    if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current) return;
+    if (results.length === 0 || !stats) return;
+    if (pulledResultsRef.current === results) {
+      pulledResultsRef.current = null; // pull echo accounted for — skip
+      return;
+    }
+    debouncedPublishResults.current(cloudUser.uid, { results, stats, filters: resultFilters });
+  }, [cloudUser, isPreviewMode, localReady, results, stats, resultFilters, debouncedPublishResults]);
+
+  const VALID_FILTERS = ['all', 'green', 'yellow', 'red', 'blue', 'unmatched'] as const;
+  const isValidFilter = (f: string): f is typeof VALID_FILTERS[number] =>
+    (VALID_FILTERS as readonly string[]).includes(f);
+
+  // View-state reporter from the dashboard (debounced there)
+  const handleViewStateChange = useCallback((v: ResultFilters) => {
+    setResultFilters((prev) =>
+      prev.activeFilter === v.activeFilter &&
+      prev.searchTerm === v.searchTerm &&
+      prev.searchColumn === v.searchColumn &&
+      prev.onlyAccept === v.onlyAccept
+        ? prev
+        : v
+    );
+  }, []);
 
   const debouncedPublishWorkbooks = useRef(
     debounce((uid: string, wbs: { reference: WorkbookData | null; comparison: WorkbookData | null }) => {
@@ -415,6 +498,38 @@ export default function App() {
   const handleCloudSignOut = async () => {
     try {
       await signOutGoogle();
+      // Clear in-memory studio state and the local cache so no other
+      // account's data lingers on this device.
+      setReferenceWb(null);
+      setComparisonWb(null);
+      setResults([]);
+      setStats(null);
+      setMappings([]);
+      setNormalization(defaultNormalizationRules);
+      setLayers(defaultDecisionLayers);
+      setHoldColumn('');
+      setHoldValues([]);
+      setHoldReason('');
+      setReleasedRowIds([]);
+      setResultFilters(defaultResultFilters);
+      pulledResultsRef.current = null;
+      setLocalReady(false);
+      setStudioSession((n) => n + 1);
+      for (const k of [
+        StorageKeys.REFERENCE_WORKBOOK,
+        StorageKeys.COMPARISON_WORKBOOK,
+        StorageKeys.COLUMN_MAPPINGS,
+        StorageKeys.NORMALIZATION_RULES,
+        StorageKeys.DECISION_LAYERS,
+        StorageKeys.HOLD_COLUMN,
+        StorageKeys.HOLD_VALUES,
+        StorageKeys.HOLD_KEYS,
+        StorageKeys.HOLD_REASON,
+        StorageKeys.RELEASED_ROWS,
+        StorageKeys.RESULTS_STATE,
+      ]) {
+        try { await deleteFromIDB(k); } catch { /* ignore */ }
+      }
       showToast(t.toastSignedOut, 'info');
     } catch (e) {
       console.warn('Sign-out failed', e);
@@ -440,7 +555,8 @@ export default function App() {
 
         // Priority 0: Public live-share link (?share=...) — no sign-in required
         const urlShareId = getShareIdFromUrl();
-        if (urlShareId) {
+        if (urlShareId && !previewHandledRef.current) {
+          previewHandledRef.current = true;
           setShareId(urlShareId);
           setIsPreviewMode(true);
           try {
@@ -460,7 +576,8 @@ export default function App() {
         }
 
         // Priority 1: Check if page was loaded via a Live Preview Link (/preview, #preview=..., or ?preview=...)
-        if (isPreviewRoute) {
+        if (isPreviewRoute && !previewHandledRef.current) {
+          previewHandledRef.current = true;
           setIsPreviewMode(true);
           const previewData = parsePreviewFromUrl();
           if (previewData && isMounted) {
@@ -492,10 +609,22 @@ export default function App() {
           }
         }
 
+        // Studio language is loaded even before sign-in so the gate renders translated
         const savedLang = await getFromIDB<Language>(StorageKeys.LANGUAGE);
         if (savedLang && isMounted) {
           setLanguage(savedLang);
           try { localStorage.setItem('excelmatch_language', savedLang); } catch { /* ignore */ }
+        }
+
+        // Login-first: wait for auth to resolve, then require a signed-in user
+        // for the studio (the sign-in gate renders otherwise).
+        if (!authResolved) return;
+        if (!cloudUser) {
+          if (isMounted) {
+            clearTimeout(safetyTimer);
+            setIsStorageLoading(false);
+          }
+          return;
         }
 
         const savedRef = await getFromIDB<WorkbookData>(
@@ -518,6 +647,11 @@ export default function App() {
         const legacyHoldKeys = await getFromIDB<string[]>(StorageKeys.HOLD_KEYS);
         const savedHoldReason = await getFromIDB<string>(StorageKeys.HOLD_REASON);
         const savedReleased = await getFromIDB<string[]>(StorageKeys.RELEASED_ROWS);
+        const savedResultsState = await getFromIDB<{
+          results: MatchedRow[];
+          stats: MatchingStats;
+          filters: ResultFilters;
+        }>(StorageKeys.RESULTS_STATE);
 
         if (savedNorm && isMounted) setNormalization(savedNorm);
         if (savedLayers && savedLayers.length > 0 && isMounted) setLayers(savedLayers);
@@ -533,20 +667,17 @@ export default function App() {
         if (savedComp && isMounted) {
           setComparisonWb(savedComp);
         }
-        // Regenerate results from the restored files so reopening shows the
-        // same incoming file, results and history as when you left.
-        if (savedRef && savedComp && isMounted) {
+        // Restore cached results instantly; the cloud pull may overwrite with
+        // newer synced results. Regenerate only when files exist but no cache.
+        // (No demo seeding: with login-first, a fresh account starts empty.)
+        if (savedResultsState && savedResultsState.results && savedResultsState.results.length > 0 && isMounted) {
+          setResults(savedResultsState.results);
+          setStats(savedResultsState.stats);
+          if (savedResultsState.filters) {
+            setResultFilters({ ...defaultResultFilters, ...savedResultsState.filters });
+          }
+        } else if (savedRef && savedComp && isMounted) {
           handleExecuteMatching(savedRef, savedComp, savedMappings || [], false);
-        } else if (isMounted && !savedRef) {
-          // Preload enterprise demo datasets on very first visit so user has immediate working experience
-          const demo = generateSampleDatasets();
-          setReferenceWb(demo.reference);
-          setComparisonWb(demo.comparison);
-          const auto = autoMapColumns(demo.reference.headers, demo.comparison.headers);
-          setMappings(auto);
-          await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, demo.reference);
-          await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, demo.comparison);
-          await saveToIDB(StorageKeys.COLUMN_MAPPINGS, auto);
         }
       } catch (e) {
         console.error('Storage loading error:', e);
@@ -554,7 +685,7 @@ export default function App() {
         if (isMounted) {
           clearTimeout(safetyTimer);
           setIsStorageLoading(false);
-          setLocalReady(true);
+          if (cloudUser) setLocalReady(true);
         }
       }
     }
@@ -598,7 +729,7 @@ export default function App() {
       window.removeEventListener('hashchange', handleUrlChange);
       window.removeEventListener('popstate', handleUrlChange);
     };
-  }, []);
+  }, [authResolved, cloudUser?.uid]);
 
   // Replace the Reference Workbook (Main File) with a newly uploaded file.
   // The old workbook is swapped out wholesale (never mutated in place); if the
@@ -948,6 +1079,48 @@ export default function App() {
     }, 150);
   };
 
+  // Login-first: the studio requires a signed-in user so files, settings and
+  // results sync from the cloud. Public share-preview links stay open.
+  if (!isPreviewMode && authResolved && !cloudUser) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-6 font-sans selection:bg-emerald-500 selection:text-white">
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-10 w-full max-w-md shadow-sm text-center space-y-5">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto">
+            <FileSpreadsheet className="w-7 h-7 text-emerald-600" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t.appName}</h1>
+            <p className="text-sm font-semibold text-slate-700">{t.gateTitle}</p>
+            <p className="text-xs text-slate-500 leading-relaxed">{t.gateDesc}</p>
+          </div>
+          <button
+            onClick={handleCloudSignIn}
+            className="w-full flex items-center justify-center gap-2.5 px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl shadow-sm transition-all"
+          >
+            <Cloud className="w-4 h-4" />
+            {t.gateSignIn}
+          </button>
+          <div className="flex items-center justify-center gap-2 pt-1">
+            <span className="text-[11px] text-slate-400">{t.headerSelectLanguage}:</span>
+            {(['en', 'my', 'th', 'zh'] as Language[]).map((l) => (
+              <button
+                key={l}
+                onClick={() => handleLanguageChange(l)}
+                className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-colors ${
+                  language === l
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isStorageLoading) {
     return <GlobalLoadingSkeleton language={language} />;
   }
@@ -1032,16 +1205,22 @@ export default function App() {
             {results.length > 0 && stats && (
               <div className="pt-2 border-t border-slate-200">
                 <ResultsDashboard
+                  key={`studio-${studioSession}`}
                   results={results}
                   stats={stats}
                   comparisonWb={comparisonWb}
                   language={language}
                   onShowToast={showToast}
                   isPreviewMode={false}
+                  initialFilter={isValidFilter(resultFilters.activeFilter) ? resultFilters.activeFilter : 'all'}
+                  initialOnlyAccept={resultFilters.onlyAccept}
+                  initialSearchTerm={resultFilters.searchTerm}
+                  initialSearchColumn={resultFilters.searchColumn}
                   initialColumnConfigs={previewColumnConfigs}
                   cloudUser={cloudUser}
                   holdReason={holdReason}
                   onReleaseHoldKey={handleReleaseHoldKey}
+                  onViewStateChange={handleViewStateChange}
                 />
               </div>
             )}
