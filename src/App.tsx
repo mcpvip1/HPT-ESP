@@ -274,8 +274,20 @@ export default function App() {
           }
           showToast(t.toastCloudFilesSynced, 'success');
         } else {
-          const seeded = await publishWorkbooksWithRetry(cloudUser.uid, { reference: effRef, comparison: effComp });
-          if (!seeded) showToast(t.toastCloudFilesSyncFailed, 'error');
+          // Seed the cloud with this device's files — but never with the
+          // built-in demo datasets. A fresh device must not upload demo data
+          // that would then overwrite real files on the next pull elsewhere.
+          const isDemoWb = (wb: WorkbookData | null) =>
+            !!wb &&
+            (wb.name === 'Master_Procurement_Catalog_2026.xlsx' ||
+              wb.name === 'Incoming_Receiving_Batch_Report.xlsx');
+          if (!isDemoWb(effRef) && !isDemoWb(effComp)) {
+            const seeded = await publishWorkbooksWithRetry(cloudUser.uid, {
+              reference: effRef,
+              comparison: effComp,
+            });
+            if (!seeded) showToast(t.toastCloudFilesSyncFailed, 'error');
+          }
         }
 
         if (effRef && effComp) {
