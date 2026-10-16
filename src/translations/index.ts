@@ -242,6 +242,111 @@ export interface TranslationDict {
   loadingRestoreMessage: string;
   loadingIndexedDbActive: string;
   loadingWorkspaceTitle: string;
+  dashRefreshedLatest: string;
+  dashRefreshCompleted: string;
+  dashColumnLayoutSaved: string;
+  dashColumnsRestored: string;
+  dashSignInForShare: string;
+  dashSharePublishFailed: string;
+  dashShareCreated: string;
+  dashShareRevokeFailed: string;
+  dashShareStopped: string;
+  dashCopyLinkFailed: string;
+  dashFilterNameAll: string;
+  dashPreviewLinkCopied: string;
+  dashExcelExported: string;
+  dashExportFailed: string;
+  dashCsvExported: string;
+  badgePassed: string;
+  badgeReview: string;
+  badgeRejected: string;
+  badgeNoRule: string;
+  dashValueMatched: string;
+  dashValueUnmatched: string;
+  dashValueEmpty: string;
+  dashValueBlanks: string;
+  colDecisionStatus: string;
+  dashOnlyAcceptTitle: string;
+  dashOnlyAccept: string;
+  dashRefreshTitle: string;
+  dashRefresh: string;
+  dashSaveViewTitle: string;
+  dashSaveSyncView: string;
+  dashSaveView: string;
+  dashColumnsTitle: string;
+  dashColumns: string;
+  dashQuickCopyTitle: string;
+  dashLinkCopied: string;
+  dashCopyLink: string;
+  dashLiveShareOnTitle: string;
+  dashLiveShareOffTitle: string;
+  dashSharingLive: string;
+  dashLiveShare: string;
+  dashPublicLiveShareLink: string;
+  dashLiveShareDesc: string;
+  dashCopied: string;
+  dashCopy: string;
+  dashStopSharing: string;
+  dashSharePreviewTitle: string;
+  dashSharePreview: string;
+  dashExportExcelTitle: string;
+  dashExportCsvTitle: string;
+  dashSearchScopeTitle: string;
+  dashSearchScopeAll: string;
+  dashSearchScopeOutcome: string;
+  dashSearchScopeReason: string;
+  dashSearchScopeUnmatched: string;
+  dashSearchScopeMatchKey: string;
+  dashOptgroupComparison: string;
+  dashOptgroupReference: string;
+  dashSearchPlaceholder: string;
+  dashClearSearchTitle: string;
+  dashRowsFound: string;
+  dashActiveColumnFilters: string;
+  dashValsSelected: string;
+  dashClearFilterOn: string;
+  dashClearAllColumnFilters: string;
+  dashClickToSortBy: string;
+  dashFilterLikeExcelTitle: string;
+  dashFilterAria: string;
+  dashMoveColumnLeft: string;
+  dashMoveColumnRight: string;
+  dashAllColumnsHidden: string;
+  dashAllColumnsHiddenDesc: string;
+  dashRestoreAllColumns: string;
+  dashChooseColumns: string;
+  dashClearSearchFilter: string;
+  dashCellMatched: string;
+  dashCellUnmatched: string;
+  dashCellDiffers: string;
+  dashUnidentified: string;
+  dashRefDifferingFields: string;
+  dashMissingInRef: string;
+  dashInspectRowTitle: string;
+  dashShowingAllRows: string;
+  dashFilteredFromTotal: string;
+  dashFullResultView: string;
+  dashRowsUnit: string;
+  rulesModalTitle: string;
+  rulesSavedOnce: string;
+  rulesModalDesc: string;
+  rulesSavedShort: string;
+  rulesSaveSettings: string;
+  rulesTabMapping: string;
+  rulesTabDecision: string;
+  rulesStorageNote: string;
+  rulesPersistNote: string;
+  rulesEvaluating: string;
+  rulesSaveShowResults: string;
+  filterHeaderPrefix: string;
+  filterCloseMenu: string;
+  filterSortAsc: string;
+  filterSortDesc: string;
+  filterSearchValues: string;
+  filterSelectAll: string;
+  filterNoMatchingValues: string;
+  filterClearFilter: string;
+  filterApply: string;
   close: string;
   confirmReset: string;
   confirmResetDesc: string;
@@ -264,8 +369,11 @@ export interface TranslationDict {
   rulesLogicSetting: string;
 }
 
+import { batchB } from './batchB';
+
 export const translations: Record<Language, TranslationDict> = {
   en: {
+    ...batchB.en,
     appName: "ExcelMatch Pro",
     appSubtitle: "Intelligent Auto-Sorting, Matching & Decision Engine",
     step1: "1. Files",
@@ -529,6 +637,7 @@ export const translations: Record<Language, TranslationDict> = {
     conditionLessThan: "Less than (<)",
   },
   my: {
+    ...batchB.my,
     appName: "ExcelMatch Pro",
     appSubtitle: "အလိုအလျောက် Excel အချက်အလက်နှိုင်းယှဉ်စစ်ဆေးရေး အင်ဂျင်",
     step1: "၁. ဖိုင်များ",
@@ -792,6 +901,7 @@ export const translations: Record<Language, TranslationDict> = {
     conditionLessThan: "ထက် ငယ်သည် (<)",
   },
   th: {
+    ...batchB.th,
     appName: "ExcelMatch Pro",
     appSubtitle: "ระบบเปรียบเทียบข้อมูล จัดเรียง และประเมินผลอัตโนมัติสำหรับ Excel",
     step1: "1. ไฟล์ข้อมูล",
@@ -1055,6 +1165,7 @@ export const translations: Record<Language, TranslationDict> = {
     conditionLessThan: "น้อยกว่า (<)",
   },
   zh: {
+    ...batchB.zh,
     appName: "ExcelMatch Pro",
     appSubtitle: "企业级智能 Excel 自动比对、多列匹配与决策引擎",
     step1: "1. 数据文件",
