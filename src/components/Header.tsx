@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Globe, SlidersHorizontal, FileSpreadsheet } from 'lucide-react';
+import { Globe, SlidersHorizontal, FileSpreadsheet, Cloud, LogOut } from 'lucide-react';
+import type { User } from 'firebase/auth';
 import { Language } from '../types';
 import { translations } from '../translations';
 
@@ -14,6 +15,9 @@ interface HeaderProps {
   hasResults: boolean;
   isPreviewMode?: boolean;
   onExitPreview?: () => void;
+  cloudUser?: User | null;
+  onCloudSignIn?: () => void;
+  onCloudSignOut?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -26,6 +30,9 @@ export const Header: React.FC<HeaderProps> = ({
   hasResults,
   isPreviewMode,
   onExitPreview,
+  cloudUser,
+  onCloudSignIn,
+  onCloudSignOut,
 }) => {
   const t = translations[language];
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -80,6 +87,27 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Language Selector & Actions */}
           <div className="flex items-center gap-2.5 shrink-0">
+            {/* Cloud sync: sign in with Google to share rules & live preview across devices */}
+            {cloudUser ? (
+              <button
+                onClick={onCloudSignOut}
+                title={`Signed in as ${cloudUser.email || 'Google user'} — click to sign out of cloud sync`}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors whitespace-nowrap shrink-0 shadow-xs"
+              >
+                <Cloud className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Synced</span>
+                <LogOut className="w-3 h-3 opacity-60" />
+              </button>
+            ) : (
+              <button
+                onClick={onCloudSignIn}
+                title="Sign in with Google to sync rules & live preview across devices"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors whitespace-nowrap shrink-0 shadow-xs"
+              >
+                <Cloud className="w-3.5 h-3.5 text-slate-500" />
+                <span className="hidden sm:inline">Sync</span>
+              </button>
+            )}
             {/* Language Switcher Dropdown */}
             <div className="relative" ref={langRef}>
               <button

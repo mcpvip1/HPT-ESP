@@ -53,7 +53,7 @@ const COLOR_REVERSE_MAP: (ResultColor | 'none')[] = [
 /**
  * Packs full MatchedRow[] results into a minimal CompactPreviewPayload
  */
-function packCompact(payload: SharedPreviewPayload): CompactPreviewPayload {
+export function packCompact(payload: SharedPreviewPayload): CompactPreviewPayload {
   // Extract unique comparison and reference headers
   const chSet = new Set<string>();
   const rhSet = new Set<string>();
@@ -104,7 +104,7 @@ function packCompact(payload: SharedPreviewPayload): CompactPreviewPayload {
 /**
  * Unpacks CompactPreviewPayload back into full SharedPreviewPayload
  */
-function unpackCompact(compact: CompactPreviewPayload): SharedPreviewPayload {
+export function unpackCompact(compact: CompactPreviewPayload): SharedPreviewPayload {
   const ch = compact.ch || [];
   const rh = compact.rh || [];
 
