@@ -1049,7 +1049,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         <span className="text-xs font-bold text-slate-900">Public live-share link</span>
                         <button
                           onClick={() => setShowLiveSharePanel(false)}
-                          className="p-1 rounded-md hover:bg-slate-100 text-slate-500"
+                          className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
                           aria-label="Close"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -1333,7 +1333,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                 setFilterAnchorRect(rect);
                                 setOpenFilterColId((prev) => (prev === col.id ? null : col.id));
                               }}
-                              className={`p-1 rounded transition-colors ${
+                              className={`p-1.5 rounded transition-colors ${
                                 isColFiltered
                                   ? 'text-emerald-700 bg-emerald-100 border border-emerald-300 shadow-xs'
                                   : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
@@ -1397,7 +1397,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                   handleMoveColumn(col.id, 'left');
                                 }}
                                 disabled={isFirst}
-                                className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+                                className="p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
                                 title="Move column left (earlier in table)"
                               >
                                 <ChevronLeft className="w-3.5 h-3.5" />
@@ -1409,7 +1409,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                   handleMoveColumn(col.id, 'right');
                                 }}
                                 disabled={isLast}
-                                className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+                                className="p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
                                 title="Move column right (later in table)"
                               >
                                 <ChevronRight className="w-3.5 h-3.5" />

@@ -125,7 +125,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
         {/* Card 1: Reference Workbook (Main File) */}
         <div className="flex flex-col bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm relative">
-          <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200/90 flex items-center justify-center text-emerald-600 shadow-xs shrink-0">
                 <Database className="w-5 h-5 stroke-[2.2]" />
@@ -363,7 +363,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
 
         {/* Card 2: Incoming Workbook (Comparison File) */}
         <div className="flex flex-col bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm relative">
-          <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200/90 flex items-center justify-center text-blue-600 shadow-xs shrink-0">
                 <FileUp className="w-5 h-5 stroke-[2.2]" />
