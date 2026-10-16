@@ -291,7 +291,7 @@ export function getRecentMappings(): { id: string; timestamp: number; mappings: 
   }
 }
 
-export function pushRecentMapping(mappings: ColumnMapping[]): void {
+export function pushRecentMapping(mappings: ColumnMapping[], moreTemplate?: string): void {
   if (!mappings || mappings.length === 0) return;
   try {
     const history = getRecentMappings();
@@ -300,7 +300,8 @@ export function pushRecentMapping(mappings: ColumnMapping[]): void {
     const filtered = history.filter(
       (h) => h.mappings.map((m) => `${m.mainCol}::${m.comparisonCol}`).join('|') !== signature
     );
-    const summary = mappings.map((m) => `${m.mainCol} ↔ ${m.comparisonCol}`).slice(0, 3).join(', ') + (mappings.length > 3 ? ` (+${mappings.length - 3} more)` : '');
+    const morePart = mappings.length > 3 ? (moreTemplate ? moreTemplate.replace('{count}', String(mappings.length - 3)) : ` (+${mappings.length - 3} more)`) : '';
+    const summary = mappings.map((m) => `${m.mainCol} ↔ ${m.comparisonCol}`).slice(0, 3).join(', ') + morePart;
     const entry = {
       id: `rec_map_${Date.now()}`,
       timestamp: Date.now(),

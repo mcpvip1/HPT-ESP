@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import type { TranslationDict } from '../translations';
 import XLSXStyle from 'xlsx-js-style';
 import {
   WorkbookData,
@@ -69,16 +70,17 @@ export function clampWorksheetRange(worksheet: XLSX.WorkSheet): void {
  */
 export async function parseExcelFile(
   file: File,
-  onProgress?: (percent: number, status: string) => void
+  onProgress?: (percent: number, status: string) => void,
+  t?: TranslationDict
 ): Promise<WorkbookData> {
-  onProgress?.(10, 'Reading file buffer...');
+  onProgress?.(10, t?.excelReadingBuffer || 'Reading file buffer...');
   // Small delay to allow UI to render spinner
   await new Promise((r) => setTimeout(r, 20));
 
   const data = await file.arrayBuffer();
   const uint8 = new Uint8Array(data);
 
-  onProgress?.(30, 'Decompressing spreadsheet...');
+  onProgress?.(30, t?.excelDecompressing || 'Decompressing spreadsheet...');
   await new Promise((r) => setTimeout(r, 10));
 
   // Suppress non-fatal SheetJS cfb zip warnings during parsing
@@ -134,7 +136,7 @@ export async function parseExcelFile(
     }
 
     const pct = 40 + Math.round(((sIdx + 0.3) / sheetNames.length) * 50);
-    onProgress?.(pct, `Reading sheet "${sName}" (${sIdx + 1} of ${sheetNames.length})...`);
+        onProgress?.(pct, t ? t.excelReadingSheet.replace('{sheet}', sName).replace('{n}', String(sIdx + 1)).replace('{total}', String(sheetNames.length)) : `Reading sheet "${sName}" (${sIdx + 1} of ${sheetNames.length})...`);
     await new Promise((r) => setTimeout(r, 0));
 
     // Critical fix: clamp range to prevent SheetJS from iterating 1,048,576 rows
@@ -197,7 +199,7 @@ export async function parseExcelFile(
     sheetNames.find((name) => (sheetsData[name]?.rows.length || 0) > 0) || sheetNames[0];
   const activeData = sheetsData[activeSheet] || { headers: [], rows: [] };
 
-  onProgress?.(100, 'Done');
+  onProgress?.(100, t?.excelDone || 'Done');
 
   return {
     id: `wb_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
