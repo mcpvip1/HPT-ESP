@@ -65,6 +65,7 @@ import {
   Settings,
   SlidersHorizontal,
   Cloud,
+  Loader2,
 } from 'lucide-react';
 
 export default function App() {
@@ -129,6 +130,8 @@ export default function App() {
   const [resultFilters, setResultFilters] = useState<ResultFilters>(defaultResultFilters);
   // Bumped when cloud results are applied so the dashboard remounts with them
   const [studioSession, setStudioSession] = useState(0);
+  // True while the login pull is downloading the workspace from the cloud
+  const [isCloudPulling, setIsCloudPulling] = useState(false);
   // Tracks results that came straight from a cloud pull (skip re-publish echo)
   const pulledResultsRef = useRef<MatchedRow[] | null>(null);
   const rulesStateRef = useRef({ normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds });
@@ -233,6 +236,8 @@ export default function App() {
   useEffect(() => {
     if (!cloudUser || !localReady || isPreviewMode || didCloudPullRef.current) return;
     didCloudPullRef.current = true;
+    setIsCloudPulling(true);
+    const pullSafety = setTimeout(() => setIsCloudPulling(false), 30000);
     (async () => {
       try {
         const [cloudRules, cloudWbs, cloudResults] = await Promise.all([
@@ -381,6 +386,9 @@ export default function App() {
         }
       } catch (e) {
         console.warn('Cloud workspace pull failed', e);
+      } finally {
+        clearTimeout(pullSafety);
+        setIsCloudPulling(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1159,8 +1167,22 @@ export default function App() {
     return <GlobalLoadingSkeleton language={language} />;
   }
 
+  // "Download Data from cloud" overlay while the login pull is in flight
+  const cloudPullOverlay = isCloudPulling && !isPreviewMode && (
+    <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6">
+      <div className="bg-white rounded-2xl px-7 py-6 shadow-xl flex items-center gap-4 max-w-sm w-full">
+        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin shrink-0" />
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-slate-900">{t.cloudDownloading}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{t.cloudDownloadingSub}</p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+      {cloudPullOverlay}
       {/* 1. Header (Adapts cleanly to Studio or Preview mode) */}
       <Header
         language={language}
