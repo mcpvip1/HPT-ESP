@@ -59,6 +59,8 @@ export interface CloudRulesState {
   layers: DecisionLayer[];
   mappings: ColumnMapping[];
   holdKeys: string[];
+  holdReason: string;
+  releasedRowIds: string[];
   updatedAt: number;
 }
 
