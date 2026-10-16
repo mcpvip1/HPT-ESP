@@ -724,7 +724,8 @@ export function processMatching(
   compWb: WorkbookData,
   mappings: ColumnMapping[],
   normalization: NormalizationRules,
-  layers: DecisionLayer[]
+  layers: DecisionLayer[],
+  holdKeys: string[] = []
 ): {
   results: MatchedRow[];
   stats: MatchingStats;
@@ -1032,10 +1033,53 @@ export function processMatching(
     }
   }
 
+  // Hold-key filter (final override): if a hold key is found among the row's
+  // key values, the row moves to the Hold tab and shows blue — even when all
+  // mapping keys are the same and the row would otherwise be Accept/green.
+  const normalizedHoldKeys = holdKeys
+    .map((k) => String(k ?? '').trim().toLowerCase())
+    .filter((k) => k.length > 0);
+  if (normalizedHoldKeys.length > 0) {
+    const HOLD_ID_COLS = new Set([
+      'po', 'ponumber', 'purchaseorder', 'orderid', 'material', 'materialcode',
+      'item', 'itemcode', 'partnumber', 'lot', 'lotno', 'lotnumber',
+    ]);
+    const holdKeyValues = (r: MatchedRow): string[] => {
+      const vals: string[] = [];
+      if (r.matchKey && r.matchKey.trim() !== '') vals.push(r.matchKey.trim().toLowerCase());
+      const collect = (rowObj: ExcelRow | undefined) => {
+        if (!rowObj) return;
+        for (const [colName, val] of Object.entries(rowObj)) {
+          const cleanCol = colName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (HOLD_ID_COLS.has(cleanCol)) {
+            const s2 = String(val ?? '').trim().toLowerCase();
+            if (s2 && s2 !== '-' && !vals.includes(s2)) vals.push(s2);
+          }
+        }
+      };
+      collect(r.comparisonRow);
+      collect(r.matchedMainRow);
+      return vals;
+    };
+    for (const r of results) {
+      const vals = holdKeyValues(r);
+      const term = normalizedHoldKeys.find((hk) => vals.some((v) => v.includes(hk)));
+      if (term) {
+        r.decisionColor = 'blue';
+        r.decisionReason = `On Hold (key "${term}" found in row)`;
+        r.isHold = true;
+        r.holdKey = term;
+        // Hold takes precedence: never hide a held row under "Only Accept"
+        r.supersededByAccept = false;
+      }
+    }
+  }
+
   // Recalculate stats accurately after duplicate resolution
   greenCount = 0;
   yellowCount = 0;
   redCount = 0;
+  let blueCount = 0;
   otherCount = 0;
   let finalMatchedCount = 0;
   for (const r of results) {
@@ -1043,6 +1087,7 @@ export function processMatching(
     if (r.decisionColor === 'green') greenCount++;
     else if (r.decisionColor === 'yellow') yellowCount++;
     else if (r.decisionColor === 'red') redCount++;
+    else if (r.decisionColor === 'blue') blueCount++;
     else otherCount++;
   }
 
@@ -1066,6 +1111,7 @@ export function processMatching(
     greenCount,
     yellowCount,
     redCount,
+    blueCount,
     otherCount,
     unmatchedItems,
   };
@@ -1143,6 +1189,8 @@ export function exportStyledExcel(
         ? 'REVIEW REQUIRED'
         : item.decisionColor === 'red'
         ? 'REJECTED'
+        : item.decisionColor === 'blue'
+        ? 'ON HOLD'
         : 'NO ACTION';
     }
     if (id === 'resultColor') return item.decisionColor.toUpperCase();
@@ -1209,6 +1257,7 @@ export function exportStyledExcel(
     const isGreen = item.decisionColor === 'green';
     const isYellow = item.decisionColor === 'yellow';
     const isRed = item.decisionColor === 'red';
+    const isBlue = item.decisionColor === 'blue';
 
     const solidColor = isGreen
       ? '10B981' // Vibrant Emerald
@@ -1216,6 +1265,8 @@ export function exportStyledExcel(
       ? 'F59E0B' // Vibrant Amber
       : isRed
       ? 'EF4444' // Vibrant Crimson
+      : isBlue
+      ? '2563EB' // Vibrant Blue (Hold)
       : '64748B'; // Slate
 
     const rowBgTint = isGreen
@@ -1224,6 +1275,8 @@ export function exportStyledExcel(
       ? 'FEF3C7' // Saturated Light Amber
       : isRed
       ? 'FEE2E2' // Saturated Light Crimson
+      : isBlue
+      ? 'DBEAFE' // Saturated Light Blue (Hold)
       : rIdx % 2 === 0
       ? 'F8FAFC'
       : 'FFFFFF';
