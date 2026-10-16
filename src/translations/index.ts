@@ -211,6 +211,11 @@ export interface TranslationDict {
   gateSignIn: string;
   cloudDownloading: string;
   cloudDownloadingSub: string;
+  toastCloudFilesUploaded: string;
+  toastCloudSettingsUploaded: string;
+  toastCloudSettingsSyncFailed: string;
+  toastCloudResultsUploaded: string;
+  toastCloudResultsSyncFailed: string;
   toastCloudFilesSyncFailed: string;
   toastShareRevoked: string;
   toastPreviewSynced: string;
@@ -768,6 +773,11 @@ export const translations: Record<Language, TranslationDict> = {
     gateSignIn: "Sign in with Google",
     cloudDownloading: "Download Data from cloud",
     cloudDownloadingSub: "Syncing your files, settings and results…",
+    toastCloudFilesUploaded: "Files uploaded to the cloud.",
+    toastCloudSettingsUploaded: "Settings uploaded to the cloud.",
+    toastCloudSettingsSyncFailed: "Couldn't upload settings to the cloud.",
+    toastCloudResultsUploaded: "Results uploaded to the cloud.",
+    toastCloudResultsSyncFailed: "Couldn't upload results to the cloud.",
     toastCloudFilesSyncFailed: "Couldn't sync your files to the cloud. Will retry automatically — check your connection if this persists.",
     toastShareRevoked: "Live sharing was turned off — showing the last received snapshot.",
     toastPreviewSynced: "Preview synced with the latest changes.",
@@ -1042,6 +1052,11 @@ export const translations: Record<Language, TranslationDict> = {
     gateSignIn: "Google ဖြင့် လော့ဂ်အင်ဝင်ရန်",
     cloudDownloading: "Cloud မှ Data များ Download လုပ်နေသည်",
     cloudDownloadingSub: "ဖိုင်များ၊ ဆက်တင်များနှင့် ရလဒ်များ ထပ်တူညှိနေပါသည်…",
+    toastCloudFilesUploaded: "ဖိုင်များ cloud သို့ upload လုပ်ပြီးပါပြီ။",
+    toastCloudSettingsUploaded: "ဆက်တင်များ cloud သို့ upload လုပ်ပြီးပါပြီ။",
+    toastCloudSettingsSyncFailed: "ဆက်တင်များ cloud သို့ upload လုပ်၍မရပါ။",
+    toastCloudResultsUploaded: "ရလဒ်များ cloud သို့ upload လုပ်ပြီးပါပြီ။",
+    toastCloudResultsSyncFailed: "ရလဒ်များ cloud သို့ upload လုပ်၍မရပါ။",
     toastCloudFilesSyncFailed: "သင့်ဖိုင်များကို cloud သို့ ထပ်တူညီ၍မရပါ။ အလိုအလျောက် ပြန်လည်ကြိုးစားပါမည်။",
     toastShareRevoked: "တိုက်ရိုက် မျှဝေမှုကို ပိတ်လိုက်ပြီ — နောက်ဆုံး ရရှိထားသော snapshot ကို ပြသနေသည်။",
     toastPreviewSynced: "အစမ်းကြည့်မှုကို နောက်ဆုံး ပြောင်းလဲမှုများနှင့် ထပ်တူညီပြီးပြီ။",
@@ -1316,6 +1331,11 @@ export const translations: Record<Language, TranslationDict> = {
     gateSignIn: "ลงชื่อเข้าใช้ด้วย Google",
     cloudDownloading: "Download Data จากคลาวด์",
     cloudDownloadingSub: "กำลังซิงค์ไฟล์ การตั้งค่า และผลลัพธ์…",
+    toastCloudFilesUploaded: "อัปโหลดไฟล์ขึ้นคลาวด์แล้ว",
+    toastCloudSettingsUploaded: "อัปโหลดการตั้งค่าขึ้นคลาวด์แล้ว",
+    toastCloudSettingsSyncFailed: "อัปโหลดการตั้งค่าขึ้นคลาวด์ไม่สำเร็จ",
+    toastCloudResultsUploaded: "อัปโหลดผลลัพธ์ขึ้นคลาวด์แล้ว",
+    toastCloudResultsSyncFailed: "อัปโหลดผลลัพธ์ขึ้นคลาวด์ไม่สำเร็จ",
     toastCloudFilesSyncFailed: "ไม่สามารถซิงค์ไฟล์ของคุณไปยังคลาวด์ได้ จะลองใหม่โดยอัตโนมัติ",
     toastShareRevoked: "ปิดการแชร์สดแล้ว — กำลังแสดงสแนปช็อตล่าสุดที่ได้รับ",
     toastPreviewSynced: "ซิงค์ตัวอย่างกับการเปลี่ยนแปลงล่าสุดแล้ว",
@@ -1590,6 +1610,11 @@ export const translations: Record<Language, TranslationDict> = {
     gateSignIn: "使用 Google 登录",
     cloudDownloading: "从云端下载数据",
     cloudDownloadingSub: "正在同步文件、设置和结果…",
+    toastCloudFilesUploaded: "文件已上传到云端。",
+    toastCloudSettingsUploaded: "设置已上传到云端。",
+    toastCloudSettingsSyncFailed: "设置上传到云端失败。",
+    toastCloudResultsUploaded: "结果已上传到云端。",
+    toastCloudResultsSyncFailed: "结果上传到云端失败。",
     toastCloudFilesSyncFailed: "无法将您的文件同步到云端，将自动重试。",
     toastShareRevoked: "已关闭实时共享 — 正在显示最后收到的快照。",
     toastPreviewSynced: "预览已与最新更改同步。",
