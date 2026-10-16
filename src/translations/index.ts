@@ -209,6 +209,8 @@ export interface TranslationDict {
   gateTitle: string;
   gateDesc: string;
   gateSignIn: string;
+  cloudDownloading: string;
+  cloudDownloadingSub: string;
   toastCloudFilesSyncFailed: string;
   toastShareRevoked: string;
   toastPreviewSynced: string;
@@ -764,6 +766,8 @@ export const translations: Record<Language, TranslationDict> = {
     gateTitle: "Sign in to sync your workspace",
     gateDesc: "Your files, settings and results are stored securely in the cloud. Sign in to pick up exactly where you left off — on any device.",
     gateSignIn: "Sign in with Google",
+    cloudDownloading: "Download Data from cloud",
+    cloudDownloadingSub: "Syncing your files, settings and results…",
     toastCloudFilesSyncFailed: "Couldn't sync your files to the cloud. Will retry automatically — check your connection if this persists.",
     toastShareRevoked: "Live sharing was turned off — showing the last received snapshot.",
     toastPreviewSynced: "Preview synced with the latest changes.",
@@ -1036,6 +1040,8 @@ export const translations: Record<Language, TranslationDict> = {
     gateTitle: "သင့် workspace ကို ထပ်တူညီရန် လော့ဂ်အင်ဝင်ပါ",
     gateDesc: "သင့်ဖိုင်များ၊ ဆက်တင်များနှင့် ရလဒ်များသည် cloud တွင် လုံခြုံစွာ သိမ်းဆည်းထားသည်။ မည်သည့်စက်တွင်မဆို ထားခဲ့သည့်နေရာမှ ဆက်လက်လုပ်ဆောင်ရန် လော့ဂ်အင်ဝင်ပါ။",
     gateSignIn: "Google ဖြင့် လော့ဂ်အင်ဝင်ရန်",
+    cloudDownloading: "Cloud မှ Data များ Download လုပ်နေသည်",
+    cloudDownloadingSub: "ဖိုင်များ၊ ဆက်တင်များနှင့် ရလဒ်များ ထပ်တူညှိနေပါသည်…",
     toastCloudFilesSyncFailed: "သင့်ဖိုင်များကို cloud သို့ ထပ်တူညီ၍မရပါ။ အလိုအလျောက် ပြန်လည်ကြိုးစားပါမည်။",
     toastShareRevoked: "တိုက်ရိုက် မျှဝေမှုကို ပိတ်လိုက်ပြီ — နောက်ဆုံး ရရှိထားသော snapshot ကို ပြသနေသည်။",
     toastPreviewSynced: "အစမ်းကြည့်မှုကို နောက်ဆုံး ပြောင်းလဲမှုများနှင့် ထပ်တူညီပြီးပြီ။",
@@ -1308,6 +1314,8 @@ export const translations: Record<Language, TranslationDict> = {
     gateTitle: "ลงชื่อเข้าใช้เพื่อซิงค์พื้นที่ทำงานของคุณ",
     gateDesc: "ไฟล์ การตั้งค่า และผลลัพธ์ของคุณถูกเก็บไว้อย่างปลอดภัยในคลาวด์ ลงชื่อเข้าใช้เพื่อทำงานต่อจากที่ค้างไว้ได้บนทุกอุปกรณ์",
     gateSignIn: "ลงชื่อเข้าใช้ด้วย Google",
+    cloudDownloading: "Download Data จากคลาวด์",
+    cloudDownloadingSub: "กำลังซิงค์ไฟล์ การตั้งค่า และผลลัพธ์…",
     toastCloudFilesSyncFailed: "ไม่สามารถซิงค์ไฟล์ของคุณไปยังคลาวด์ได้ จะลองใหม่โดยอัตโนมัติ",
     toastShareRevoked: "ปิดการแชร์สดแล้ว — กำลังแสดงสแนปช็อตล่าสุดที่ได้รับ",
     toastPreviewSynced: "ซิงค์ตัวอย่างกับการเปลี่ยนแปลงล่าสุดแล้ว",
@@ -1580,6 +1588,8 @@ export const translations: Record<Language, TranslationDict> = {
     gateTitle: "登录以同步您的工作区",
     gateDesc: "您的文件、设置和结果都安全地存储在云端。登录后即可在任何设备上从上次离开的地方继续工作。",
     gateSignIn: "使用 Google 登录",
+    cloudDownloading: "从云端下载数据",
+    cloudDownloadingSub: "正在同步文件、设置和结果…",
     toastCloudFilesSyncFailed: "无法将您的文件同步到云端，将自动重试。",
     toastShareRevoked: "已关闭实时共享 — 正在显示最后收到的快照。",
     toastPreviewSynced: "预览已与最新更改同步。",
