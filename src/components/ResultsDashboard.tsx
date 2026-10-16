@@ -546,27 +546,37 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       return;
     }
     const sid = generateShareId();
-    try {
-      await setActiveShare(cloudUser.uid, sid);
-      try {
-        localStorage.setItem('emp_live_share_id', sid);
-      } catch {
-        // ignore storage failures
-      }
-      setLiveShareId(sid);
-      if (results.length > 0 && stats) {
-        await publishSharedSnapshot(sid, cloudUser.uid, buildSharePayload());
-      }
-      setShowLiveSharePanel(true);
-      onShowToast('Live share link created — anyone with the link sees your latest results.', 'success');
-    } catch {
-      onShowToast('Could not create the share link.', 'error');
+    const okShare = await setActiveShare(cloudUser.uid, sid);
+    let okPublish = false;
+    if (okShare && results.length > 0 && stats) {
+      okPublish = await publishSharedSnapshot(sid, cloudUser.uid, buildSharePayload());
     }
+    if (!okShare || !okPublish) {
+      // Don't leave behind a link that points at nothing
+      await setActiveShare(cloudUser.uid, null);
+      onShowToast(
+        'Could not publish the share link. Check that Firestore rules allow the /shares collection, then try again.',
+        'error'
+      );
+      return;
+    }
+    try {
+      localStorage.setItem('emp_live_share_id', sid);
+    } catch {
+      // ignore storage failures
+    }
+    setLiveShareId(sid);
+    setShowLiveSharePanel(true);
+    onShowToast('Live share link created — anyone with the link sees your latest results.', 'success');
   };
 
   const handleStopLiveShare = async () => {
     if (!liveShareId) return;
-    await unpublishSharedSnapshot(liveShareId);
+    const ok = await unpublishSharedSnapshot(liveShareId);
+    if (!ok) {
+      onShowToast('Could not revoke the share link (network or permissions). Try again.', 'error');
+      return;
+    }
     if (cloudUser) await setActiveShare(cloudUser.uid, null);
     try {
       localStorage.removeItem('emp_live_share_id');
