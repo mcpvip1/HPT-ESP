@@ -274,22 +274,29 @@ export interface TranslationDict {
   dashOnlyAccept: string;
   dashRefreshTitle: string;
   dashRefresh: string;
-  dashHoldKeys: string;
-  dashHoldKeysTitle: string;
-  dashHoldKeysDialogTitle: string;
-  dashHoldKeysDialogDesc: string;
-  dashHoldKeysPlaceholder: string;
-  dashHoldKeysClear: string;
-  dashHoldKeysSave: string;
+
   dashHoldReasonLabel: string;
   dashHoldReasonPlaceholder: string;
-  dashConfirmRelease: string;
-  dashConfirmReleaseTitle: string;
-  dashReleaseTitle: string;
+
   dashReleaseDesc: string;
   dashReleaseSupervisor: string;
   dashReleaseNoReason: string;
-  dashReleasedToast: string;
+  dashRemoveFromHold: string;
+  dashRemoveFromHoldTitle: string;
+  dashReleaseOutcomeToast: string;
+  toastHoldFound: string;
+  rulesTabHold: string;
+  rulesHoldColumnLabel: string;
+  rulesHoldColumnLegacy: string;
+  rulesHoldValuesLabel: string;
+  rulesHoldValuesSearch: string;
+  rulesHoldSelectAll: string;
+  rulesHoldClearSel: string;
+  rulesHoldLegacyLabel: string;
+  rulesHoldLegacyDesc: string;
+  rulesHoldLegacyPlaceholder: string;
+  rulesHoldNoValues: string;
+  rulesHoldNoData: string;
   dashSaveViewTitle: string;
   dashSaveSyncView: string;
   dashSaveView: string;
@@ -549,7 +556,7 @@ export const translations: Record<Language, TranslationDict> = {
     step1: "1. Files",
     step2: "2. Results & Export",
     step3: "Results & Export",
-    rulesLogicSetting: "Rules & Logic Setting",
+    rulesLogicSetting: "Setting",
     step1Title: "Reference & Incoming Files",
     step1Desc: "Manage persistent reference data and load your incoming comparison spreadsheet.",
     step2Title: "2. Rules & Logic Setting",
@@ -779,7 +786,7 @@ export const translations: Record<Language, TranslationDict> = {
     headerSync: "Sync",
     headerSelectLanguage: "Select Language",
     headerRulesTitle: "Configure mapping keys and decision rules (saved permanently in browser)",
-    headerRulesShort: "Rules",
+    headerRulesShort: "Setting",
     toastDismiss: "Dismiss",
     errorBoundaryTitle: "Application Recovered from Error",
     errorBoundaryDesc: "An unexpected exception occurred while rendering. You can safely reload the page or reset the workspace cache.",
@@ -817,7 +824,7 @@ export const translations: Record<Language, TranslationDict> = {
     step1: "၁. ဖိုင်များ",
     step2: "၂. ရလဒ်နှင့် ထုတ်ယူမှု",
     step3: "ရလဒ်နှင့် ထုတ်ယူမှု",
-    rulesLogicSetting: "စည်းမျဉ်း သတ်မှတ်ချက်",
+    rulesLogicSetting: "ဆက်တင်",
     step1Title: "အခြေခံဖိုင်နှင့် အသစ်ရောက်ရှိလာသောဖိုင်",
     step1Desc: "အမြဲသိမ်းဆည်းထားသော အခြေခံဖိုင်ကို စီမံပြီး နှိုင်းယှဉ်မည့်ဖိုင်ကို တင်သွင်းပါ။",
     step2Title: "စည်းမျဉ်းနှင့် ယုတ္တိဗေဒ သတ်မှတ်ချက်",
@@ -1047,7 +1054,7 @@ export const translations: Record<Language, TranslationDict> = {
     headerSync: "ထပ်တူညီရန်",
     headerSelectLanguage: "ဘာသာစကား ရွေးချယ်ရန်",
     headerRulesTitle: "မြေပုံသော့များနှင့် ဆုံးဖြတ်ချက်စည်းမျဉ်းများကို ပြင်ဆင်ရန် (ဘရောင်ဇာတွင် အမြဲတမ်း သိမ်းဆည်းထားသည်)",
-    headerRulesShort: "စည်းမျဉ်းများ",
+    headerRulesShort: "ဆက်တင်",
     toastDismiss: "ပယ်ဖျက်ရန်",
     errorBoundaryTitle: "အမှားမှ အပလီကေးရှင်း ပြန်လည်ရယူပြီးပြီ",
     errorBoundaryDesc: "ပြသနေစဉ် မမျှော်လင့်သော ခြွင်းချက်တစ်ခု ဖြစ်ပွားခဲ့သည်။ စာမျက်နှာကို ပြန်လည်ဖွင့်နိုင် သို့မဟုတ် workspace cache ကို ပြန်လည်သတ်မှတ်နိုင်သည်။",
@@ -1085,7 +1092,7 @@ export const translations: Record<Language, TranslationDict> = {
     step1: "1. ไฟล์ข้อมูล",
     step2: "2. ผลลัพธ์และส่งออก",
     step3: "ผลลัพธ์และส่งออก",
-    rulesLogicSetting: "Rules & Logic Setting",
+    rulesLogicSetting: "ตั้งค่า",
     step1Title: "ไฟล์หลักอ้างอิงและไฟล์เปรียบเทียบ",
     step1Desc: "จัดการข้อมูลไฟล์หลักที่บันทึกถาวร และอัปโหลดไฟล์ใหม่สำหรับเปรียบเทียบในวันนี้",
     step2Title: "Rules & Logic Setting (การตั้งค่ากฎและตรรกะ)",
@@ -1315,7 +1322,7 @@ export const translations: Record<Language, TranslationDict> = {
     headerSync: "ซิงค์",
     headerSelectLanguage: "เลือกภาษา",
     headerRulesTitle: "กำหนดค่าคีย์การแมปและกฎการตัดสินใจ (บันทึกถาวรในเบราว์เซอร์)",
-    headerRulesShort: "กฎ",
+    headerRulesShort: "ตั้งค่า",
     toastDismiss: "ปิด",
     errorBoundaryTitle: "แอปพลิเคชันกู้คืนจากข้อผิดพลาดแล้ว",
     errorBoundaryDesc: "เกิดข้อยกเว้นที่ไม่คาดคิดขณะแสดงผล คุณสามารถโหลดหน้าซ้ำหรือรีเซ็ตแคชพื้นที่ทำงานได้อย่างปลอดภัย",
@@ -1353,7 +1360,7 @@ export const translations: Record<Language, TranslationDict> = {
     step1: "1. 数据文件",
     step2: "2. 结果与导出",
     step3: "结果与导出",
-    rulesLogicSetting: "规则与逻辑设置",
+    rulesLogicSetting: "设置",
     step1Title: "基准文件与比对文件",
     step1Desc: "管理本地持久化基准数据，随时载入待比对的 Excel 数据表格。",
     step2Title: "规则与逻辑设置 (Rules & Logic Setting)",
@@ -1583,7 +1590,7 @@ export const translations: Record<Language, TranslationDict> = {
     headerSync: "同步",
     headerSelectLanguage: "选择语言",
     headerRulesTitle: "配置映射键和判定规则（永久保存在浏览器中）",
-    headerRulesShort: "规则",
+    headerRulesShort: "设置",
     toastDismiss: "关闭",
     errorBoundaryTitle: "应用已从错误中恢复",
     errorBoundaryDesc: "呈现时发生意外异常。您可以安全地重新加载页面或重置工作区缓存。",
