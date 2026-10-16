@@ -155,3 +155,12 @@ export interface SyncHistoryEntry {
   title: string;
   status: 'done' | 'failed';
 }
+
+// A cloud upload currently in flight (for the upload-manager UI)
+export interface ActiveUpload {
+  kind: 'file' | 'settings' | 'results';
+  label: string;
+  fileName: string;
+  done: number;
+  total: number; // 0 = indeterminate
+}

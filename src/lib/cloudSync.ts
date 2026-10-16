@@ -155,35 +155,126 @@ function splitIntoByteChunks(str: string, maxBytes: number): string[] {
   return chunks;
 }
 
+export interface ChunkedPublishOptions {
+  /** Real upload progress: called with (chunksDone, chunksTotal). */
+  onProgress?: (done: number, total: number) => void;
+  /**
+   * When true, uploads everything in a single atomic batch (no progress
+   * reporting, no uploading marker). Used for small payloads like share
+   * snapshots where readers must never see a partial state.
+   */
+  atomic?: boolean;
+}
+
+/** Freshness window for the uploading marker (a crashed upload's marker goes stale). */
+const UPLOAD_MARKER_STALE_MS = 5 * 60 * 1000;
+
 async function publishChunkedDoc(
   metaRef: DocumentReference,
   json: string,
   metaFields: Record<string, unknown>,
-  chunkFields: Record<string, unknown> = {}
+  chunkFields: Record<string, unknown> = {},
+  opts: ChunkedPublishOptions = {}
 ): Promise<boolean> {
-  try {
-    const chunks = splitIntoByteChunks(json, CHUNK_BYTES);
+  const chunks = splitIntoByteChunks(json, CHUNK_BYTES);
+  const chunksCol = collection(metaRef, 'chunks');
 
+  // Small/atomic path: single batch, all-or-nothing (previous behavior).
+  if (opts.atomic) {
+    try {
+      const prevSnap = await getDoc(metaRef).catch(() => null);
+      const prevCount =
+        prevSnap && prevSnap.exists()
+          ? ((prevSnap.data() as { chunkCount?: number }).chunkCount || 0)
+          : 0;
+      const batch = writeBatch(db);
+      chunks.forEach((data, i) => {
+        batch.set(doc(chunksCol, String(i)), { data, ...chunkFields });
+      });
+      for (let i = chunks.length; i < prevCount; i++) {
+        batch.delete(doc(chunksCol, String(i)));
+      }
+      batch.set(metaRef, { ...metaFields, chunkCount: chunks.length });
+      await batch.commit();
+      opts.onProgress?.(chunks.length, chunks.length);
+      return true;
+    } catch (e) {
+      console.warn('Cloud sync: failed to publish chunked doc', e);
+      return false;
+    }
+  }
+
+  // Progressive path: upload chunks with real progress, then finalize
+  // atomically. An "uploading" marker tells concurrent readers to wait
+  // instead of reading a partial payload; every chunk carries an uploadId
+  // so a reader can detect chunks from an overlapping upload.
+  const uploadId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const total = chunks.length;
+  try {
     const prevSnap = await getDoc(metaRef).catch(() => null);
     const prevCount =
       prevSnap && prevSnap.exists()
         ? ((prevSnap.data() as { chunkCount?: number }).chunkCount || 0)
         : 0;
 
+    // 1. Marker first (quick single write)
+    await setDoc(
+      metaRef,
+      { ...metaFields, chunkCount: 0, uploading: true, uploadId, uploadStartedAt: Date.now() },
+      { merge: true }
+    );
+
+    // 2. Chunks with real progress (bounded concurrency)
+    opts.onProgress?.(0, total);
+    const CONCURRENCY = 6;
+    for (let i = 0; i < total; i += CONCURRENCY) {
+      const end = Math.min(i + CONCURRENCY, total);
+      await Promise.all(
+        chunks.slice(i, end).map((data, j) =>
+          setDoc(doc(chunksCol, String(i + j)), { data, uploadId, ...chunkFields })
+        )
+      );
+      opts.onProgress?.(end, total);
+    }
+
+    // 3. Atomic finalize: drop stale chunks + publish the real meta
     const batch = writeBatch(db);
-    const chunksCol = collection(metaRef, 'chunks');
-    chunks.forEach((data, i) => {
-      batch.set(doc(chunksCol, String(i)), { data, ...chunkFields });
-    });
-    // Remove stale chunks left over from a previously larger payload
-    for (let i = chunks.length; i < prevCount; i++) {
+    for (let i = total; i < prevCount; i++) {
       batch.delete(doc(chunksCol, String(i)));
     }
-    batch.set(metaRef, { ...metaFields, chunkCount: chunks.length });
+    batch.set(metaRef, {
+      ...metaFields,
+      chunkCount: total,
+      uploading: false,
+      uploadId,
+      uploadStartedAt: Date.now(),
+    });
     await batch.commit();
+    opts.onProgress?.(total, total);
     return true;
   } catch (e) {
     console.warn('Cloud sync: failed to publish chunked doc', e);
+    // Best effort: clear the marker so readers don't wait on a dead upload
+    try {
+      await setDoc(metaRef, { uploading: false }, { merge: true });
+    } catch { /* ignore */ }
+    return false;
+  }
+}
+
+/**
+ * True while the given workspace doc has a fresh "uploading" marker.
+ * The login pull uses this to avoid seeding over / reading a mid-upload doc.
+ */
+export async function isCloudDocUploading(uid: string, name: string): Promise<boolean> {
+  try {
+    const snap = await getDoc(stateDoc(uid, name));
+    if (!snap.exists()) return false;
+    const meta = snap.data() as { uploading?: boolean; uploadStartedAt?: number };
+    if (!meta.uploading) return false;
+    const started = meta.uploadStartedAt || 0;
+    return Date.now() - started < UPLOAD_MARKER_STALE_MS;
+  } catch {
     return false;
   }
 }
@@ -195,14 +286,24 @@ async function fetchChunkedDoc(
     const metaSnap = await getDoc(metaRef);
     if (!metaSnap.exists()) return null;
     const meta = metaSnap.data() as Record<string, unknown>;
+    // An upload in progress (or crashed mid-upload): never read partial data.
+    if (meta.uploading) return null;
     const expected = (meta.chunkCount as number) || 0;
     if (expected === 0) return null;
+    const metaUploadId = meta.uploadId as string | undefined;
     const colSnap = await getDocs(collection(metaSnap.ref, 'chunks'));
     const parts: string[] = [];
+    let consistent = true;
     colSnap.forEach((d) => {
       const idx = parseInt(d.id, 10);
-      if (idx >= 0 && idx < expected) parts[idx] = (d.data() as { data: string }).data;
+      if (idx >= 0 && idx < expected) {
+        const dd = d.data() as { data: string; uploadId?: string };
+        // Chunks from an overlapping upload must not be mixed in
+        if (metaUploadId && dd.uploadId && dd.uploadId !== metaUploadId) consistent = false;
+        parts[idx] = dd.data;
+      }
     });
+    if (!consistent) return null;
     // Direct index access (not .some(), which skips holes in sparse arrays).
     for (let i = 0; i < expected; i++) {
       if (parts[i] === undefined) return null;
@@ -236,11 +337,13 @@ async function publishSnapshotTo(
   extraFields: Record<string, unknown> = {},
   chunkFields: Record<string, unknown> = {}
 ): Promise<boolean> {
+  // Share snapshots stay atomic: public viewers must never see a partial payload.
   return publishChunkedDoc(
     metaRef,
     JSON.stringify(packCompact(payload)),
     previewMetaFields(payload, extraFields),
-    chunkFields
+    chunkFields,
+    { atomic: true }
   );
 }
 
@@ -391,12 +494,15 @@ export interface CloudWorkbooks {
 
 export async function publishWorkbooks(
   uid: string,
-  wbs: { reference: WorkbookData | null; comparison: WorkbookData | null }
+  wbs: { reference: WorkbookData | null; comparison: WorkbookData | null },
+  onProgress?: (done: number, total: number) => void
 ): Promise<boolean> {
   return publishChunkedDoc(
     stateDoc(uid, 'workbooks'),
     JSON.stringify({ reference: wbs.reference, comparison: wbs.comparison }),
-    { updatedAt: Date.now() }
+    { updatedAt: Date.now() },
+    {},
+    { onProgress }
   );
 }
 
@@ -448,12 +554,15 @@ export const defaultResultFilters: ResultFilters = {
 
 export async function publishResultsState(
   uid: string,
-  state: Omit<CloudResultsState, 'updatedAt'>
+  state: Omit<CloudResultsState, 'updatedAt'>,
+  onProgress?: (done: number, total: number) => void
 ): Promise<boolean> {
   return publishChunkedDoc(
     stateDoc(uid, 'results'),
     JSON.stringify({ results: state.results, stats: state.stats, filters: state.filters }),
-    { updatedAt: Date.now() }
+    { updatedAt: Date.now() },
+    {},
+    { onProgress }
   );
 }
 
