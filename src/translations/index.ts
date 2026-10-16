@@ -201,6 +201,47 @@ export interface TranslationDict {
   dpSelectSheet: string;
   dpShowing: string;
   searchDataCells: string;
+  toastCloudRulesSynced: string;
+  toastCloudFilesSynced: string;
+  toastShareRevoked: string;
+  toastPreviewSynced: string;
+  toastSignInFailed: string;
+  toastSignedOut: string;
+  toastRefLoadedRegen: string;
+  toastCompImported: string;
+  toastRefSheetSwitched: string;
+  toastRefSheetSwitchedDone: string;
+  toastCompSheetSwitched: string;
+  toastCompSheetSwitchedDone: string;
+  toastExitedPreview: string;
+  toastRulesSaved: string;
+  toastSampleLoaded: string;
+  toastBothFilesRequired: string;
+  toastMappingRequired: string;
+  toastEvaluatedSummary: string;
+  toastMatchingError: string;
+  toastPreviewRefreshed: string;
+  previewNoResultsTitle: string;
+  previewNoResultsDesc: string;
+  headerResultPreview: string;
+  headerLiveTable: string;
+  headerSignedInTitle: string;
+  headerGoogleUser: string;
+  headerSynced: string;
+  headerSignInTitle: string;
+  headerSync: string;
+  headerSelectLanguage: string;
+  headerRulesTitle: string;
+  headerRulesShort: string;
+  toastDismiss: string;
+  errorBoundaryTitle: string;
+  errorBoundaryDesc: string;
+  errorBoundaryReload: string;
+  errorBoundaryResetTitle: string;
+  errorBoundaryReset: string;
+  loadingRestoreMessage: string;
+  loadingIndexedDbActive: string;
+  loadingWorkspaceTitle: string;
   close: string;
   confirmReset: string;
   confirmResetDesc: string;
@@ -426,6 +467,47 @@ export const translations: Record<Language, TranslationDict> = {
     dpSelectSheet: "Select Sheet:",
     dpShowing: "Showing {n} filtered rows",
     searchDataCells: "Search data cells...",
+    toastCloudRulesSynced: "Cloud workspace synced — rules & mappings match your other devices.",
+    toastCloudFilesSynced: "Files synced from the cloud — same history on this device.",
+    toastShareRevoked: "Live sharing was turned off — showing the last received snapshot.",
+    toastPreviewSynced: "Preview synced with the latest changes.",
+    toastSignInFailed: "Google sign-in failed.",
+    toastSignedOut: "Signed out of cloud sync.",
+    toastRefLoadedRegen: "Loaded {name}! Regenerating Results & Export with saved Rules & Logic Settings...",
+    toastCompImported: "Imported {name}! Generating Results & Export with saved Rules & Logic Settings...",
+    toastRefSheetSwitched: "Switched Main File sheet to “{sheet}” ({rows} rows, {cols} columns). Updating results...",
+    toastRefSheetSwitchedDone: "Switched Main File sheet to “{sheet}” ({rows} rows, {cols} columns).",
+    toastCompSheetSwitched: "Switched Incoming File sheet to “{sheet}” ({rows} rows, {cols} columns). Updating results...",
+    toastCompSheetSwitchedDone: "Switched Incoming File sheet to “{sheet}” ({rows} rows, {cols} columns).",
+    toastExitedPreview: "Exited Live Preview mode. Full studio controls restored.",
+    toastRulesSaved: "Rules & Logic Settings saved! Saved once, future file imports will automatically evaluate and show Results & Export directly.",
+    toastSampleLoaded: "Enterprise Procurement & Inspection Sample loaded! Evaluating...",
+    toastBothFilesRequired: "Both Reference and Comparison workbooks are required.",
+    toastMappingRequired: "Please specify at least one column mapping in Rules & Logic Setting.",
+    toastEvaluatedSummary: "Evaluated {total} rows: {green} passed, {yellow} review, {red} rejected.",
+    toastMatchingError: "Error occurred during matching.",
+    toastPreviewRefreshed: "Preview results refreshed",
+    previewNoResultsTitle: "No Matching Results Yet",
+    previewNoResultsDesc: "The shared result preview link does not contain results data, or the link expired.",
+    headerResultPreview: "Result Preview",
+    headerLiveTable: "· Live Interactive Table",
+    headerSignedInTitle: "Signed in as {email} — click to sign out of cloud sync",
+    headerGoogleUser: "Google user",
+    headerSynced: "Synced",
+    headerSignInTitle: "Sign in with Google to sync rules & live preview across devices",
+    headerSync: "Sync",
+    headerSelectLanguage: "Select Language",
+    headerRulesTitle: "Configure mapping keys and decision rules (saved permanently in browser)",
+    headerRulesShort: "Rules",
+    toastDismiss: "Dismiss",
+    errorBoundaryTitle: "Application Recovered from Error",
+    errorBoundaryDesc: "An unexpected exception occurred while rendering. You can safely reload the page or reset the workspace cache.",
+    errorBoundaryReload: "Reload Page",
+    errorBoundaryResetTitle: "Clears corrupted local cache and restarts fresh",
+    errorBoundaryReset: "Reset Data",
+    loadingRestoreMessage: "Restoring workbooks, column mappings, and decision rules...",
+    loadingIndexedDbActive: "IndexedDB Active",
+    loadingWorkspaceTitle: "Loading Enterprise Workspace",
     close: "Close",
     confirmReset: "Reset Reference Workbook?",
     confirmResetDesc: "This will remove the saved reference workbook from local storage. You will need to upload a new one.",
@@ -648,6 +730,47 @@ export const translations: Record<Language, TranslationDict> = {
     dpSelectSheet: "စာရွက်ရွေးချယ်ရန်:",
     dpShowing: "{n} စစ်ထုတ်ထားသော အတန်းများကို ပြသနေသည်",
     searchDataCells: "ဒေတာဆဲလ်များ ရှာဖွေရန်...",
+    toastCloudRulesSynced: "Cloud workspace ထပ်တူညီပြီးပြီ — စည်းမျဉ်းများနှင့် မြေပုံများသည် အခြားစက်များနှင့် ကိုက်ညီသည်။",
+    toastCloudFilesSynced: "ဖိုင်များကို cloud မှ ထပ်တူညီပြီးပြီ — ဤစက်တွင် တူညီသော မှတ်တမ်းရှိသည်။",
+    toastShareRevoked: "တိုက်ရိုက် မျှဝေမှုကို ပိတ်လိုက်ပြီ — နောက်ဆုံး ရရှိထားသော snapshot ကို ပြသနေသည်။",
+    toastPreviewSynced: "အစမ်းကြည့်မှုကို နောက်ဆုံး ပြောင်းလဲမှုများနှင့် ထပ်တူညီပြီးပြီ။",
+    toastSignInFailed: "Google ဖြင့် ဝင်ရောက်မှု မအောင်မြင်ပါ။",
+    toastSignedOut: "Cloud sync မှ ထွက်လိုက်ပြီ။",
+    toastRefLoadedRegen: "{name} ကို ဖွင့်ပြီးပြီ! သိမ်းထားသော Rules & Logic Settings များဖြင့် ရလဒ်နှင့် ထုတ်ယူမှုကို ပြန်လည် တွက်ချက်နေသည်...",
+    toastCompImported: "{name} ကို ထည့်သွင်းပြီးပြီ! သိမ်းထားသော Rules & Logic Settings များဖြင့် ရလဒ်နှင့် ထုတ်ယူမှုကို တွက်ချက်နေသည်...",
+    toastRefSheetSwitched: "Main File ၏ စာရွက်ကို “{sheet}” သို့ ပြောင်းလိုက်ပြီ ({rows} အတန်း၊ {cols} ကော်လံ)။ ရလဒ်များကို အပ်ဒိတ်လုပ်နေသည်...",
+    toastRefSheetSwitchedDone: "Main File ၏ စာရွက်ကို “{sheet}” သို့ ပြောင်းလိုက်ပြီ ({rows} အတန်း၊ {cols} ကော်လံ)။",
+    toastCompSheetSwitched: "Incoming File ၏ စာရွက်ကို “{sheet}” သို့ ပြောင်းလိုက်ပြီ ({rows} အတန်း၊ {cols} ကော်လံ)။ ရလဒ်များကို အပ်ဒိတ်လုပ်နေသည်...",
+    toastCompSheetSwitchedDone: "Incoming File ၏ စာရွက်ကို “{sheet}” သို့ ပြောင်းလိုက်ပြီ ({rows} အတန်း၊ {cols} ကော်လံ)။",
+    toastExitedPreview: "Live Preview မုဒ်မှ ထွက်လိုက်ပြီ။ Studio ထိန်းချုပ်မှုအပြည့်အစုံ ပြန်လည်ရရှိပြီ။",
+    toastRulesSaved: "Rules & Logic Settings များကို သိမ်းဆည်းပြီးပြီ! တစ်ကြိမ်သိမ်းဆည်းရုံဖြင့် နောက်ဖိုင်များ ထည့်သွင်းတိုင်း အလိုအလျောက် အကဲဖြတ်ပြီး ရလဒ်နှင့် ထုတ်ယူမှုကို တိုက်ရိုက်ပြသမည်။",
+    toastSampleLoaded: "Enterprise Procurement & Inspection နမူနာကို ဖွင့်ပြီးပြီ! အကဲဖြတ်နေသည်...",
+    toastBothFilesRequired: "Reference နှင့် Comparison workbook နှစ်ခုလုံး လိုအပ်သည်။",
+    toastMappingRequired: "Rules & Logic Setting တွင် ကော်လံမြေပုံ အနည်းဆုံး တစ်ခု သတ်မှတ်ပါ။",
+    toastEvaluatedSummary: "အတန်း {total} ကို အကဲဖြတ်ပြီးပြီ — {green} အောင်မြင်၊ {yellow} ပြန်လည်သုံးသပ်ရန်၊ {red} ပယ်ချထားသည်။",
+    toastMatchingError: "ကိုက်ညီမှု တွက်ချက်စဉ် အမှားတစ်ခု ဖြစ်ပွားခဲ့သည်။",
+    toastPreviewRefreshed: "အစမ်းကြည့်ရလဒ်များကို ပြန်လည်ရယူပြီးပြီ",
+    previewNoResultsTitle: "ကိုက်ညီသော ရလဒ်များ မရှိသေးပါ",
+    previewNoResultsDesc: "မျှဝေထားသော ရလဒ် အစမ်းကြည့်လင့်ခ်တွင် ရလဒ်ဒေတာ မပါဝင်ပါ သို့မဟုတ် လင့်ခ် သက်တမ်းကုန်သွားပြီ။",
+    headerResultPreview: "ရလဒ် အစမ်းကြည့်မှု",
+    headerLiveTable: "· တိုက်ရိုက် အပြန်အလှန် ဇယား",
+    headerSignedInTitle: "{email} အဖြစ် ဝင်ရောက်ထားသည် — cloud sync မှ ထွက်ရန် နှိပ်ပါ",
+    headerGoogleUser: "Google အသုံးပြုသူ",
+    headerSynced: "ထပ်တူညီပြီးပြီ",
+    headerSignInTitle: "စက်များအကြား စည်းမျဉ်းများနှင့် တိုက်ရိုက် အစမ်းကြည့်မှုကို ထပ်တူညီရန် Google ဖြင့် ဝင်ရောက်ပါ",
+    headerSync: "ထပ်တူညီရန်",
+    headerSelectLanguage: "ဘာသာစကား ရွေးချယ်ရန်",
+    headerRulesTitle: "မြေပုံသော့များနှင့် ဆုံးဖြတ်ချက်စည်းမျဉ်းများကို ပြင်ဆင်ရန် (ဘရောင်ဇာတွင် အမြဲတမ်း သိမ်းဆည်းထားသည်)",
+    headerRulesShort: "စည်းမျဉ်းများ",
+    toastDismiss: "ပယ်ဖျက်ရန်",
+    errorBoundaryTitle: "အမှားမှ အပလီကေးရှင်း ပြန်လည်ရယူပြီးပြီ",
+    errorBoundaryDesc: "ပြသနေစဉ် မမျှော်လင့်သော ခြွင်းချက်တစ်ခု ဖြစ်ပွားခဲ့သည်။ စာမျက်နှာကို ပြန်လည်ဖွင့်နိုင် သို့မဟုတ် workspace cache ကို ပြန်လည်သတ်မှတ်နိုင်သည်။",
+    errorBoundaryReload: "စာမျက်နှာ ပြန်ဖွင့်ရန်",
+    errorBoundaryResetTitle: "ပျက်စီးနေသော local cache ကို ရှင်းလင်းပြီး အသစ်ပြန်လည်စတင်သည်",
+    errorBoundaryReset: "ဒေတာ ပြန်လည်သတ်မှတ်ရန်",
+    loadingRestoreMessage: "Workbook များ၊ ကော်လံမြေပုံများနှင့် ဆုံးဖြတ်ချက်စည်းမျဉ်းများကို ပြန်လည်ရယူနေသည်...",
+    loadingIndexedDbActive: "IndexedDB လှုပ်ရှားနေသည်",
+    loadingWorkspaceTitle: "Enterprise Workspace ကို ဖွင့်နေသည်",
     close: "ပိတ်ရန်",
     confirmReset: "ပင်မဖိုင်ကို ရှင်းလင်းမည်လား?",
     confirmResetDesc: "စက်ထဲတွင် သိမ်းဆည်းထားသော အချက်အလက်များ ပျက်သွားပါမည်။",
@@ -870,6 +993,47 @@ export const translations: Record<Language, TranslationDict> = {
     dpSelectSheet: "เลือกชีต:",
     dpShowing: "กำลังแสดง {n} แถวที่กรองแล้ว",
     searchDataCells: "ค้นหาเซลล์ข้อมูล...",
+    toastCloudRulesSynced: "ซิงค์พื้นที่ทำงานคลาวด์แล้ว — กฎและการแมปตรงกับอุปกรณ์อื่นของคุณ",
+    toastCloudFilesSynced: "ซิงค์ไฟล์จากคลาวด์แล้ว — ประวัติเดียวกันบนอุปกรณ์นี้",
+    toastShareRevoked: "ปิดการแชร์สดแล้ว — กำลังแสดงสแนปช็อตล่าสุดที่ได้รับ",
+    toastPreviewSynced: "ซิงค์ตัวอย่างกับการเปลี่ยนแปลงล่าสุดแล้ว",
+    toastSignInFailed: "ลงชื่อเข้าใช้ Google ไม่สำเร็จ",
+    toastSignedOut: "ลงชื่อออกจากคลาวด์ซิงค์แล้ว",
+    toastRefLoadedRegen: "โหลด {name} แล้ว! กำลังคำนวณผลลัพธ์และการส่งออกใหม่ด้วยการตั้งค่ากฎและตรรกะที่บันทึกไว้...",
+    toastCompImported: "นำเข้า {name} แล้ว! กำลังสร้างผลลัพธ์และการส่งออกด้วยการตั้งค่ากฎและตรรกะที่บันทึกไว้...",
+    toastRefSheetSwitched: "เปลี่ยนชีตไฟล์หลักเป็น “{sheet}” แล้ว ({rows} แถว, {cols} คอลัมน์) กำลังอัปเดตผลลัพธ์...",
+    toastRefSheetSwitchedDone: "เปลี่ยนชีตไฟล์หลักเป็น “{sheet}” แล้ว ({rows} แถว, {cols} คอลัมน์)",
+    toastCompSheetSwitched: "เปลี่ยนชีตไฟล์ขาเข้าเป็น “{sheet}” แล้ว ({rows} แถว, {cols} คอลัมน์) กำลังอัปเดตผลลัพธ์...",
+    toastCompSheetSwitchedDone: "เปลี่ยนชีตไฟล์ขาเข้าเป็น “{sheet}” แล้ว ({rows} แถว, {cols} คอลัมน์)",
+    toastExitedPreview: "ออกจากโหมดตัวอย่างสดแล้ว กู้คืนการควบคุมสตูดิโอแบบเต็ม",
+    toastRulesSaved: "บันทึกการตั้งค่ากฎและตรรกะแล้ว! บันทึกครั้งเดียว การนำเข้าไฟล์ครั้งต่อไปจะประเมินและแสดงผลลัพธ์และการส่งออกโดยอัตโนมัติ",
+    toastSampleLoaded: "โหลดตัวอย่างการจัดซื้อและการตรวจสอบระดับองค์กรแล้ว! กำลังประเมิน...",
+    toastBothFilesRequired: "ต้องมีทั้งเวิร์กบุ๊กอ้างอิงและเวิร์กบุ๊กเปรียบเทียบ",
+    toastMappingRequired: "โปรดระบุการแมปคอลัมน์อย่างน้อยหนึ่งรายการในการตั้งค่ากฎและตรรกะ",
+    toastEvaluatedSummary: "ประเมิน {total} แถว: ผ่าน {green} ตรวจสอบ {yellow} ปฏิเสธ {red}",
+    toastMatchingError: "เกิดข้อผิดพลาดระหว่างการจับคู่",
+    toastPreviewRefreshed: "รีเฟรชผลลัพธ์ตัวอย่างแล้ว",
+    previewNoResultsTitle: "ยังไม่มีผลลัพธ์ที่ตรงกัน",
+    previewNoResultsDesc: "ลิงก์ตัวอย่างผลลัพธ์ที่แชร์ไม่มีข้อมูลผลลัพธ์ หรือลิงก์หมดอายุ",
+    headerResultPreview: "ตัวอย่างผลลัพธ์",
+    headerLiveTable: "· ตารางโต้ตอบสด",
+    headerSignedInTitle: "ลงชื่อเข้าใช้เป็น {email} — คลิกเพื่อลงชื่อออกจากการซิงค์คลาวด์",
+    headerGoogleUser: "ผู้ใช้ Google",
+    headerSynced: "ซิงค์แล้ว",
+    headerSignInTitle: "ลงชื่อเข้าใช้ด้วย Google เพื่อซิงค์กฎและตัวอย่างสดระหว่างอุปกรณ์",
+    headerSync: "ซิงค์",
+    headerSelectLanguage: "เลือกภาษา",
+    headerRulesTitle: "กำหนดค่าคีย์การแมปและกฎการตัดสินใจ (บันทึกถาวรในเบราว์เซอร์)",
+    headerRulesShort: "กฎ",
+    toastDismiss: "ปิด",
+    errorBoundaryTitle: "แอปพลิเคชันกู้คืนจากข้อผิดพลาดแล้ว",
+    errorBoundaryDesc: "เกิดข้อยกเว้นที่ไม่คาดคิดขณะแสดงผล คุณสามารถโหลดหน้าซ้ำหรือรีเซ็ตแคชพื้นที่ทำงานได้อย่างปลอดภัย",
+    errorBoundaryReload: "โหลดหน้าซ้ำ",
+    errorBoundaryResetTitle: "ล้างแคชในเครื่องที่เสียหายและเริ่มใหม่",
+    errorBoundaryReset: "รีเซ็ตข้อมูล",
+    loadingRestoreMessage: "กำลังกู้คืนเวิร์กบุ๊ก การแมปคอลัมน์ และกฎการตัดสินใจ...",
+    loadingIndexedDbActive: "IndexedDB ทำงานอยู่",
+    loadingWorkspaceTitle: "กำลังโหลดพื้นที่ทำงานองค์กร",
     close: "ปิด",
     confirmReset: "ยืนยันการล้างไฟล์หลัก?",
     confirmResetDesc: "การกระทำนี้จะลบไฟล์อ้างอิงที่บันทึกไว้ในเครื่องของคุณ",
@@ -1092,6 +1256,47 @@ export const translations: Record<Language, TranslationDict> = {
     dpSelectSheet: "选择工作表:",
     dpShowing: "正在显示 {n} 个筛选后的行",
     searchDataCells: "搜索数据单元格...",
+    toastCloudRulesSynced: "云工作区已同步 — 规则与映射与其他设备一致。",
+    toastCloudFilesSynced: "已从云端同步文件 — 此设备上的历史记录相同。",
+    toastShareRevoked: "已关闭实时共享 — 正在显示最后收到的快照。",
+    toastPreviewSynced: "预览已与最新更改同步。",
+    toastSignInFailed: "Google 登录失败。",
+    toastSignedOut: "已退出云同步。",
+    toastRefLoadedRegen: "已加载 {name}！正在使用已保存的规则与逻辑设置重新生成结果和导出...",
+    toastCompImported: "已导入 {name}！正在使用已保存的规则与逻辑设置生成结果和导出...",
+    toastRefSheetSwitched: "已将主文件工作表切换为“{sheet}”（{rows} 行，{cols} 列）。正在更新结果...",
+    toastRefSheetSwitchedDone: "已将主文件工作表切换为“{sheet}”（{rows} 行，{cols} 列）。",
+    toastCompSheetSwitched: "已将传入文件工作表切换为“{sheet}”（{rows} 行，{cols} 列）。正在更新结果...",
+    toastCompSheetSwitchedDone: "已将传入文件工作表切换为“{sheet}”（{rows} 行，{cols} 列）。",
+    toastExitedPreview: "已退出实时预览模式，工作室完整控件已恢复。",
+    toastRulesSaved: "规则与逻辑设置已保存！只需保存一次，今后导入文件时将自动评估并直接显示结果与导出。",
+    toastSampleLoaded: "企业采购与检验示例已加载！正在评估...",
+    toastBothFilesRequired: "需要同时提供参考工作簿和比对工作簿。",
+    toastMappingRequired: "请在规则与逻辑设置中至少指定一个列映射。",
+    toastEvaluatedSummary: "已评估 {total} 行：{green} 通过，{yellow} 待复核，{red} 被拒绝。",
+    toastMatchingError: "匹配过程中发生错误。",
+    toastPreviewRefreshed: "预览结果已刷新",
+    previewNoResultsTitle: "暂无匹配结果",
+    previewNoResultsDesc: "共享的结果预览链接不包含结果数据，或链接已过期。",
+    headerResultPreview: "结果预览",
+    headerLiveTable: "· 实时交互表",
+    headerSignedInTitle: "已登录为 {email} — 点击退出云同步",
+    headerGoogleUser: "Google 用户",
+    headerSynced: "已同步",
+    headerSignInTitle: "使用 Google 登录以在设备间同步规则和实时预览",
+    headerSync: "同步",
+    headerSelectLanguage: "选择语言",
+    headerRulesTitle: "配置映射键和判定规则（永久保存在浏览器中）",
+    headerRulesShort: "规则",
+    toastDismiss: "关闭",
+    errorBoundaryTitle: "应用已从错误中恢复",
+    errorBoundaryDesc: "呈现时发生意外异常。您可以安全地重新加载页面或重置工作区缓存。",
+    errorBoundaryReload: "重新加载页面",
+    errorBoundaryResetTitle: "清除已损坏的本地缓存并重新开始",
+    errorBoundaryReset: "重置数据",
+    loadingRestoreMessage: "正在恢复工作簿、列映射和判定规则...",
+    loadingIndexedDbActive: "IndexedDB 运行中",
+    loadingWorkspaceTitle: "正在加载企业工作区",
     close: "关闭",
     confirmReset: "确认重置基准工作簿？",
     confirmResetDesc: "此操作将清除浏览器本地保存的基准文件及缓存，需重新上传。",
