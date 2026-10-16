@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Globe, SlidersHorizontal, FileSpreadsheet, Cloud, CloudUpload, LogOut } from 'lucide-react';
+import { ProgressRing } from './ProgressRing';
+import type { ActiveUpload } from '../types';
 import type { User } from 'firebase/auth';
 import { Language } from '../types';
 import { translations } from '../translations';
@@ -18,7 +20,7 @@ interface HeaderProps {
   cloudUser?: User | null;
   onCloudSignIn?: () => void;
   onCloudSignOut?: () => void;
-  isUploading?: boolean;
+  activeUpload?: ActiveUpload | null;
   onOpenSyncPanel?: () => void;
 }
 
@@ -35,7 +37,7 @@ export const Header: React.FC<HeaderProps> = ({
   cloudUser,
   onCloudSignIn,
   onCloudSignOut,
-  isUploading,
+  activeUpload,
   onOpenSyncPanel,
 }) => {
   const t = translations[language];
@@ -96,10 +98,27 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onOpenSyncPanel}
                 title={t.syncPanelTitle}
-                className="flex items-center gap-1.5 px-2.5 py-2 text-xs font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-lg border border-sky-200 transition-colors whitespace-nowrap shrink-0 shadow-xs"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-lg border border-sky-200 transition-colors whitespace-nowrap shrink-0 shadow-xs"
               >
-                <CloudUpload className={`w-3.5 h-3.5 ${isUploading ? 'animate-bounce' : ''}`} />
-                <span className="hidden sm:inline">{isUploading ? t.syncUploading : t.syncAllSynced}</span>
+                {activeUpload ? (
+                  <>
+                    <ProgressRing
+                      pct={activeUpload.total > 0 ? Math.round((activeUpload.done / activeUpload.total) * 100) : null}
+                      size={20}
+                    />
+                    <span className="font-bold tabular-nums">
+                      {activeUpload.total > 0 ? `${Math.round((activeUpload.done / activeUpload.total) * 100)}%` : '…'}
+                    </span>
+                    <span className="hidden lg:inline max-w-[160px] truncate text-sky-600/80 font-normal">
+                      {activeUpload.fileName}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <CloudUpload className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{t.syncAllSynced}</span>
+                  </>
+                )}
               </button>
             )}
             {/* Cloud sync: sign in with Google to share rules & live preview across devices */}
