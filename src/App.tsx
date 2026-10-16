@@ -9,6 +9,7 @@ import {
   MatchingStats,
   ColumnConfigItem,
   SyncHistoryEntry,
+  ActiveUpload,
 } from './types';
 import {
   saveToIDB,
@@ -55,6 +56,7 @@ import {
   publishResultsState,
   fetchResultsState,
   deleteResultsState,
+  isCloudDocUploading,
   defaultResultFilters,
 } from './lib/cloudSync';
 import type { ResultFilters } from './lib/cloudSync';
@@ -134,12 +136,11 @@ export default function App() {
   const [studioSession, setStudioSession] = useState(0);
   // True while the login pull is downloading the workspace from the cloud
   const [isCloudPulling, setIsCloudPulling] = useState(false);
-  // Cloud upload tracking: header arrow animation + history panel
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadLabel, setUploadLabel] = useState('');
+  // Cloud upload tracking: real upload-manager state (progress ring + history)
   const [syncHistory, setSyncHistory] = useState<SyncHistoryEntry[]>([]);
   const [isSyncPanelOpen, setIsSyncPanelOpen] = useState(false);
-  const pendingUploadsRef = useRef(0);
+  const [activeUpload, setActiveUpload] = useState<ActiveUpload | null>(null);
+  const activeUploadsRef = useRef<Record<string, ActiveUpload>>({});
   const syncHistoryRef = useRef<SyncHistoryEntry[]>([]);
   // Tracks results that came straight from a cloud pull (skip re-publish echo)
   const pulledResultsRef = useRef<MatchedRow[] | null>(null);
@@ -229,10 +230,11 @@ export default function App() {
   const publishWorkbooksWithRetry = async (
     uid: string,
     wbs: { reference: WorkbookData | null; comparison: WorkbookData | null },
-    attempts = 3
+    attempts = 3,
+    onProgress?: (done: number, total: number) => void
   ): Promise<boolean> => {
     for (let i = 0; i < attempts; i++) {
-      if (await publishWorkbooks(uid, wbs)) return true;
+      if (await publishWorkbooks(uid, wbs, onProgress)) return true;
       if (i < attempts - 1) await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
     }
     return false;
@@ -251,10 +253,12 @@ export default function App() {
     const pullSafety = setTimeout(() => setIsCloudPulling(false), 30000);
     (async () => {
       try {
-        const [cloudRules, cloudWbs, cloudResults] = await Promise.all([
+        const [cloudRules, cloudWbs, cloudResults, wbsUploading, resultsUploading] = await Promise.all([
           fetchRulesState(cloudUser.uid),
           fetchWorkbooks(cloudUser.uid),
           fetchResultsState(cloudUser.uid),
+          isCloudDocUploading(cloudUser.uid, 'workbooks'),
+          isCloudDocUploading(cloudUser.uid, 'results'),
         ]);
 
         let effMappings = rulesStateRef.current.mappings;
@@ -324,7 +328,11 @@ export default function App() {
           });
         }
 
-        if (cloudWbs && cloudWbs.updatedAt) {
+        // While the cloud doc is mid-upload, keep local files untouched:
+        // never seed over it, mirror it, or apply a partial payload.
+        if (wbsUploading) {
+          console.log('Cloud pull: workbooks mid-upload on another device — keeping local files');
+        } else if (cloudWbs && cloudWbs.updatedAt) {
           if (cloudWbs.reference) {
             setReferenceWb(cloudWbs.reference);
             await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, cloudWbs.reference);
@@ -367,12 +375,17 @@ export default function App() {
         // files are newer than the synced results (publish race), regenerate
         // instead of applying stale results.
         const resultsFresh =
+          !wbsUploading &&
           cloudResults &&
           cloudResults.results.length > 0 &&
           effRef &&
           effComp &&
           (!cloudWbs || !cloudWbs.updatedAt || cloudResults.updatedAt >= cloudWbs.updatedAt);
-        if (resultsFresh) {
+        // While the cloud results are mid-upload, keep local results untouched:
+        // never apply a partial payload or regenerate over it.
+        if (resultsUploading) {
+          console.log('Cloud pull: results mid-upload on another device — keeping local results');
+        } else if (resultsFresh) {
           pulledResultsRef.current = cloudResults.results;
           setResults(cloudResults.results);
           setStats(cloudResults.stats);
@@ -405,14 +418,27 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cloudUser, localReady, isPreviewMode]);
 
-  const beginUpload = useCallback((label: string) => {
-    pendingUploadsRef.current += 1;
-    setUploadLabel(label);
-    setIsUploading(true);
+  const pickActiveUpload = useCallback(() => {
+    const m = activeUploadsRef.current;
+    const next = m['file'] || m['settings'] || m['results'] || null;
+    setActiveUpload(next ? { ...next } : null);
   }, []);
 
+  const beginUpload = useCallback((kind: ActiveUpload['kind'], label: string, fileName: string) => {
+    activeUploadsRef.current[kind] = { kind, label, fileName, done: 0, total: 0 };
+    pickActiveUpload();
+  }, [pickActiveUpload]);
+
+  const updateUploadProgress = useCallback((kind: ActiveUpload['kind'], done: number, total: number) => {
+    const cur = activeUploadsRef.current[kind];
+    if (!cur) return;
+    activeUploadsRef.current[kind] = { ...cur, done, total };
+    pickActiveUpload();
+  }, [pickActiveUpload]);
+
   const endUpload = useCallback((entry: { kind: 'file' | 'settings' | 'results'; title: string; status: 'done' | 'failed' }) => {
-    pendingUploadsRef.current = Math.max(0, pendingUploadsRef.current - 1);
+    delete activeUploadsRef.current[entry.kind];
+    pickActiveUpload();
     const full: SyncHistoryEntry = {
       ...entry,
       id: `sh_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -422,11 +448,7 @@ export default function App() {
     syncHistoryRef.current = next;
     setSyncHistory(next);
     saveToIDB(StorageKeys.SYNC_HISTORY, next).catch(() => {});
-    if (pendingUploadsRef.current === 0) {
-      setIsUploading(false);
-      setUploadLabel('');
-    }
-  }, []);
+  }, [pickActiveUpload]);
 
   // Human-readable reason for a settings upload, by diffing rule sections
   const describeRulesChange = useCallback((prevJson: string | null, cur: Record<string, unknown>): string => {
@@ -457,7 +479,7 @@ export default function App() {
       if (key === lastRulesPublishRef.current) return;
       lastRulesPublishRef.current = key;
       const tt = tRef.current;
-      beginUpload(tt.syncSettingsLabel);
+      beginUpload('settings', tt.syncSettingsLabel, reason);
       publishRulesState(uid, st).then((ok) => {
         endUpload({ kind: 'settings', title: reason, status: ok ? 'done' : 'failed' });
         if (ok) showToast(tt.toastCloudSettingsUploaded, 'success');
@@ -486,8 +508,10 @@ export default function App() {
     debounce((uid: string, state: { results: MatchedRow[]; stats: MatchingStats; filters: ResultFilters }, gen: number) => {
       if (gen !== resultsPublishGenRef.current) return;
       const tt = tRef.current;
-      beginUpload(tt.syncResultsLabel);
-      publishResultsState(uid, state).then((ok) => {
+      beginUpload('results', tt.syncResultsLabel, `${state.results.length}`);
+      publishResultsState(uid, state, (done, total) =>
+        updateUploadProgress('results', done, total)
+      ).then((ok) => {
         endUpload({ kind: 'results', title: `${tt.syncResultsLabel} (${state.results.length})`, status: ok ? 'done' : 'failed' });
         if (ok) showToast(tt.toastCloudResultsUploaded, 'success');
         else showToast(tt.toastCloudResultsSyncFailed, 'error');
@@ -526,8 +550,10 @@ export default function App() {
     debounce((uid: string, wbs: { reference: WorkbookData | null; comparison: WorkbookData | null }) => {
       const tt = tRef.current;
       const names = [wbs.reference?.name, wbs.comparison?.name].filter(Boolean).join(' + ') || tt.syncFilesLabel;
-      beginUpload(tt.syncFilesLabel);
-      publishWorkbooksWithRetry(uid, wbs).then((ok) => {
+      beginUpload('file', tt.syncFilesLabel, names);
+      publishWorkbooksWithRetry(uid, wbs, 3, (done, total) =>
+        updateUploadProgress('file', done, total)
+      ).then((ok) => {
         endUpload({ kind: 'file', title: names, status: ok ? 'done' : 'failed' });
         if (ok) showToast(tt.toastCloudFilesUploaded, 'success');
         else showToast(tt.toastCloudFilesSyncFailed, 'error');
@@ -606,8 +632,8 @@ export default function App() {
       syncHistoryRef.current = [];
       setSyncHistory([]);
       setIsSyncPanelOpen(false);
-      pendingUploadsRef.current = 0;
-      setIsUploading(false);
+      activeUploadsRef.current = {};
+      setActiveUpload(null);
       setStudioSession((n) => n + 1);
       for (const k of [
         StorageKeys.REFERENCE_WORKBOOK,
@@ -1277,7 +1303,7 @@ export default function App() {
         cloudUser={cloudUser}
         onCloudSignIn={handleCloudSignIn}
         onCloudSignOut={handleCloudSignOut}
-        isUploading={isUploading}
+        activeUpload={activeUpload}
         onOpenSyncPanel={() => setIsSyncPanelOpen(true)}
         onOpenRulesSetting={() => setIsRulesModalOpen(true)}
         hasRefFile={!!referenceWb}
@@ -1378,8 +1404,7 @@ export default function App() {
         isOpen={isSyncPanelOpen}
         onClose={() => setIsSyncPanelOpen(false)}
         language={language}
-        isUploading={isUploading}
-        uploadLabel={uploadLabel}
+        activeUpload={activeUpload}
         history={syncHistory}
         onClearHistory={clearSyncHistory}
       />
