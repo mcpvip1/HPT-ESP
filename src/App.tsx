@@ -21,6 +21,7 @@ import {
   processMatching,
   generateSampleDatasets,
   autoMapColumns,
+  changeWorkbookSheet,
 } from './utils/excel';
 import { Header } from './components/Header';
 import { FilesManagement } from './components/FilesManagement';
@@ -301,6 +302,76 @@ export default function App() {
     }
   };
 
+  // Switch Active Sheet for Main Reference File
+  const handleSelectReferenceSheet = async (sheetName: string) => {
+    if (!referenceWb || referenceWb.activeSheet === sheetName) return;
+
+    const updatedWb = changeWorkbookSheet(referenceWb, sheetName);
+    setReferenceWb(updatedWb);
+    await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, updatedWb);
+
+    // If new sheet has different columns, re-evaluate column mappings
+    let effectiveMappings = mappings;
+    if (comparisonWb) {
+      const validMappings = mappings.filter((m) => updatedWb.headers.includes(m.mainCol));
+      if (validMappings.length === 0) {
+        effectiveMappings = autoMapColumns(updatedWb.headers, comparisonWb.headers);
+        if (effectiveMappings.length > 0) {
+          setMappings(effectiveMappings);
+          await saveToIDB(StorageKeys.COLUMN_MAPPINGS, effectiveMappings);
+        }
+      } else {
+        effectiveMappings = validMappings;
+      }
+
+      showToast(
+        `Switched Main File sheet to "${sheetName}" (${updatedWb.rows.length.toLocaleString()} rows, ${updatedWb.headers.length} columns). Updating results...`,
+        'info'
+      );
+
+      handleExecuteMatching(updatedWb, comparisonWb, effectiveMappings, true);
+    } else {
+      showToast(
+        `Switched Main File sheet to "${sheetName}" (${updatedWb.rows.length.toLocaleString()} rows, ${updatedWb.headers.length} columns).`,
+        'success'
+      );
+    }
+  };
+
+  // Switch Active Sheet for Incoming Comparison File
+  const handleSelectComparisonSheet = async (sheetName: string) => {
+    if (!comparisonWb || comparisonWb.activeSheet === sheetName) return;
+
+    const updatedWb = changeWorkbookSheet(comparisonWb, sheetName);
+    setComparisonWb(updatedWb);
+
+    let effectiveMappings = mappings;
+    if (referenceWb) {
+      const validMappings = mappings.filter((m) => updatedWb.headers.includes(m.comparisonCol));
+      if (validMappings.length === 0) {
+        effectiveMappings = autoMapColumns(referenceWb.headers, updatedWb.headers);
+        if (effectiveMappings.length > 0) {
+          setMappings(effectiveMappings);
+          await saveToIDB(StorageKeys.COLUMN_MAPPINGS, effectiveMappings);
+        }
+      } else {
+        effectiveMappings = validMappings;
+      }
+
+      showToast(
+        `Switched Incoming File sheet to "${sheetName}" (${updatedWb.rows.length.toLocaleString()} rows, ${updatedWb.headers.length} columns). Updating results...`,
+        'info'
+      );
+
+      handleExecuteMatching(referenceWb, updatedWb, effectiveMappings, true);
+    } else {
+      showToast(
+        `Switched Incoming File sheet to "${sheetName}" (${updatedWb.rows.length.toLocaleString()} rows, ${updatedWb.headers.length} columns).`,
+        'success'
+      );
+    }
+  };
+
   // Auto-save Settings
   const handleUpdateMappings = async (newMappings: ColumnMapping[]) => {
     setMappings(newMappings);
@@ -507,6 +578,8 @@ export default function App() {
               comparisonWb={comparisonWb}
               onSetReferenceWb={handleSetReferenceWb}
               onSetComparisonWb={handleSetComparisonWb}
+              onSelectReferenceSheet={handleSelectReferenceSheet}
+              onSelectComparisonSheet={handleSelectComparisonSheet}
               onPreviewWb={(wb, title) =>
                 setPreviewModal({ isOpen: true, workbook: wb, title })
               }
@@ -561,6 +634,13 @@ export default function App() {
           setPreviewModal({ isOpen: false, workbook: null, title: '' })
         }
         title={previewModal.title}
+        onSelectSheet={(sheetName) => {
+          if (previewModal.workbook?.id === referenceWb?.id) {
+            handleSelectReferenceSheet(sheetName);
+          } else if (previewModal.workbook?.id === comparisonWb?.id) {
+            handleSelectComparisonSheet(sheetName);
+          }
+        }}
       />
 
       {/* Toast Notifications */}

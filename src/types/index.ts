@@ -11,6 +11,7 @@ export interface WorkbookData {
   rows: ExcelRow[];
   sheetNames: string[];
   activeSheet: string;
+  sheets?: Record<string, { headers: string[]; rows: ExcelRow[] }>;
 }
 
 export interface ColumnMapping {
@@ -79,6 +80,14 @@ export interface UnmatchedInfo {
   closestReferenceRow?: ExcelRow;
 }
 
+export interface ReconciledPostponeInfo {
+  originalPostponeColumn?: string;
+  originalPostponeValue?: string;
+  acceptedPeerRowIndex?: number;
+  acceptedPeerKey?: string;
+  source?: string;
+}
+
 export interface MatchedRow {
   id: string;
   rowIndex: number;
@@ -92,6 +101,7 @@ export interface MatchedRow {
   decisionLayerName?: string;
   mergedRow: ExcelRow;
   supersededByAccept?: boolean;
+  reconciledPostponeInfo?: ReconciledPostponeInfo;
 }
 
 export interface MatchingStats {

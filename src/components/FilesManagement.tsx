@@ -10,6 +10,7 @@ import {
   Database,
   FileUp,
   SlidersHorizontal,
+  Layers,
 } from 'lucide-react';
 import { WorkbookData, Language } from '../types';
 import { translations } from '../translations';
@@ -20,6 +21,8 @@ interface FilesManagementProps {
   comparisonWb: WorkbookData | null;
   onSetReferenceWb: (wb: WorkbookData | null) => void;
   onSetComparisonWb: (wb: WorkbookData | null, autoEvaluate?: boolean) => void;
+  onSelectReferenceSheet?: (sheetName: string) => void;
+  onSelectComparisonSheet?: (sheetName: string) => void;
   onPreviewWb: (wb: WorkbookData, title: string) => void;
   onOpenRulesSetting?: () => void;
   onProceedToStep3?: () => void;
@@ -32,6 +35,8 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
   comparisonWb,
   onSetReferenceWb,
   onSetComparisonWb,
+  onSelectReferenceSheet,
+  onSelectComparisonSheet,
   onPreviewWb,
   language,
   onShowToast,
@@ -167,7 +172,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span className="text-sm font-semibold text-slate-900 truncate block">
+                        <span className="text-sm font-bold text-slate-900 truncate block">
                           {referenceWb.name}
                         </span>
                       </div>
@@ -189,9 +194,87 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                   </div>
                 </div>
 
+                {/* Active Sheet Selection for Main File */}
+                {referenceWb.sheetNames && referenceWb.sheetNames.length > 0 && (
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                        <Layers className="w-4 h-4 text-emerald-600" />
+                        <span>Select Main File Sheet:</span>
+                        {referenceWb.sheetNames.length > 1 && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
+                            {referenceWb.sheetNames.length} Sheets
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        Active: <strong className="text-emerald-700 font-bold">{referenceWb.activeSheet}</strong>
+                      </span>
+                    </div>
+
+                    {referenceWb.sheetNames.length > 1 ? (
+                      <div className="space-y-2">
+                        <select
+                          value={referenceWb.activeSheet}
+                          onChange={(e) => onSelectReferenceSheet?.(e.target.value)}
+                          className="w-full bg-slate-50 hover:bg-slate-100/90 border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-xs cursor-pointer font-mono"
+                          aria-label="Select Reference File Sheet"
+                        >
+                          {referenceWb.sheetNames.map((sheet) => {
+                            const sheetInfo = referenceWb.sheets?.[sheet];
+                            const rCount = sheetInfo ? sheetInfo.rows.length : (sheet === referenceWb.activeSheet ? referenceWb.rows.length : '?');
+                            const cCount = sheetInfo ? sheetInfo.headers.length : (sheet === referenceWb.activeSheet ? referenceWb.headers.length : '?');
+                            return (
+                              <option key={sheet} value={sheet}>
+                                📄 {sheet} ({rCount.toLocaleString()} rows · {cCount} columns)
+                              </option>
+                            );
+                          })}
+                        </select>
+
+                        <div className="flex flex-wrap gap-1.5">
+                          {referenceWb.sheetNames.map((sheet) => {
+                            const isSelected = sheet === referenceWb.activeSheet;
+                            const sheetInfo = referenceWb.sheets?.[sheet];
+                            const rCount = sheetInfo ? sheetInfo.rows.length : (sheet === referenceWb.activeSheet ? referenceWb.rows.length : 0);
+                            return (
+                              <button
+                                key={sheet}
+                                type="button"
+                                onClick={() => onSelectReferenceSheet?.(sheet)}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all shadow-xs ${
+                                  isSelected
+                                    ? 'bg-emerald-600 text-white font-bold ring-2 ring-emerald-600/30'
+                                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-medium'
+                                }`}
+                              >
+                                <span>{sheet}</span>
+                                <span
+                                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ${
+                                    isSelected
+                                      ? 'bg-emerald-700 text-white'
+                                      : 'bg-white text-slate-500 border border-slate-200'
+                                  }`}
+                                >
+                                  {rCount.toLocaleString()}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs font-medium text-slate-700 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 flex items-center justify-between">
+                        <span className="font-semibold text-slate-800 font-mono">📄 {referenceWb.activeSheet}</span>
+                        <span className="text-[11px] text-slate-400">Single Sheet File</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="text-xs text-slate-600">
-                  <span className="font-medium text-slate-700">Columns Detected: </span>
-                  <span className="text-slate-500 font-mono text-[11px]">
+                  <span className="font-bold text-slate-700">Columns Detected ({referenceWb.headers.length}): </span>
+                  <span className="text-slate-600 font-mono text-[11px]">
                     {referenceWb.headers.slice(0, 5).join(', ')}
                     {referenceWb.headers.length > 5 ? ` +${referenceWb.headers.length - 5} more` : ''}
                   </span>
@@ -326,7 +409,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <FileSpreadsheet className="w-4 h-4 text-blue-600 shrink-0" />
-                        <span className="text-sm font-semibold text-slate-900 truncate block">
+                        <span className="text-sm font-bold text-slate-900 truncate block">
                           {comparisonWb.name}
                         </span>
                       </div>
@@ -348,9 +431,87 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                   </div>
                 </div>
 
+                {/* Active Sheet Selection for Comparison File */}
+                {comparisonWb.sheetNames && comparisonWb.sheetNames.length > 0 && (
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                        <Layers className="w-4 h-4 text-blue-600" />
+                        <span>Select Incoming File Sheet:</span>
+                        {comparisonWb.sheetNames.length > 1 && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-blue-50 text-blue-700 font-bold border border-blue-200">
+                            {comparisonWb.sheetNames.length} Sheets
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        Active: <strong className="text-blue-700 font-bold">{comparisonWb.activeSheet}</strong>
+                      </span>
+                    </div>
+
+                    {comparisonWb.sheetNames.length > 1 ? (
+                      <div className="space-y-2">
+                        <select
+                          value={comparisonWb.activeSheet}
+                          onChange={(e) => onSelectComparisonSheet?.(e.target.value)}
+                          className="w-full bg-slate-50 hover:bg-slate-100/90 border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-xs cursor-pointer font-mono"
+                          aria-label="Select Comparison File Sheet"
+                        >
+                          {comparisonWb.sheetNames.map((sheet) => {
+                            const sheetInfo = comparisonWb.sheets?.[sheet];
+                            const rCount = sheetInfo ? sheetInfo.rows.length : (sheet === comparisonWb.activeSheet ? comparisonWb.rows.length : '?');
+                            const cCount = sheetInfo ? sheetInfo.headers.length : (sheet === comparisonWb.activeSheet ? comparisonWb.headers.length : '?');
+                            return (
+                              <option key={sheet} value={sheet}>
+                                📄 {sheet} ({rCount.toLocaleString()} rows · {cCount} columns)
+                              </option>
+                            );
+                          })}
+                        </select>
+
+                        <div className="flex flex-wrap gap-1.5">
+                          {comparisonWb.sheetNames.map((sheet) => {
+                            const isSelected = sheet === comparisonWb.activeSheet;
+                            const sheetInfo = comparisonWb.sheets?.[sheet];
+                            const rCount = sheetInfo ? sheetInfo.rows.length : (sheet === comparisonWb.activeSheet ? comparisonWb.rows.length : 0);
+                            return (
+                              <button
+                                key={sheet}
+                                type="button"
+                                onClick={() => onSelectComparisonSheet?.(sheet)}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all shadow-xs ${
+                                  isSelected
+                                    ? 'bg-blue-600 text-white font-bold ring-2 ring-blue-600/30'
+                                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-medium'
+                                }`}
+                              >
+                                <span>{sheet}</span>
+                                <span
+                                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ${
+                                    isSelected
+                                      ? 'bg-blue-700 text-white'
+                                      : 'bg-white text-slate-500 border border-slate-200'
+                                  }`}
+                                >
+                                  {rCount.toLocaleString()}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs font-medium text-slate-700 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 flex items-center justify-between">
+                        <span className="font-semibold text-slate-800 font-mono">📄 {comparisonWb.activeSheet}</span>
+                        <span className="text-[11px] text-slate-400">Single Sheet File</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="text-xs text-slate-600">
-                  <span className="font-medium text-slate-700">Columns Detected: </span>
-                  <span className="text-slate-500 font-mono text-[11px]">
+                  <span className="font-bold text-slate-700">Columns Detected ({comparisonWb.headers.length}): </span>
+                  <span className="text-slate-600 font-mono text-[11px]">
                     {comparisonWb.headers.slice(0, 5).join(', ')}
                     {comparisonWb.headers.length > 5 ? ` +${comparisonWb.headers.length - 5} more` : ''}
                   </span>

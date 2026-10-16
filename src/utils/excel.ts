@@ -123,66 +123,79 @@ export async function parseExcelFile(
     throw new Error('No sheets found in workbook.');
   }
 
-  const activeSheet = sheetNames[0];
-  const worksheet = workbook.Sheets[activeSheet];
+  const sheetsData: Record<string, { headers: string[]; rows: ExcelRow[] }> = {};
 
-  onProgress?.(50, 'Optimizing sheet bounds...');
-  // Critical fix: clamp range to prevent SheetJS from iterating 1,048,576 rows
-  clampWorksheetRange(worksheet);
-
-  onProgress?.(65, 'Extracting tabular data...');
-  await new Promise((r) => setTimeout(r, 10));
-
-  // Convert to 2D array with blankrows omitted
-  const rawRows: any[] = XLSX.utils.sheet_to_json(worksheet, {
-    header: 1,
-    blankrows: false,
-    raw: true,
-  });
-
-  if (!rawRows || rawRows.length === 0) {
-    throw new Error('Sheet contains no readable data rows.');
-  }
-
-  // Header row is index 0
-  const headerRow: string[] = (rawRows[0] || []).map((h: any, idx: number) => {
-    const str = h !== undefined && h !== null ? String(h).trim() : '';
-    return str !== '' ? str : `Column_${idx + 1}`;
-  });
-
-  const totalRaw = rawRows.length;
-  const rows: ExcelRow[] = [];
-
-  // Non-blocking row conversion: yields every 500 rows
-  for (let r = 1; r < totalRaw; r++) {
-    if (r % 500 === 0) {
-      const pct = 65 + Math.round((r / totalRaw) * 30);
-      onProgress?.(pct, `Processing row ${r.toLocaleString()} of ${totalRaw.toLocaleString()}...`);
-      await new Promise((resolve) => setTimeout(resolve, 0));
+  for (let sIdx = 0; sIdx < sheetNames.length; sIdx++) {
+    const sName = sheetNames[sIdx];
+    const worksheet = workbook.Sheets[sName];
+    if (!worksheet) {
+      sheetsData[sName] = { headers: [], rows: [] };
+      continue;
     }
 
-    const rowArray = rawRows[r];
-    if (!rowArray || rowArray.length === 0) continue;
+    const pct = 40 + Math.round(((sIdx + 0.3) / sheetNames.length) * 50);
+    onProgress?.(pct, `Reading sheet "${sName}" (${sIdx + 1} of ${sheetNames.length})...`);
+    await new Promise((r) => setTimeout(r, 0));
 
-    // Fast check: verify at least one cell has content
-    let hasContent = false;
-    for (let c = 0; c < rowArray.length; c++) {
-      const val = rowArray[c];
-      if (val !== undefined && val !== null && val !== '') {
-        hasContent = true;
-        break;
+    // Critical fix: clamp range to prevent SheetJS from iterating 1,048,576 rows
+    clampWorksheetRange(worksheet);
+
+    // Convert to 2D array with blankrows omitted
+    const rawRows: any[] = XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+      blankrows: false,
+      raw: true,
+    });
+
+    if (!rawRows || rawRows.length === 0) {
+      sheetsData[sName] = { headers: [], rows: [] };
+      continue;
+    }
+
+    // Header row is index 0
+    const headerRow: string[] = (rawRows[0] || []).map((h: any, idx: number) => {
+      const str = h !== undefined && h !== null ? String(h).trim() : '';
+      return str !== '' ? str : `Column_${idx + 1}`;
+    });
+
+    const totalRaw = rawRows.length;
+    const rows: ExcelRow[] = [];
+
+    // Non-blocking row conversion
+    for (let r = 1; r < totalRaw; r++) {
+      if (r % 800 === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
-    }
-    if (!hasContent) continue;
 
-    const rowObj: ExcelRow = {};
-    for (let c = 0; c < headerRow.length; c++) {
-      const colName = headerRow[c];
-      const val = rowArray[c];
-      rowObj[colName] = val !== undefined && val !== null ? val : '';
+      const rowArray = rawRows[r];
+      if (!rowArray || rowArray.length === 0) continue;
+
+      let hasContent = false;
+      for (let c = 0; c < rowArray.length; c++) {
+        const val = rowArray[c];
+        if (val !== undefined && val !== null && val !== '') {
+          hasContent = true;
+          break;
+        }
+      }
+      if (!hasContent) continue;
+
+      const rowObj: ExcelRow = {};
+      for (let c = 0; c < headerRow.length; c++) {
+        const colName = headerRow[c];
+        const val = rowArray[c];
+        rowObj[colName] = val !== undefined && val !== null ? val : '';
+      }
+      rows.push(rowObj);
     }
-    rows.push(rowObj);
+
+    sheetsData[sName] = { headers: headerRow, rows };
   }
+
+  // Pick first sheet that contains data, or first sheet by default
+  const activeSheet =
+    sheetNames.find((name) => (sheetsData[name]?.rows.length || 0) > 0) || sheetNames[0];
+  const activeData = sheetsData[activeSheet] || { headers: [], rows: [] };
 
   onProgress?.(100, 'Done');
 
@@ -191,10 +204,39 @@ export async function parseExcelFile(
     name: file.name,
     size: file.size,
     lastModified: file.lastModified,
-    headers: headerRow,
-    rows,
+    headers: activeData.headers,
+    rows: activeData.rows,
     sheetNames,
     activeSheet,
+    sheets: sheetsData,
+  };
+}
+
+/**
+ * Switches the active sheet of a WorkbookData object to a new sheet name.
+ * Updates headers and rows to match the selected sheet's structure.
+ */
+export function changeWorkbookSheet(wb: WorkbookData, targetSheet: string): WorkbookData {
+  if (!wb.sheets) {
+    return {
+      ...wb,
+      activeSheet: targetSheet,
+    };
+  }
+
+  const sheetData = wb.sheets[targetSheet];
+  if (!sheetData) {
+    return {
+      ...wb,
+      activeSheet: targetSheet,
+    };
+  }
+
+  return {
+    ...wb,
+    activeSheet: targetSheet,
+    headers: sheetData.headers,
+    rows: sheetData.rows,
   };
 }
 
@@ -862,6 +904,8 @@ export function processMatching(
 
       // Check if ANY peer row or matched reference has Accept or Waive
       let hasAcceptInGroup = false;
+      let acceptedPeer: MatchedRow | undefined;
+      let acceptedFromRef = false;
 
       // Check matched reference row
       if (
@@ -869,6 +913,7 @@ export function processMatching(
         hasInspectionTerm(r.matchedMainRow, 'waive')
       ) {
         hasAcceptInGroup = true;
+        acceptedFromRef = true;
       }
 
       // Check peer comparison rows
@@ -882,6 +927,7 @@ export function processMatching(
             hasInspectionTerm(peer.matchedMainRow, 'waive')
           ) {
             hasAcceptInGroup = true;
+            acceptedPeer = peer;
             break;
           }
         }
@@ -889,9 +935,42 @@ export function processMatching(
 
       if (hasAcceptInGroup) {
         // "only take accept no need to show yellow"
+        // User requirement: "remember decision status must be passed Match status must be matched that rule can not be broken"
         r.decisionColor = 'green';
-        r.decisionReason = 'Accept (Duplicate key: Accept status takes precedence; Postpone overridden)';
+        r.decisionReason = `Accept (Duplicate key: Postpone overridden by Accept ${acceptedFromRef ? 'from Reference File' : `from Row #${acceptedPeer?.rowIndex ?? 'duplicate'}`})`;
         r.supersededByAccept = true;
+        r.isMatched = true;
+        r.unmatchedInfo = undefined;
+
+        let origCol = '';
+        let origVal = '';
+        for (const [colName, val] of Object.entries(r.comparisonRow)) {
+          const s = String(val ?? '').toLowerCase();
+          if (s.includes('postpone')) {
+            origCol = colName;
+            origVal = String(val);
+            break;
+          }
+        }
+
+        r.reconciledPostponeInfo = {
+          originalPostponeColumn: origCol || 'Inspection Status',
+          originalPostponeValue: origVal || 'Postpone',
+          acceptedPeerRowIndex: acceptedPeer?.rowIndex,
+          acceptedPeerKey: r.matchKey,
+          source: acceptedFromRef
+            ? 'Master Reference'
+            : (acceptedPeer ? `Row #${acceptedPeer.rowIndex} (${acceptedPeer.comparisonRow['Inspection Status'] || 'Accept'})` : 'Duplicate Record'),
+        };
+
+        if (!r.matchedMainRow) {
+          for (const peer of peerRows) {
+            if (peer.matchedMainRow) {
+              r.matchedMainRow = peer.matchedMainRow;
+              break;
+            }
+          }
+        }
 
         // Replace any postpone status in comparisonRow and mergedRow with Accept
         for (const [colName, val] of Object.entries(r.comparisonRow)) {
@@ -925,7 +1004,17 @@ export function processMatching(
         for (const r of groupRows) {
           if (r.decisionColor !== 'red') {
             r.decisionColor = 'green';
+            r.isMatched = true;
+            r.unmatchedInfo = undefined;
             r.decisionReason = 'Accept (Duplicate key: Accept status takes precedence)';
+            if (!r.matchedMainRow) {
+              for (const peer of groupRows) {
+                if (peer.matchedMainRow) {
+                  r.matchedMainRow = peer.matchedMainRow;
+                  break;
+                }
+              }
+            }
             for (const [colName, val] of Object.entries(r.comparisonRow)) {
               const s = String(val ?? '').toLowerCase();
               if (s.includes('postpone') || s.includes('pending') || s.includes('hold')) {
@@ -946,7 +1035,9 @@ export function processMatching(
   yellowCount = 0;
   redCount = 0;
   otherCount = 0;
+  let finalMatchedCount = 0;
   for (const r of results) {
+    if (r.isMatched) finalMatchedCount++;
     if (r.decisionColor === 'green') greenCount++;
     else if (r.decisionColor === 'yellow') yellowCount++;
     else if (r.decisionColor === 'red') redCount++;
@@ -954,6 +1045,7 @@ export function processMatching(
   }
 
   const totalIncoming = compWb.rows.length;
+  matchedCount = finalMatchedCount;
   const matchRate = totalIncoming > 0 ? (matchedCount / totalIncoming) * 100 : 0;
 
   const unmatchedItems = results
@@ -1360,15 +1452,67 @@ export function generateSampleDatasets(): {
     { 'Purchase Order': 'PO-8817', 'Item Code': 'CMP-117-Q', 'Lot No': 'LOT-2026-17', 'Vendor': 'Precision Micro LLC', 'Received Qty': 280, 'Inspection Status': 'Postpone', 'Inspection Result': 'Postponed - Awaiting Waiver', 'Quality Grade': 'Grade B', 'Inspector': 'S. Chen' },
   ];
 
+  // Sheet 2 for Main Reference File (Different columns & rows: QA Supplier Audit)
+  const refQaBatchRows: ExcelRow[] = [
+    { 'PO Number': 'PO-8801', 'Part Number': 'CMP-101-A', 'Supplier Name': 'Apex Industrial Co.', 'Inspection Status': 'Waive', 'Inspection Result': 'Normal', 'Audit Grade': 'ISO-Pass', 'Inspector ID': 'AUD-01' },
+    { 'PO Number': 'PO-8802', 'Part Number': 'CMP-102-B', 'Supplier Name': 'Precision Micro LLC', 'Inspection Status': 'Pending', 'Inspection Result': 'Accept', 'Audit Grade': 'Standard', 'Inspector ID': 'AUD-02' },
+    { 'PO Number': 'PO-8803', 'Part Number': 'CMP-103-C', 'Supplier Name': 'Titan Fasteners Corp', 'Inspection Status': 'Waive', 'Inspection Result': 'Special Approval', 'Audit Grade': 'High Precision', 'Inspector ID': 'AUD-01' },
+    { 'PO Number': 'PO-8805', 'Part Number': 'CMP-105-E', 'Supplier Name': 'Silicon Global Tech', 'Inspection Status': 'Accept', 'Inspection Result': 'Verified', 'Audit Grade': 'Mil-Spec', 'Inspector ID': 'AUD-03' },
+    { 'PO Number': 'PO-8807', 'Part Number': 'CMP-107-G', 'Supplier Name': 'Nordic Aero Parts', 'Inspection Status': 'Waive', 'Inspection Result': 'Expedited', 'Audit Grade': 'Aviation-OK', 'Inspector ID': 'AUD-04' },
+    { 'PO Number': 'PO-8809', 'Part Number': 'CMP-109-I', 'Supplier Name': 'Vertex Dynamics', 'Inspection Status': 'Accept', 'Inspection Result': 'Certified OK', 'Audit Grade': 'Standard', 'Inspector ID': 'AUD-02' },
+    { 'PO Number': 'PO-8816', 'Part Number': 'CMP-116-P', 'Supplier Name': 'Apex Industrial Co.', 'Inspection Status': 'Accept', 'Inspection Result': 'Accept - Re-inspection Passed', 'Audit Grade': 'Re-tested', 'Inspector ID': 'AUD-01' },
+    { 'PO Number': 'PO-8817', 'Part Number': 'CMP-117-Q', 'Supplier Name': 'Precision Micro LLC', 'Inspection Status': 'Postpone', 'Inspection Result': 'Postponed - Awaiting Waiver', 'Audit Grade': 'Pending-Review', 'Inspector ID': 'AUD-05' },
+  ];
+
+  // Sheet 3 for Main Reference File (Different columns & rows: Inventory Bin Specs)
+  const refInventoryRows: ExcelRow[] = [
+    { 'Part Number': 'CMP-101-A', 'Warehouse Location': 'Bay-01-A', 'Bin Code': 'BIN-A1', 'Stock Level': 1250, 'Reorder Point': 300, 'Unit Weight': '0.45 kg' },
+    { 'Part Number': 'CMP-102-B', 'Warehouse Location': 'Bay-01-B', 'Bin Code': 'BIN-A2', 'Stock Level': 480, 'Reorder Point': 150, 'Unit Weight': '0.12 kg' },
+    { 'Part Number': 'CMP-103-C', 'Warehouse Location': 'Bay-02-A', 'Bin Code': 'BIN-B1', 'Stock Level': 890, 'Reorder Point': 200, 'Unit Weight': '1.05 kg' },
+    { 'Part Number': 'CMP-105-E', 'Warehouse Location': 'Bay-03-A', 'Bin Code': 'BIN-C1', 'Stock Level': 320, 'Reorder Point': 80, 'Unit Weight': '0.08 kg' },
+    { 'Part Number': 'CMP-116-P', 'Warehouse Location': 'Bay-06-A', 'Bin Code': 'BIN-F1', 'Stock Level': 750, 'Reorder Point': 250, 'Unit Weight': '0.62 kg' },
+  ];
+
+  // Sheet 2 for Incoming Comparison File (Express Logistics)
+  const compExpressRows: ExcelRow[] = [
+    { 'Purchase Order': 'PO-8801', 'Item Code': 'CMP-101-A', 'Airway Bill': 'AWB-9021', 'Inspection Status': 'Waive', 'Inspection Result': 'Normal', 'Carrier': 'FedEx Express', 'Priority': 'Urgent' },
+    { 'Purchase Order': 'PO-8805', 'Item Code': 'CMP-105-E', 'Airway Bill': 'AWB-9022', 'Inspection Status': 'Accept', 'Inspection Result': 'Verified', 'Carrier': 'DHL Global', 'Priority': 'Critical' },
+    { 'Purchase Order': 'PO-8807', 'Item Code': 'CMP-107-G', 'Airway Bill': 'AWB-9023', 'Inspection Status': 'Waive', 'Inspection Result': 'Expedited', 'Carrier': 'UPS Worldwide', 'Priority': 'Urgent' },
+    { 'Purchase Order': 'PO-8816', 'Item Code': 'CMP-116-P', 'Airway Bill': 'AWB-9024', 'Inspection Status': 'Accept', 'Inspection Result': 'Accept - Re-inspection Passed', 'Carrier': 'FedEx Express', 'Priority': 'Standard' },
+  ];
+
+  const refSheetNames = [
+    'Master Catalog',
+    'Secondary Supplier QA Batch',
+    'Archive Inventory Records',
+  ];
+
+  const refSheets = {
+    'Master Catalog': { headers: Object.keys(refRows[0]), rows: refRows },
+    'Secondary Supplier QA Batch': { headers: Object.keys(refQaBatchRows[0]), rows: refQaBatchRows },
+    'Archive Inventory Records': { headers: Object.keys(refInventoryRows[0]), rows: refInventoryRows },
+  };
+
+  const compSheetNames = [
+    'Receiving Inspections',
+    'Express Logistics Dispatch',
+  ];
+
+  const compSheets = {
+    'Receiving Inspections': { headers: Object.keys(compRows[0]), rows: compRows },
+    'Express Logistics Dispatch': { headers: Object.keys(compExpressRows[0]), rows: compExpressRows },
+  };
+
   const reference: WorkbookData = {
     id: 'wb_ref_sample',
     name: 'Master_Procurement_Catalog_2026.xlsx',
     size: 45200,
     lastModified: Date.now() - 86400000 * 3,
-    headers: Object.keys(refRows[0]),
-    rows: refRows,
-    sheetNames: ['Master Catalog'],
+    headers: refSheets['Master Catalog'].headers,
+    rows: refSheets['Master Catalog'].rows,
+    sheetNames: refSheetNames,
     activeSheet: 'Master Catalog',
+    sheets: refSheets,
   };
 
   const comparison: WorkbookData = {
@@ -1376,10 +1520,11 @@ export function generateSampleDatasets(): {
     name: 'Incoming_Receiving_Batch_Report.xlsx',
     size: 28400,
     lastModified: Date.now(),
-    headers: Object.keys(compRows[0]),
-    rows: compRows,
-    sheetNames: ['Receiving Inspections'],
+    headers: compSheets['Receiving Inspections'].headers,
+    rows: compSheets['Receiving Inspections'].rows,
+    sheetNames: compSheetNames,
     activeSheet: 'Receiving Inspections',
+    sheets: compSheets,
   };
 
   return { reference, comparison };

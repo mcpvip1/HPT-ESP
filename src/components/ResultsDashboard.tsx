@@ -111,6 +111,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [sortColumn, setSortColumn] = useState<string>('rowIndex');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRow, setSelectedRow] = useState<MatchedRow | null>(null);
+  const [hideSupersededPostpone, setHideSupersededPostpone] = useState<boolean>(false);
 
   // Excel-style column filters: mapping colId -> allowed string values
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
@@ -522,6 +523,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       if (activeFilter === 'red' && item.decisionColor !== 'red') return false;
       if (activeFilter === 'unmatched' && item.isMatched) return false;
 
+      // Deduplication: "only take accept" - optionally hide rows that were superseded by an Accept record
+      if (hideSupersededPostpone && item.supersededByAccept) return false;
+
       // 2. Excel-Style Column Filters (Multi-Column Checklists)
       for (const [filterColId, allowedVals] of Object.entries(columnFilters)) {
         if (allowedVals && Array.isArray(allowedVals)) {
@@ -576,7 +580,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
       return true;
     });
-  }, [results, activeFilter, columnFilters, searchTerm, searchColumn]);
+  }, [results, activeFilter, columnFilters, searchTerm, searchColumn, hideSupersededPostpone]);
 
   // Sorting Logic
   const sortedRows = useMemo(() => {
@@ -670,28 +674,28 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     switch (color) {
       case 'green':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold text-white bg-emerald-600 border border-emerald-400/50 shadow-sm tracking-wide">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-bold text-white bg-emerald-600 shadow-xs tracking-wider">
             <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
             PASSED
           </span>
         );
       case 'yellow':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold text-slate-950 bg-amber-400 border border-amber-300 shadow-sm tracking-wide">
-            <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5] text-slate-950" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-bold text-white bg-amber-500 shadow-xs tracking-wider">
+            <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5]" />
             REVIEW
           </span>
         );
       case 'red':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold text-white bg-rose-600 border border-rose-400/50 shadow-sm tracking-wide">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-bold text-white bg-rose-600 shadow-xs tracking-wider">
             <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
             REJECTED
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-slate-400 bg-slate-800">
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold text-slate-600 bg-slate-100">
             NO RULE
           </span>
         );
@@ -701,10 +705,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* 1. Interactive Control Bar (Filters & Clean Professional Export) */}
-      <div className="bg-slate-900/90 backdrop-blur-sm border border-slate-800 rounded-2xl p-4 shadow-md space-y-4">
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Segmented Filter Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-950/80 rounded-xl border border-slate-800">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
             <button
               onClick={() => {
                 setActiveFilter('all');
@@ -712,8 +716,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               }}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'all'
-                  ? 'bg-slate-800 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               {t.filterAll} ({results.length})
@@ -725,11 +729,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'green'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm font-black'
-                  : 'text-emerald-400 hover:bg-emerald-950/50'
+                  ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                  : 'text-emerald-700 hover:bg-emerald-50'
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span className={`w-2 h-2 rounded-full ${activeFilter === 'green' ? 'bg-white' : 'bg-emerald-500'}`} />
               <span>{t.filterGreen} ({stats.greenCount})</span>
             </button>
             <button
@@ -739,11 +743,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'yellow'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm font-black'
-                  : 'text-amber-400 hover:bg-amber-950/50'
+                  ? 'bg-amber-500 text-white shadow-xs font-bold'
+                  : 'text-amber-700 hover:bg-amber-50'
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              <span className={`w-2 h-2 rounded-full ${activeFilter === 'yellow' ? 'bg-white' : 'bg-amber-500'}`} />
               <span>{t.filterYellow} ({stats.yellowCount})</span>
             </button>
             <button
@@ -753,11 +757,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'red'
-                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm font-black'
-                  : 'text-rose-400 hover:bg-rose-950/50'
+                  ? 'bg-rose-600 text-white shadow-xs font-bold'
+                  : 'text-rose-700 hover:bg-rose-50'
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-rose-400" />
+              <span className={`w-2 h-2 rounded-full ${activeFilter === 'red' ? 'bg-white' : 'bg-rose-500'}`} />
               <span>{t.filterRed} ({stats.redCount})</span>
             </button>
             <button
@@ -767,12 +771,30 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap shrink-0 ${
                 activeFilter === 'unmatched'
-                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm font-black'
-                  : 'text-blue-400 hover:bg-blue-950/50'
+                  ? 'bg-blue-600 text-white shadow-xs font-bold'
+                  : 'text-blue-700 hover:bg-blue-50'
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-blue-400" />
+              <span className={`w-2 h-2 rounded-full ${activeFilter === 'unmatched' ? 'bg-white' : 'bg-blue-500'}`} />
               <span>{t.filterUnmatched} ({stats.unmatchedCount})</span>
+            </button>
+
+            {/* Deduplicate: Only Show Accept Toggle */}
+            <div className="h-4 w-px bg-slate-300 mx-1 hidden sm:block" />
+            <button
+              onClick={() => {
+                setHideSupersededPostpone(!hideSupersededPostpone);
+                setPage(1);
+              }}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${
+                hideSupersededPostpone
+                  ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+              title="Filter to only show Accept records (hiding superseded Postpone rows for duplicate keys)"
+            >
+              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Only Accept</span>
             </button>
           </div>
 
@@ -782,10 +804,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-750 active:bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 group"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 group"
               title="Refresh results data"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-teal-400 group-hover:rotate-180 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 group-hover:rotate-180 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
             </button>
 
@@ -793,14 +815,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             {!isPreviewMode && (
               <button
                 onClick={() => handleSaveColumnConfigs(columnConfigs)}
-                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none ${
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none ${
                   hasUnsavedColumnChanges
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/50 shadow-md ring-1 ring-emerald-400 animate-pulse'
-                    : 'bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 hover:border-slate-600'
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-200 shadow-md ring-1 ring-emerald-400 animate-pulse'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
                 }`}
                 title="Save custom column order and visibility (syncs to preview links)"
               >
-                <Save className={`w-3.5 h-3.5 ${hasUnsavedColumnChanges ? 'text-white' : 'text-emerald-400'}`} />
+                <Save className={`w-3.5 h-3.5 ${hasUnsavedColumnChanges ? 'text-white' : 'text-emerald-600'}`} />
                 <span>{hasUnsavedColumnChanges ? 'Save & Sync View' : 'Save View'}</span>
               </button>
             )}
@@ -808,12 +830,12 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             {/* Customize Columns Button (Exact same settings in both evaluation results & styled export and preview page) */}
             <button
               onClick={() => setShowColumnModal(true)}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none group"
+              className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
               title="Customize and reorder columns for Results Table and Excel Export"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+              <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
               <span>Columns</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-950 text-emerald-300 border border-emerald-900/60 font-bold">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-emerald-700 border border-emerald-200 font-bold">
                 {tableVisibleCount}
               </span>
             </button>
@@ -824,17 +846,17 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 {/* Quick 1-Click Copy Preview Link */}
                 <button
                   onClick={handleQuickCopyPreviewLink}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-teal-300 hover:text-white bg-slate-800 hover:bg-slate-750 active:bg-slate-900 border border-teal-500/50 hover:border-teal-400 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none group"
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
                   title="Quick copy preview link (clean short link)"
                 >
                   {quickCopied ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
-                      <span className="text-emerald-400 font-bold">Link Copied!</span>
+                      <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                      <span className="text-emerald-600 font-bold">Link Copied!</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-3.5 h-3.5 text-teal-400 group-hover:scale-110 transition-transform" />
+                      <Copy className="w-3.5 h-3.5 text-slate-500 group-hover:scale-110 transition-transform" />
                       <span>Copy Link</span>
                     </>
                   )}
@@ -843,16 +865,16 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 {/* Share Preview Options Button */}
                 <button
                   onClick={() => setShowShareModal(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-100 bg-slate-800 hover:bg-slate-750 active:bg-slate-900 border border-teal-500/50 hover:border-teal-400 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none group"
+                  className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
                   title="Configure and share result preview link with other users"
                 >
-                  <Share2 className="w-3.5 h-3.5 text-teal-400 group-hover:scale-110 transition-transform" />
+                  <Share2 className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
                   <span>Share Preview</span>
                 </button>
 
                 <button
                   onClick={handleExportExcel}
-                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 border border-emerald-400/50 rounded-lg shadow-md shadow-emerald-950 transition-all whitespace-nowrap shrink-0"
+                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0"
                   title="Export clean professional Excel workbook retaining solid Green, Yellow, and Red fills"
                 >
                   <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
@@ -861,10 +883,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
                 <button
                   onClick={handleExportCsv}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border border-blue-400/50 rounded-lg shadow-md shadow-blue-950 transition-all whitespace-nowrap shrink-0"
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0"
                   title="Export selected columns to CSV"
                 >
-                  <Download className="w-3.5 h-3.5 text-blue-100" />
+                  <Download className="w-3.5 h-3.5 text-slate-200" />
                   <span>{t.exportCsv}</span>
                 </button>
               </>
@@ -873,9 +895,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         </div>
 
         {/* 3. DEDICATED REAL-TIME SEARCH BAR & SCOPE SELECTOR */}
-        <div className="pt-3 border-t border-slate-800/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="pt-3 border-t border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           <div className="flex flex-1 items-center gap-2 max-w-2xl">
-            {/* Search Scope Dropdown (Hidden in Preview mode per user request: "remove All Columns (Real-time) in preview page") */}
+            {/* Search Scope Dropdown */}
             {!isPreviewMode && (
               <div className="relative shrink-0">
                 <select
@@ -884,7 +906,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     setSearchColumn(e.target.value);
                     setPage(1);
                   }}
-                  className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 hover:text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 hover:text-slate-900 focus:outline-none focus:border-emerald-500 transition-colors shadow-xs"
                   title="Search Scope"
                 >
                   <option value="all">All Columns (Real-time)</option>
@@ -923,7 +945,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   setPage(1);
                 }}
                 placeholder="Search rows in real-time (type anything to filter instantly)..."
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all font-mono shadow-xs"
               />
               {searchTerm && (
                 <button
@@ -931,7 +953,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     setSearchTerm('');
                     setPage(1);
                   }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-white rounded transition-colors"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded transition-colors"
                   title="Clear search"
                   aria-label="Clear search"
                 >
@@ -942,7 +964,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
             {/* Match Counter Badge */}
             {searchTerm.trim() && (
-              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 shrink-0 font-mono">
+              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 font-mono">
                 <Filter className="w-3 h-3" />
                 {filteredRows.length} found
               </span>
@@ -951,7 +973,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
           {/* Rows Per Page Selector (Only in Studio mode since Preview mode shows all rows) */}
           {!isPreviewMode && (
-            <div className="flex items-center gap-3 text-xs text-slate-400 self-end md:self-auto shrink-0">
+            <div className="flex items-center gap-3 text-xs text-slate-500 self-end md:self-auto shrink-0">
               <span>{t.rowsPerPage}:</span>
               <select
                 value={pageSize}
@@ -959,7 +981,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   setPageSize(Number(e.target.value));
                   setPage(1);
                 }}
-                className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
+                className="bg-white border border-slate-200 rounded-md px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-emerald-500 font-mono shadow-xs"
               >
                 <option value={25}>25</option>
                 <option value={50}>50</option>
@@ -972,8 +994,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
         {/* Active Excel Column Filters Pill Bar */}
         {Object.keys(columnFilters).length > 0 && (
-          <div className="pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-emerald-400 font-semibold flex items-center gap-1.5 shrink-0">
+          <div className="pt-2.5 border-t border-slate-200 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-emerald-700 font-semibold flex items-center gap-1.5 shrink-0">
               <Filter className="w-3.5 h-3.5" />
               <span>Excel Column Filters:</span>
             </span>
@@ -983,10 +1005,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               return (
                 <span
                   key={colId}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-700/60 shadow-sm"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-xs"
                 >
-                  <span className="font-sans font-medium text-slate-300">{label}:</span>
-                  <span>{vals.length} selected</span>
+                  <span className="font-sans font-medium text-slate-700">{label}:</span>
+                  <span className="font-bold text-emerald-700">{vals.length} selected</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -997,7 +1019,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       });
                       setPage(1);
                     }}
-                    className="p-0.5 hover:text-white rounded hover:bg-emerald-900/50 transition-colors ml-0.5"
+                    className="p-0.5 hover:text-slate-900 rounded hover:bg-emerald-100 transition-colors ml-0.5 text-emerald-700"
                     title={`Clear filter on ${label}`}
                   >
                     <X className="w-3 h-3" />
@@ -1011,7 +1033,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 setColumnFilters({});
                 setPage(1);
               }}
-              className="text-xs text-rose-400 hover:text-rose-300 underline font-medium ml-1 transition-colors"
+              className="text-xs text-rose-600 hover:text-rose-700 underline font-semibold ml-1 transition-colors"
             >
               Clear all column filters
             </button>
@@ -1019,13 +1041,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         )}
       </div>
 
-
-
       {/* 4. Main Data Table with Dynamic Column Visibility & Real-Time Search Match Highlighting */}
-      <div className="bg-slate-900/90 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden shadow-xl flex flex-col">
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur-sm border-b border-slate-700 text-slate-300 font-semibold select-none">
+            <thead className="sticky top-0 z-10 bg-slate-100/90 backdrop-blur-sm border-b border-slate-200 text-slate-700 font-bold select-none shadow-xs">
               <tr>
                 {visibleTableColumns.map((col, idx) => {
                   const isFirst = idx === 0;
@@ -1046,31 +1066,31 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   return (
                     <th
                       key={col.id}
-                      className={`py-3.5 px-3 border-r border-slate-800/80 whitespace-nowrap group/th transition-colors relative ${
-                        col.category === 'reference' ? 'text-blue-300 bg-blue-950/40' : 'text-slate-300'
+                      className={`py-3.5 px-3 border-r border-slate-200 whitespace-nowrap group/th transition-colors relative ${
+                        col.category === 'reference' ? 'text-blue-800 bg-blue-50/60' : 'text-slate-700'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         {/* Sortable Header Label */}
                         <div
                           onClick={handleColSort}
-                          className="flex items-center gap-1.5 cursor-pointer font-mono select-none hover:text-emerald-400 transition-colors"
+                          className="flex items-center gap-1.5 cursor-pointer font-mono select-none hover:text-emerald-700 transition-colors"
                           title={`Click to sort by ${col.label}`}
                         >
                           {col.category === 'reference' && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-950 text-blue-300 border border-blue-700/80 font-sans shadow-sm">
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-100 text-blue-700 border border-blue-200 font-sans shadow-xs">
                               Ref
                             </span>
                           )}
                           <span>{col.label.replace('[Ref] ', '')}</span>
                           {isSorted ? (
                             sortDirection === 'asc' ? (
-                              <ArrowUp className="w-3 h-3 text-emerald-400 shrink-0" />
+                              <ArrowUp className="w-3 h-3 text-emerald-600 shrink-0" />
                             ) : (
-                              <ArrowDown className="w-3 h-3 text-emerald-400 shrink-0" />
+                              <ArrowDown className="w-3 h-3 text-emerald-600 shrink-0" />
                             )
                           ) : (
-                            <ArrowUpDown className="w-3 h-3 text-slate-600 shrink-0 opacity-0 group-hover/th:opacity-100 transition-opacity" />
+                            <ArrowUpDown className="w-3 h-3 text-slate-400 shrink-0 opacity-0 group-hover/th:opacity-100 transition-opacity" />
                           )}
                         </div>
 
@@ -1088,8 +1108,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                               }}
                               className={`p-1 rounded transition-colors ${
                                 isColFiltered
-                                  ? 'text-emerald-300 bg-emerald-500/20 border border-emerald-500/50 shadow-sm'
-                                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                  ? 'text-emerald-700 bg-emerald-100 border border-emerald-300 shadow-xs'
+                                  : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
                               }`}
                               title={`Filter ${col.label} like Excel (multi-select checklist & search)`}
                               aria-label={`Filter ${col.label}`}
@@ -1150,7 +1170,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                   handleMoveColumn(col.id, 'left');
                                 }}
                                 disabled={isFirst}
-                                className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+                                className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
                                 title="Move column left (earlier in table)"
                               >
                                 <ChevronLeft className="w-3.5 h-3.5" />
@@ -1162,7 +1182,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                   handleMoveColumn(col.id, 'right');
                                 }}
                                 disabled={isLast}
-                                className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+                                className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
                                 title="Move column right (later in table)"
                               >
                                 <ChevronRight className="w-3.5 h-3.5" />
@@ -1176,34 +1196,34 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 })}
 
                 {/* Actions column */}
-                <th className="py-3 px-3 text-center w-16 text-slate-400 whitespace-nowrap">
+                <th className="py-3 px-3 text-center w-16 text-slate-500 whitespace-nowrap">
                   {t.viewDetails}
                 </th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-800/80">
+            <tbody className="divide-y divide-slate-100 bg-white">
               {visibleTableColumns.length === 0 ? (
                 <tr>
-                  <td colSpan={100} className="py-16 text-center text-slate-400 bg-slate-950/60">
+                  <td colSpan={100} className="py-16 text-center text-slate-500 bg-slate-50/60">
                     <div className="max-w-md mx-auto space-y-3 px-4">
-                      <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 mx-auto">
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-emerald-600 mx-auto">
                         <SlidersHorizontal className="w-6 h-6" />
                       </div>
-                      <h4 className="text-sm font-bold text-white">All Table Columns are Currently Hidden</h4>
-                      <p className="text-xs text-slate-400 leading-relaxed">
+                      <h4 className="text-sm font-bold text-slate-900">All Table Columns are Currently Hidden</h4>
+                      <p className="text-xs text-slate-500 leading-relaxed">
                         You currently have 0 columns enabled for the table view. To see data rows again, restore all columns or configure your column choices.
                       </p>
                       <div className="flex justify-center gap-2.5 pt-2">
                         <button
                           onClick={handleResetDefaultColumns}
-                          className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-colors"
+                          className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
                         >
                           Restore All Columns
                         </button>
                         <button
                           onClick={() => setShowColumnModal(true)}
-                          className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors"
+                          className="px-4 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition-colors"
                         >
                           Choose Columns
                         </button>
@@ -1220,14 +1240,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   return (
                     <tr
                       key={row.id}
-                      className={`transition-colors border-b border-slate-800/70 ${
+                      className={`transition-colors border-b border-slate-100 ${
                         isGreen
-                          ? 'bg-emerald-950/20 hover:bg-emerald-950/35 border-l-[3px] border-l-emerald-400'
+                          ? 'bg-emerald-50/30 hover:bg-emerald-50/70 border-l-[4px] border-l-emerald-500'
                           : isYellow
-                          ? 'bg-amber-950/20 hover:bg-amber-950/35 border-l-[3px] border-l-amber-400'
+                          ? 'bg-amber-50/30 hover:bg-amber-50/70 border-l-[4px] border-l-amber-500'
                           : isRed
-                          ? 'bg-rose-950/20 hover:bg-rose-950/35 border-l-[3px] border-l-rose-500'
-                          : 'even:bg-slate-900/40 hover:bg-slate-800/60 border-l-[3px] border-l-transparent'
+                          ? 'bg-rose-50/30 hover:bg-rose-50/70 border-l-[4px] border-l-rose-500'
+                          : 'even:bg-slate-50/40 hover:bg-slate-50 border-l-[4px] border-l-transparent'
                       }`}
                     >
                       {visibleTableColumns.map((col) => {
@@ -1235,7 +1255,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           return (
                             <td
                               key={col.id}
-                              className="py-2.5 px-3 border-r border-slate-800/80 text-center text-slate-400 font-mono tabular-nums text-[11px] font-bold"
+                              className="py-2.5 px-3 border-r border-slate-200 text-center text-slate-500 font-mono tabular-nums text-[11px] font-bold"
                             >
                               {highlightText(row.rowIndex, searchTerm)}
                             </td>
@@ -1244,7 +1264,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
                         if (col.id === 'decisionStatus') {
                           return (
-                            <td key={col.id} className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap">
+                            <td key={col.id} className="py-2.5 px-4 border-r border-slate-200 whitespace-nowrap">
                               {getSolidBadge(row.decisionColor)}
                             </td>
                           );
@@ -1252,34 +1272,34 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
                         if (col.id === 'matchStatus') {
                           return (
-                            <td key={col.id} className="py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap">
+                            <td key={col.id} className="py-2.5 px-4 border-r border-slate-200 whitespace-nowrap">
                               {row.isMatched ? (
-                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-200 bg-blue-950/80 px-2.5 py-1 rounded-md border border-blue-500/60 shadow-sm shadow-blue-500/25">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0 stroke-[2.5]" />
+                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 px-2.5 py-1 rounded-md shadow-xs">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
                                   Matched
                                 </span>
                               ) : (
                                 <div className="flex flex-col gap-0.5">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold text-amber-300 bg-amber-950/80 border border-amber-800/60 shrink-0">
-                                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold text-white bg-amber-500 shadow-xs shrink-0">
+                                      <AlertTriangle className="w-3 h-3 text-white shrink-0" />
                                       UNMATCHED
                                     </span>
                                     {row.unmatchedInfo?.matchType === 'partial_mismatch' && (
-                                      <span className="text-[9px] font-semibold text-rose-300 bg-rose-950/60 px-1 py-0.2 rounded border border-rose-900/60 shrink-0">
+                                      <span className="text-[9px] font-bold text-rose-700 bg-rose-100 px-1 py-0.2 rounded border border-rose-200 shrink-0">
                                         Differs
                                       </span>
                                     )}
                                   </div>
                                   <div
-                                    className="font-mono text-xs font-bold text-amber-300 hover:text-amber-200 cursor-pointer truncate max-w-[210px]"
+                                    className="font-mono text-xs font-bold text-amber-800 hover:text-amber-900 cursor-pointer truncate max-w-[210px]"
                                     onClick={() => setSelectedRow(row)}
                                     title={row.unmatchedInfo?.unmatchedKeyDisplay || row.matchKey}
                                   >
                                     {highlightText(row.unmatchedInfo?.primaryIdentifier || row.matchKey || 'Unidentified', searchTerm)}
                                   </div>
                                   <span
-                                    className="text-[10px] text-slate-400 truncate max-w-[210px] font-sans"
+                                    className="text-[10px] text-slate-500 truncate max-w-[210px] font-sans"
                                     title={row.unmatchedInfo?.reason}
                                   >
                                     {row.unmatchedInfo?.matchType === 'partial_mismatch'
@@ -1294,7 +1314,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
                         if (col.id === 'decisionReason') {
                           return (
-                            <td key={col.id} className="py-2.5 px-4 border-r border-slate-800/80 text-xs text-slate-300 font-medium truncate max-w-xs">
+                            <td key={col.id} className="py-2.5 px-4 border-r border-slate-200 text-xs text-slate-700 font-medium truncate max-w-xs">
                               <span title={row.decisionReason}>
                                 {highlightText(row.decisionReason, searchTerm)}
                               </span>
@@ -1302,29 +1322,48 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           );
                         }
 
+                        // Inspection cell filled badges helper
+                        const renderFilledInspectionCell = (rawVal: any) => {
+                          const valStr = String(rawVal ?? '');
+                          const lower = valStr.toLowerCase();
+                          if (lower.includes('accept') || lower.includes('waive') || lower.includes('certified ok') || lower.includes('normal')) {
+                            return (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold text-white bg-emerald-600 shadow-xs tracking-wide">
+                                {valStr}
+                              </span>
+                            );
+                          }
+                          if (lower.includes('postpone') || lower.includes('pending') || lower.includes('hold') || lower.includes('review') || lower.includes('quarantine')) {
+                            return (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold text-white bg-amber-500 shadow-xs tracking-wide">
+                                {valStr}
+                              </span>
+                            );
+                          }
+                          if (lower.includes('reject') || lower.includes('fail') || lower.includes('discrepant') || lower.includes('out of spec')) {
+                            return (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold text-white bg-rose-600 shadow-xs tracking-wide">
+                                {valStr}
+                              </span>
+                            );
+                          }
+                          return highlightText(valStr, searchTerm);
+                        };
+
                         if (col.id.startsWith('[Ref] ')) {
                           const rawKey = col.id.replace('[Ref] ', '');
                           let valStr = String(row.matchedMainRow?.[rawKey] ?? '');
                           if (row.decisionColor === 'green' && valStr.toLowerCase().includes('postpone')) {
                             valStr = 'Accept';
                           }
-                          const isWaiveOrAccept =
-                            valStr.toLowerCase().includes('waive') ||
-                            valStr.toLowerCase().includes('accept');
+                          const isInspectionCol = col.id.toLowerCase().includes('status') || col.id.toLowerCase().includes('result') || col.id.toLowerCase().includes('grade');
+
                           return (
                             <td
                               key={col.id}
-                              className={`py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap font-mono text-xs ${
-                                isWaiveOrAccept ? 'text-emerald-300 font-bold bg-emerald-950/30' : 'text-blue-200 bg-blue-950/20'
-                              }`}
+                              className="py-2.5 px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800 bg-blue-50/20"
                             >
-                              {isWaiveOrAccept ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30">
-                                  {valStr}
-                                </span>
-                              ) : (
-                                highlightText(valStr, searchTerm)
-                              )}
+                              {isInspectionCol ? renderFilledInspectionCell(valStr) : highlightText(valStr, searchTerm)}
                             </td>
                           );
                         }
@@ -1334,26 +1373,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         if (row.decisionColor === 'green' && valStr.toLowerCase().includes('postpone')) {
                           valStr = 'Accept';
                         }
-                        const isWaiveOrAccept =
-                          valStr.toLowerCase().includes('waive') ||
-                          valStr.toLowerCase().includes('accept');
+                        const isInspectionCol = col.id.toLowerCase().includes('status') || col.id.toLowerCase().includes('result') || col.id.toLowerCase().includes('grade');
 
                         return (
                           <td
                             key={col.id}
-                            className={`py-2.5 px-4 border-r border-slate-800/80 whitespace-nowrap font-mono text-xs ${
-                              isWaiveOrAccept
-                                ? 'text-emerald-300 font-bold bg-emerald-950/30'
-                                : 'text-slate-200'
-                            }`}
+                            className="py-2.5 px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800"
                           >
-                            {isWaiveOrAccept ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30">
-                                {valStr}
-                              </span>
-                            ) : (
-                              highlightText(valStr, searchTerm)
-                            )}
+                            {isInspectionCol ? renderFilledInspectionCell(valStr) : highlightText(valStr, searchTerm)}
                           </td>
                         );
                       })}
@@ -1362,7 +1389,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       <td className="py-2.5 px-3 text-center whitespace-nowrap">
                         <button
                           onClick={() => setSelectedRow(row)}
-                          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
                           title="Inspect row discrepancy"
                         >
                           <Eye className="w-4 h-4" />
@@ -1381,7 +1408,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     {searchTerm && (
                       <button
                         onClick={() => setSearchTerm('')}
-                        className="text-xs text-emerald-400 hover:underline inline-block mt-1 font-medium"
+                        className="text-xs text-emerald-600 hover:underline inline-block mt-1 font-semibold"
                       >
                         Clear search filter ({searchTerm})
                       </button>
@@ -1394,11 +1421,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         </div>
 
         {/* 5. Table Pagination Footer */}
-        <div className="px-6 py-3.5 border-t border-slate-800 bg-slate-950 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+        <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
           {isPreviewMode ? (
             <div className="w-full flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-200 font-mono">
+                <span className="font-semibold text-slate-800 font-mono">
                   Showing all {currentPageRows.length.toLocaleString()} rows
                 </span>
                 {results.length !== currentPageRows.length && (
@@ -1407,7 +1434,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-teal-400 font-mono font-medium">
+              <div className="text-[11px] text-emerald-700 font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                 Full Result View
               </div>
             </div>
@@ -1415,15 +1442,15 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             <>
               <div>
                 {t.showingRows}{' '}
-                <strong className="text-slate-200 font-mono tabular-nums">
+                <strong className="text-slate-800 font-mono tabular-nums">
                   {filteredRows.length > 0 ? (page - 1) * pageSize + 1 : 0}
                 </strong>{' '}
                 -{' '}
-                <strong className="text-slate-200 font-mono tabular-nums">
+                <strong className="text-slate-800 font-mono tabular-nums">
                   {Math.min(page * pageSize, filteredRows.length)}
                 </strong>{' '}
                 {t.of}{' '}
-                <strong className="text-slate-200 font-mono tabular-nums">
+                <strong className="text-slate-800 font-mono tabular-nums">
                   {filteredRows.length.toLocaleString()}
                 </strong>{' '}
                 rows
@@ -1438,18 +1465,18 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   <span>{t.prevPage}</span>
                 </button>
-                <span className="px-2 font-mono text-slate-300 tabular-nums">
+                <span className="px-2 font-mono text-slate-700 font-bold tabular-nums">
                   {page} / {totalPages}
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs"
                 >
                   <span>{t.nextPage}</span>
                   <ChevronRight className="w-3.5 h-3.5" />
