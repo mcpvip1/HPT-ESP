@@ -71,11 +71,13 @@ const stateDoc = (uid: string, name: string) => doc(db, 'workspaces', uid, 'stat
 export async function publishRulesState(
   uid: string,
   state: Omit<CloudRulesState, 'updatedAt'>
-): Promise<void> {
+): Promise<boolean> {
   try {
     await setDoc(stateDoc(uid, 'rules'), { ...state, updatedAt: Date.now() });
+    return true;
   } catch (e) {
     console.warn('Cloud sync: failed to publish rules', e);
+    return false;
   }
 }
 
