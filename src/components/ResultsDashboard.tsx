@@ -59,6 +59,7 @@ interface ResultsDashboardProps {
   language: Language;
   onShowToast: (msg: string, type: 'success' | 'error' | 'info') => void;
   initialFilter?: FilterType;
+  initialOnlyAccept?: boolean;
   initialSearchTerm?: string;
   initialSearchColumn?: string;
   initialColumnConfigs?: ColumnConfigItem[];
@@ -103,6 +104,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   language,
   onShowToast,
   initialFilter,
+  initialOnlyAccept,
   initialSearchTerm,
   initialSearchColumn,
   initialColumnConfigs,
@@ -134,7 +136,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [sortColumn, setSortColumn] = useState<string>('rowIndex');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRow, setSelectedRow] = useState<MatchedRow | null>(null);
-  const [hideSupersededPostpone, setHideSupersededPostpone] = useState<boolean>(false);
+  const [hideSupersededPostpone, setHideSupersededPostpone] = useState<boolean>(true);
 
   // Excel-style column filters: mapping colId -> allowed string values
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
@@ -165,6 +167,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       }, 350);
     }
   };
+
+  // Synchronize the Only Accept toggle when the parent provides it (preview links)
+  useEffect(() => {
+    if (initialOnlyAccept !== undefined) {
+      setHideSupersededPostpone(initialOnlyAccept);
+    }
+  }, [initialOnlyAccept]);
 
   // Synchronize state when initialFilter/Search changes from URL or parent
   useEffect(() => {
@@ -377,6 +386,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           stats,
           results,
           filter: activeFilter,
+          onlyAccept: hideSupersededPostpone,
           searchTerm,
           searchColumn,
           columnConfigs: newConfigs,
@@ -461,6 +471,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         stats,
         results,
         filter: activeFilter,
+        onlyAccept: hideSupersededPostpone,
         searchTerm,
         searchColumn,
         columnConfigs,
@@ -473,6 +484,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     results,
     stats,
     activeFilter,
+    hideSupersededPostpone,
     searchTerm,
     searchColumn,
     columnConfigs,
@@ -511,6 +523,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         stats,
         results,
         filter: activeFilter,
+        onlyAccept: hideSupersededPostpone,
         searchTerm,
         searchColumn,
         columnConfigs,
@@ -522,7 +535,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     } catch {
       // Ignore URL length edge cases
     }
-  }, [isPreviewMode, activeFilter, searchTerm, searchColumn, columnConfigs, comparisonWb, stats, results]);
+  }, [isPreviewMode, activeFilter, hideSupersededPostpone, searchTerm, searchColumn, columnConfigs, comparisonWb, stats, results]);
 
   const buildSharePayload = (): SharedPreviewPayload => ({
     version: 1,
@@ -531,6 +544,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     stats,
     results,
     filter: activeFilter,
+    onlyAccept: hideSupersededPostpone,
     searchTerm,
     searchColumn,
     columnConfigs,
@@ -620,6 +634,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         stats,
         results,
         filter: activeFilter,
+        onlyAccept: hideSupersededPostpone,
         searchTerm,
         searchColumn,
         columnConfigs,
@@ -910,7 +925,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               >
                 <div className="flex items-center gap-1.5">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${k.dot}`} />
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 truncate">
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 leading-tight">
                     {k.label}
                   </span>
                 </div>
