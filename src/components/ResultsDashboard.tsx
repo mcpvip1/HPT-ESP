@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Download,
   Search,
@@ -36,6 +36,9 @@ import {
 import { translations } from '../translations';
 import { exportStyledExcel, exportCsv } from '../utils/excel';
 import { generatePreviewLink, copyPreviewLinkToClipboard } from '../utils/previewSharing';
+import type { SharedPreviewPayload } from '../utils/previewSharing';
+import type { User } from 'firebase/auth';
+import { publishPreviewSnapshot, debounce } from '../lib/cloudSync';
 import { RowDetailModal } from './RowDetailModal';
 import { ColumnCustomizationModal } from './ColumnCustomizationModal';
 import { SharePreviewModal } from './SharePreviewModal';
@@ -54,6 +57,7 @@ interface ResultsDashboardProps {
   isPreviewMode?: boolean;
   onExitPreview?: () => void;
   onRefresh?: () => void;
+  cloudUser?: User | null;
 }
 
 type FilterType = 'all' | 'green' | 'yellow' | 'red' | 'unmatched';
@@ -97,6 +101,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   isPreviewMode,
   onExitPreview,
   onRefresh,
+  cloudUser,
 }) => {
   const t = translations[language];
 
@@ -415,6 +420,42 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
   const tableVisibleCount = columnConfigs.filter((c) => c.showInTable).length;
   const exportVisibleCount = columnConfigs.filter((c) => c.showInExport).length;
+
+  // Cloud live preview: in the studio, publish the latest results + active
+  // filter/search/columns to the shared workspace (debounced) so the preview
+  // page on any signed-in device follows along automatically.
+  const debouncedPublishPreview = useRef(
+    debounce((uid: string, payload: SharedPreviewPayload) => {
+      publishPreviewSnapshot(uid, payload);
+    }, 2000)
+  ).current;
+
+  useEffect(() => {
+    if (isPreviewMode || !cloudUser) return;
+    if (!results || results.length === 0 || !stats) return;
+    debouncedPublishPreview(cloudUser.uid, {
+      version: 1,
+      createdAt: Date.now(),
+      comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+      stats,
+      results,
+      filter: activeFilter,
+      searchTerm,
+      searchColumn,
+      columnConfigs,
+    });
+  }, [
+    isPreviewMode,
+    cloudUser,
+    results,
+    stats,
+    activeFilter,
+    searchTerm,
+    searchColumn,
+    columnConfigs,
+    comparisonWb,
+    debouncedPublishPreview,
+  ]);
 
   // Keep URL hash updated seamlessly when in preview mode as filters or columns change
   useEffect(() => {
