@@ -110,11 +110,14 @@ export default function App() {
   const [layers, setLayers] = useState<DecisionLayer[]>(defaultDecisionLayers);
   // Hold-key filter: rows containing any of these keys move to the Hold tab (blue)
   const [holdKeys, setHoldKeys] = useState<string[]>([]);
+  // Why the items are on hold (shown at supervisor release) + rows released via supervisor confirm
+  const [holdReason, setHoldReason] = useState<string>('');
+  const [releasedRowIds, setReleasedRowIds] = useState<string[]>([]);
 
   // Cloud sync (Firebase): one shared workspace across every device
   const [cloudUser, setCloudUser] = useState<User | null>(null);
-  const rulesStateRef = useRef({ normalization, layers, mappings, holdKeys });
-  rulesStateRef.current = { normalization, layers, mappings, holdKeys };
+  const rulesStateRef = useRef({ normalization, layers, mappings, holdKeys, holdReason, releasedRowIds });
+  rulesStateRef.current = { normalization, layers, mappings, holdKeys, holdReason, releasedRowIds };
   const lastRulesPublishRef = useRef<string>('');
   const lastCloudPreviewAtRef = useRef<number>(0);
 
@@ -222,6 +225,7 @@ export default function App() {
 
         let effMappings = rulesStateRef.current.mappings;
         let effHoldKeys = rulesStateRef.current.holdKeys;
+        let effReleased = rulesStateRef.current.releasedRowIds;
         let effRef = refWbRef.current;
         let effComp = compWbRef.current;
 
@@ -244,11 +248,22 @@ export default function App() {
             await saveToIDB(StorageKeys.HOLD_KEYS, cloudRules.holdKeys);
             effHoldKeys = cloudRules.holdKeys;
           }
+          if (typeof cloudRules.holdReason === 'string') {
+            setHoldReason(cloudRules.holdReason);
+            await saveToIDB(StorageKeys.HOLD_REASON, cloudRules.holdReason);
+          }
+          if (cloudRules.releasedRowIds) {
+            setReleasedRowIds(cloudRules.releasedRowIds);
+            await saveToIDB(StorageKeys.RELEASED_ROWS, cloudRules.releasedRowIds);
+            effReleased = cloudRules.releasedRowIds;
+          }
           lastRulesPublishRef.current = JSON.stringify({
             n: cloudRules.normalization,
             l: cloudRules.layers,
             m: cloudRules.mappings,
             h: cloudRules.holdKeys,
+            hr: cloudRules.holdReason,
+            rr: cloudRules.releasedRowIds,
           });
           showToast(t.toastCloudRulesSynced, 'success');
         } else {
@@ -259,6 +274,8 @@ export default function App() {
             l: cur.layers,
             m: cur.mappings,
             h: cur.holdKeys,
+            hr: cur.holdReason,
+            rr: cur.releasedRowIds,
           });
         }
 
@@ -301,7 +318,7 @@ export default function App() {
         }
 
         if (effRef && effComp) {
-          handleExecuteMatching(effRef, effComp, effMappings, false, effHoldKeys);
+          handleExecuteMatching(effRef, effComp, effMappings, false, effHoldKeys, effReleased);
         }
       } catch (e) {
         console.warn('Cloud workspace pull failed', e);
@@ -312,8 +329,8 @@ export default function App() {
 
   // Publish rule settings to the cloud whenever they change (debounced).
   const debouncedPublishRules = useRef(
-    debounce((uid: string, st: { normalization: NormalizationRules; layers: DecisionLayer[]; mappings: ColumnMapping[]; holdKeys: string[] }) => {
-      const key = JSON.stringify({ n: st.normalization, l: st.layers, m: st.mappings, h: st.holdKeys });
+    debounce((uid: string, st: { normalization: NormalizationRules; layers: DecisionLayer[]; mappings: ColumnMapping[]; holdKeys: string[]; holdReason: string; releasedRowIds: string[] }) => {
+      const key = JSON.stringify({ n: st.normalization, l: st.layers, m: st.mappings, h: st.holdKeys, hr: st.holdReason, rr: st.releasedRowIds });
       if (key === lastRulesPublishRef.current) return;
       lastRulesPublishRef.current = key;
       publishRulesState(uid, st);
@@ -323,7 +340,7 @@ export default function App() {
   useEffect(() => {
     if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current) return;
     debouncedPublishRules(cloudUser.uid, rulesStateRef.current);
-  }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, holdKeys, debouncedPublishRules]);
+  }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, holdKeys, holdReason, releasedRowIds, debouncedPublishRules]);
 
   const debouncedPublishWorkbooks = useRef(
     debounce((uid: string, wbs: { reference: WorkbookData | null; comparison: WorkbookData | null }) => {
@@ -484,10 +501,14 @@ export default function App() {
           StorageKeys.DECISION_LAYERS
         );
         const savedHoldKeys = await getFromIDB<string[]>(StorageKeys.HOLD_KEYS);
+        const savedHoldReason = await getFromIDB<string>(StorageKeys.HOLD_REASON);
+        const savedReleased = await getFromIDB<string[]>(StorageKeys.RELEASED_ROWS);
 
         if (savedNorm && isMounted) setNormalization(savedNorm);
         if (savedLayers && savedLayers.length > 0 && isMounted) setLayers(savedLayers);
         if (savedHoldKeys && isMounted) setHoldKeys(savedHoldKeys);
+        if (savedHoldReason !== null && savedHoldReason !== undefined && isMounted) setHoldReason(savedHoldReason);
+        if (savedReleased && isMounted) setReleasedRowIds(savedReleased);
 
         if (savedRef && isMounted) {
           setReferenceWb(savedRef);
@@ -568,12 +589,34 @@ export default function App() {
   // Incoming file is already loaded, results are regenerated immediately so the
   // results and all data stay in sync until the next change.
   // Hold-key filter changes: persist, sync via the rules publish effect, and re-run matching
-  const handleHoldKeysChange = async (keys: string[]) => {
+  const handleHoldSettingsChange = async (keys: string[], reason: string) => {
     setHoldKeys(keys);
+    setHoldReason(reason);
     await saveToIDB(StorageKeys.HOLD_KEYS, keys);
+    await saveToIDB(StorageKeys.HOLD_REASON, reason);
     if (referenceWb && comparisonWb) {
       handleExecuteMatching(referenceWb, comparisonWb, mappings, false, keys);
     }
+  };
+
+  // Supervisor-confirmed release: delete the key from the hold settings, then
+  // re-run matching. Released rows that matched & passed turn green; the rest
+  // are forced to yellow (review) via releasedRowIds.
+  const handleReleaseHoldKey = async (key: string) => {
+    const affected = results.filter((r) => r.isHold && r.holdKey === key);
+    const newHoldKeys = holdKeys.filter((k) => k !== key);
+    const newReleased = [...releasedRowIds];
+    for (const r of affected) {
+      if (!newReleased.includes(r.id)) newReleased.push(r.id);
+    }
+    setHoldKeys(newHoldKeys);
+    setReleasedRowIds(newReleased);
+    await saveToIDB(StorageKeys.HOLD_KEYS, newHoldKeys);
+    await saveToIDB(StorageKeys.RELEASED_ROWS, newReleased);
+    if (referenceWb && comparisonWb) {
+      handleExecuteMatching(referenceWb, comparisonWb, mappings, false, newHoldKeys, newReleased);
+    }
+    return affected.length;
   };
 
   const handleSetReferenceWb = async (wb: WorkbookData | null) => {
@@ -779,7 +822,8 @@ export default function App() {
     customComp?: WorkbookData | null,
     customMappings?: ColumnMapping[],
     notifySuccess = true,
-    customHoldKeys?: string[]
+    customHoldKeys?: string[],
+    customReleasedRowIds?: string[]
   ) => {
     const ref = customRef !== undefined ? customRef : referenceWb;
     const comp = customComp !== undefined ? customComp : comparisonWb;
@@ -814,7 +858,8 @@ export default function App() {
           effectiveMappings,
           normalization,
           layers,
-          customHoldKeys !== undefined ? customHoldKeys : holdKeys
+          customHoldKeys !== undefined ? customHoldKeys : holdKeys,
+          customReleasedRowIds !== undefined ? customReleasedRowIds : releasedRowIds
         );
 
         setResults(evaluatedResults);
@@ -946,7 +991,9 @@ export default function App() {
                   initialColumnConfigs={previewColumnConfigs}
                   cloudUser={cloudUser}
                   holdKeys={holdKeys}
-                  onHoldKeysChange={handleHoldKeysChange}
+                  holdReason={holdReason}
+                  onHoldSettingsChange={handleHoldSettingsChange}
+                  onReleaseHoldKey={handleReleaseHoldKey}
                 />
               </div>
             )}
