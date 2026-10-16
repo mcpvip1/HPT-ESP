@@ -38,6 +38,15 @@ export interface BatchBKeys {
   dashHoldKeysPlaceholder: string;
   dashHoldKeysClear: string;
   dashHoldKeysSave: string;
+  dashHoldReasonLabel: string;
+  dashHoldReasonPlaceholder: string;
+  dashConfirmRelease: string;
+  dashConfirmReleaseTitle: string;
+  dashReleaseTitle: string;
+  dashReleaseDesc: string;
+  dashReleaseSupervisor: string;
+  dashReleaseNoReason: string;
+  dashReleasedToast: string;
   dashSaveViewTitle: string;
   dashSaveSyncView: string;
   dashSaveView: string;
@@ -155,6 +164,15 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashHoldKeysPlaceholder: "e.g. PO-8801\nCMP-101-A",
     dashHoldKeysClear: "Clear",
     dashHoldKeysSave: "Save",
+    dashHoldReasonLabel: "Why are these items on hold?",
+    dashHoldReasonPlaceholder: "e.g. Waiting for supplier confirmation",
+    dashConfirmRelease: "Confirm",
+    dashConfirmReleaseTitle: "Confirm release with supervisor",
+    dashReleaseTitle: "Release from Hold",
+    dashReleaseDesc: "Release key \"{key}\"? {n} row(s) are currently on hold. Rows that matched and passed will turn green; the rest will turn yellow for review.",
+    dashReleaseSupervisor: "My supervisor has confirmed this release",
+    dashReleaseNoReason: "No reason given",
+    dashReleasedToast: "Key \"{key}\" released - {n} row(s) re-evaluated",
     dashSaveViewTitle: "Save custom column order and visibility (syncs to preview links)",
     dashSaveSyncView: "Save & Sync View",
     dashSaveView: "Save View",
@@ -270,6 +288,15 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashHoldKeysPlaceholder: "ဥပမာ PO-8801\nCMP-101-A",
     dashHoldKeysClear: "ရှင်းလင်းရန်",
     dashHoldKeysSave: "သိမ်းရန်",
+    dashHoldReasonLabel: "ဒီအရာတွေကို ဘာကြောင့် ထိန်းထားတာလဲ?",
+    dashHoldReasonPlaceholder: "ဥပမာ ပေးသွင်းသူ အတည်ပြုချက် စောင့်နေသည်",
+    dashConfirmRelease: "အတည်ပြုရန်",
+    dashConfirmReleaseTitle: "ကြီးကြပ်သူနှင့် အတည်ပြုပြီး ထုတ်လွှတ်ရန်",
+    dashReleaseTitle: "ထိန်းထားခြင်းမှ ထုတ်လွှတ်ရန်",
+    dashReleaseDesc: "\"{key}\" သော့ကို ထုတ်လွှတ်မလား။ လက်ရှိ ထိန်းထားသော အတန်း {n} ခု ရှိသည်။ ကိုက်ညီပြီး အောင်မြင်သော အတန်းများသည် အစိမ်းရောင် ဖြစ်လာမည်။ ကျန်အတန်းများသည် ပြန်လည်စစ်ဆေးရန် အဝါရောင် ဖြစ်လာမည်။",
+    dashReleaseSupervisor: "ကျွန်ုပ်၏ ကြီးကြပ်သူသည် ဤထုတ်လွှတ်မှုကို အတည်ပြုပြီးဖြစ်သည်",
+    dashReleaseNoReason: "အကြောင်းရင်း မဖော်ပြထားပါ",
+    dashReleasedToast: "\"{key}\" သော့ကို ထုတ်လွှတ်ပြီးဖြစ်သည် - အတန်း {n} ခုကို ပြန်လည်အကဲဖြတ်ပြီးဖြစ်သည်",
     dashSaveViewTitle: "စိတ်ကြိုက် ကော်လံအစီအစဉ်နှင့် မြင်နိုင်မှုကို သိမ်းဆည်းရန် (အစမ်းကြည့်လင့်ခ်များသို့ ထပ်တူညီမည်)",
     dashSaveSyncView: "မြင်ကွင်းကို သိမ်းဆည်း & ထပ်တူညီရန်",
     dashSaveView: "မြင်ကွင်း သိမ်းဆည်းရန်",
@@ -385,6 +412,15 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashHoldKeysPlaceholder: "เช่น PO-8801\nCMP-101-A",
     dashHoldKeysClear: "ล้าง",
     dashHoldKeysSave: "บันทึก",
+    dashHoldReasonLabel: "ทำไมรายการเหล่านี้จึงถูกพักไว้?",
+    dashHoldReasonPlaceholder: "เช่น รอการยืนยันจากซัพพลายเออร์",
+    dashConfirmRelease: "ยืนยัน",
+    dashConfirmReleaseTitle: "ยืนยันการปล่อยกับหัวหน้างาน",
+    dashReleaseTitle: "ปล่อยจากการพักไว้",
+    dashReleaseDesc: "ปล่อยคีย์ \"{key}\" ใช่หรือไม่? มี {n} แถวที่ถูกพักไว้อยู่ แถวที่ตรงกันและผ่านจะเปลี่ยนเป็นสีเขียว ส่วนที่เหลือจะเปลี่ยนเป็นสีเหลืองเพื่อตรวจสอบ",
+    dashReleaseSupervisor: "หัวหน้างานของฉันได้ยืนยันการปล่อยนี้แล้ว",
+    dashReleaseNoReason: "ไม่ได้ระบุเหตุผล",
+    dashReleasedToast: "ปล่อยคีย์ \"{key}\" แล้ว - ประเมิน {n} แถวใหม่แล้ว",
     dashSaveViewTitle: "บันทึกลำดับและการมองเห็นคอลัมน์ที่กำหนดเอง (ซิงค์ไปยังลิงก์ตัวอย่าง)",
     dashSaveSyncView: "บันทึก & ซิงค์มุมมอง",
     dashSaveView: "บันทึกมุมมอง",
@@ -500,6 +536,15 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashHoldKeysPlaceholder: "例如 PO-8801\nCMP-101-A",
     dashHoldKeysClear: "清除",
     dashHoldKeysSave: "保存",
+    dashHoldReasonLabel: "这些项目为何被暂存？",
+    dashHoldReasonPlaceholder: "例如 等待供应商确认",
+    dashConfirmRelease: "确认",
+    dashConfirmReleaseTitle: "与主管确认后释放",
+    dashReleaseTitle: "从暂存中释放",
+    dashReleaseDesc: "释放关键字\"{key}\"吗？当前有 {n} 行被暂存。匹配并通过的行将变为绿色，其余将变为黄色以供复核。",
+    dashReleaseSupervisor: "我的主管已确认此次释放",
+    dashReleaseNoReason: "未填写原因",
+    dashReleasedToast: "关键字\"{key}\"已释放 - 已重新评估 {n} 行",
     dashSaveViewTitle: "保存自定义列顺序和可见性（同步到预览链接）",
     dashSaveSyncView: "保存并同步视图",
     dashSaveView: "保存视图",
