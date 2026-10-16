@@ -190,6 +190,7 @@ export const StorageKeys = {
   HOLD_VALUES: 'hold_values',
   HOLD_REASON: 'hold_reason',
   RELEASED_ROWS: 'released_rows',
+  RESULTS_STATE: 'results_state',
 };
 
 export const defaultNormalizationRules: NormalizationRules = {

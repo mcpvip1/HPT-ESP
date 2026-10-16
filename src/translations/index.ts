@@ -205,6 +205,10 @@ export interface TranslationDict {
   searchDataCells: string;
   toastCloudRulesSynced: string;
   toastCloudFilesSynced: string;
+  toastCloudResultsSynced: string;
+  gateTitle: string;
+  gateDesc: string;
+  gateSignIn: string;
   toastCloudFilesSyncFailed: string;
   toastShareRevoked: string;
   toastPreviewSynced: string;
@@ -756,6 +760,10 @@ export const translations: Record<Language, TranslationDict> = {
     searchDataCells: "Search data cells...",
     toastCloudRulesSynced: "Cloud workspace synced — rules & mappings match your other devices.",
     toastCloudFilesSynced: "Files synced from the cloud — same history on this device.",
+    toastCloudResultsSynced: "Results synced from the cloud.",
+    gateTitle: "Sign in to sync your workspace",
+    gateDesc: "Your files, settings and results are stored securely in the cloud. Sign in to pick up exactly where you left off — on any device.",
+    gateSignIn: "Sign in with Google",
     toastCloudFilesSyncFailed: "Couldn't sync your files to the cloud. Will retry automatically — check your connection if this persists.",
     toastShareRevoked: "Live sharing was turned off — showing the last received snapshot.",
     toastPreviewSynced: "Preview synced with the latest changes.",
@@ -1024,6 +1032,10 @@ export const translations: Record<Language, TranslationDict> = {
     searchDataCells: "ဒေတာဆဲလ်များ ရှာဖွေရန်...",
     toastCloudRulesSynced: "Cloud workspace ထပ်တူညီပြီးပြီ — စည်းမျဉ်းများနှင့် မြေပုံများသည် အခြားစက်များနှင့် ကိုက်ညီသည်။",
     toastCloudFilesSynced: "ဖိုင်များကို cloud မှ ထပ်တူညီပြီးပြီ — ဤစက်တွင် တူညီသော မှတ်တမ်းရှိသည်။",
+    toastCloudResultsSynced: "ရလဒ်များကို cloud မှ ထပ်တူညီပြီးပြီ။",
+    gateTitle: "သင့် workspace ကို ထပ်တူညီရန် လော့ဂ်အင်ဝင်ပါ",
+    gateDesc: "သင့်ဖိုင်များ၊ ဆက်တင်များနှင့် ရလဒ်များသည် cloud တွင် လုံခြုံစွာ သိမ်းဆည်းထားသည်။ မည်သည့်စက်တွင်မဆို ထားခဲ့သည့်နေရာမှ ဆက်လက်လုပ်ဆောင်ရန် လော့ဂ်အင်ဝင်ပါ။",
+    gateSignIn: "Google ဖြင့် လော့ဂ်အင်ဝင်ရန်",
     toastCloudFilesSyncFailed: "သင့်ဖိုင်များကို cloud သို့ ထပ်တူညီ၍မရပါ။ အလိုအလျောက် ပြန်လည်ကြိုးစားပါမည်။",
     toastShareRevoked: "တိုက်ရိုက် မျှဝေမှုကို ပိတ်လိုက်ပြီ — နောက်ဆုံး ရရှိထားသော snapshot ကို ပြသနေသည်။",
     toastPreviewSynced: "အစမ်းကြည့်မှုကို နောက်ဆုံး ပြောင်းလဲမှုများနှင့် ထပ်တူညီပြီးပြီ။",
@@ -1292,6 +1304,10 @@ export const translations: Record<Language, TranslationDict> = {
     searchDataCells: "ค้นหาเซลล์ข้อมูล...",
     toastCloudRulesSynced: "ซิงค์พื้นที่ทำงานคลาวด์แล้ว — กฎและการแมปตรงกับอุปกรณ์อื่นของคุณ",
     toastCloudFilesSynced: "ซิงค์ไฟล์จากคลาวด์แล้ว — ประวัติเดียวกันบนอุปกรณ์นี้",
+    toastCloudResultsSynced: "ซิงค์ผลลัพธ์จากคลาวด์แล้ว",
+    gateTitle: "ลงชื่อเข้าใช้เพื่อซิงค์พื้นที่ทำงานของคุณ",
+    gateDesc: "ไฟล์ การตั้งค่า และผลลัพธ์ของคุณถูกเก็บไว้อย่างปลอดภัยในคลาวด์ ลงชื่อเข้าใช้เพื่อทำงานต่อจากที่ค้างไว้ได้บนทุกอุปกรณ์",
+    gateSignIn: "ลงชื่อเข้าใช้ด้วย Google",
     toastCloudFilesSyncFailed: "ไม่สามารถซิงค์ไฟล์ของคุณไปยังคลาวด์ได้ จะลองใหม่โดยอัตโนมัติ",
     toastShareRevoked: "ปิดการแชร์สดแล้ว — กำลังแสดงสแนปช็อตล่าสุดที่ได้รับ",
     toastPreviewSynced: "ซิงค์ตัวอย่างกับการเปลี่ยนแปลงล่าสุดแล้ว",
@@ -1560,6 +1576,10 @@ export const translations: Record<Language, TranslationDict> = {
     searchDataCells: "搜索数据单元格...",
     toastCloudRulesSynced: "云工作区已同步 — 规则与映射与其他设备一致。",
     toastCloudFilesSynced: "已从云端同步文件 — 此设备上的历史记录相同。",
+    toastCloudResultsSynced: "已从云端同步结果。",
+    gateTitle: "登录以同步您的工作区",
+    gateDesc: "您的文件、设置和结果都安全地存储在云端。登录后即可在任何设备上从上次离开的地方继续工作。",
+    gateSignIn: "使用 Google 登录",
     toastCloudFilesSyncFailed: "无法将您的文件同步到云端，将自动重试。",
     toastShareRevoked: "已关闭实时共享 — 正在显示最后收到的快照。",
     toastPreviewSynced: "预览已与最新更改同步。",
