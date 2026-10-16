@@ -19,6 +19,7 @@ import type {
   MatchedRow,
   MatchingStats,
   NormalizationRules,
+  SyncHistoryEntry,
   WorkbookData,
 } from '../types';
 
@@ -564,6 +565,52 @@ export async function publishResultsState(
     {},
     { onProgress }
   );
+}
+
+// ---------------------------------------------------------------------------
+// Sync history: the per-device upload log (file names, settings reasons,
+// results). Small enough for a single doc — no chunking. Merged (not
+// overwritten) on pull so every device sees every other device's uploads.
+// ---------------------------------------------------------------------------
+
+export interface CloudSyncHistory {
+  entries: SyncHistoryEntry[];
+  updatedAt: number;
+  clearedAt?: number;
+}
+
+export async function publishSyncHistory(
+  uid: string,
+  history: SyncHistoryEntry[],
+  clearedAt?: number
+): Promise<boolean> {
+  try {
+    await setDoc(stateDoc(uid, 'history'), {
+      entries: history.slice(0, 50),
+      updatedAt: Date.now(),
+      ...(clearedAt ? { clearedAt } : {}),
+    });
+    return true;
+  } catch (e) {
+    console.warn('Cloud sync: failed to publish history', e);
+    return false;
+  }
+}
+
+export async function fetchSyncHistory(uid: string): Promise<CloudSyncHistory | null> {
+  try {
+    const snap = await getDoc(stateDoc(uid, 'history'));
+    if (!snap.exists()) return null;
+    const data = snap.data() as { entries?: SyncHistoryEntry[]; updatedAt?: number; clearedAt?: number };
+    return {
+      entries: Array.isArray(data.entries) ? data.entries : [],
+      updatedAt: data.updatedAt || 0,
+      clearedAt: data.clearedAt || 0,
+    };
+  } catch (e) {
+    console.warn('Cloud sync: failed to fetch history', e);
+    return null;
+  }
 }
 
 export async function deleteResultsState(uid: string): Promise<void> {
