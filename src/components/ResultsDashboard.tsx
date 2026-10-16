@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  PauseCircle,
   Percent,
   FileSpreadsheet,
   X,
@@ -67,9 +68,11 @@ interface ResultsDashboardProps {
   onExitPreview?: () => void;
   onRefresh?: () => void;
   cloudUser?: User | null;
+  holdKeys?: string[];
+  onHoldKeysChange?: (keys: string[]) => void;
 }
 
-type FilterType = 'all' | 'green' | 'yellow' | 'red' | 'unmatched';
+type FilterType = 'all' | 'green' | 'yellow' | 'red' | 'blue' | 'unmatched';
 
 // Helper to highlight matching text in real-time
 function highlightText(content: any, query: string): React.ReactNode {
@@ -112,6 +115,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   onExitPreview,
   onRefresh,
   cloudUser,
+  holdKeys = [],
+  onHoldKeysChange,
 }) => {
   const t = translations[language];
 
@@ -136,6 +141,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [sortColumn, setSortColumn] = useState<string>('rowIndex');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRow, setSelectedRow] = useState<MatchedRow | null>(null);
+  const [showHoldKeysDialog, setShowHoldKeysDialog] = useState(false);
+  const [holdKeysDraft, setHoldKeysDraft] = useState('');
   const [hideSupersededPostpone, setHideSupersededPostpone] = useState<boolean>(true);
 
   // Excel-style column filters: mapping colId -> allowed string values
@@ -641,7 +648,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         const filterName = activeFilter === 'all' ? t.dashFilterNameAll
           : activeFilter === 'green' ? t.filterGreen
           : activeFilter === 'yellow' ? t.filterYellow
-          : activeFilter === 'red' ? t.filterRed : t.filterUnmatched;
+          : activeFilter === 'red' ? t.filterRed
+          : activeFilter === 'blue' ? t.filterBlue : t.filterUnmatched;
         onShowToast(t.dashPreviewLinkCopied.replace('{filter}', filterName), 'success');
         setTimeout(() => setQuickCopied(false), 2500);
       } else {
@@ -662,6 +670,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         ? t.badgeReview
         : row.decisionColor === 'red'
         ? t.badgeRejected
+        : row.decisionColor === 'blue'
+        ? t.badgeHold
         : t.badgeNoRule;
     }
     if (colId === 'matchStatus') {
@@ -707,6 +717,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       if (activeFilter === 'green' && item.decisionColor !== 'green') return false;
       if (activeFilter === 'yellow' && item.decisionColor !== 'yellow') return false;
       if (activeFilter === 'red' && item.decisionColor !== 'red') return false;
+      if (activeFilter === 'blue' && item.decisionColor !== 'blue') return false;
       if (activeFilter === 'unmatched' && item.isMatched) return false;
 
       // Deduplication: "only take accept" - optionally hide rows that were superseded by an Accept record
@@ -728,7 +739,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           // Search across all comparison fields, reference fields, key, and evaluation reason
           const inKey = item.matchKey.toLowerCase().includes(query);
           const inReason = item.decisionReason.toLowerCase().includes(query);
-          const inOutcome = (item.decisionColor === 'green' ? 'passed accept' : item.decisionColor === 'yellow' ? 'review postpone' : item.decisionColor === 'red' ? 'rejected fail' : '').includes(query);
+          const inOutcome = (item.decisionColor === 'green' ? 'passed accept' : item.decisionColor === 'yellow' ? 'review postpone' : item.decisionColor === 'red' ? 'rejected fail' : item.decisionColor === 'blue' ? 'hold blue' : '').includes(query);
           const inMatchStatus = (item.isMatched ? 'matched' : 'unmatched new').includes(query);
           const inRowIdx = String(item.rowIndex).includes(query);
           const inUnmatched = item.unmatchedInfo
@@ -751,7 +762,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         } else if (searchColumn === 'matchKey') {
           return item.matchKey.toLowerCase().includes(query);
         } else if (searchColumn === 'outcome') {
-          const outcomeStr = item.decisionColor === 'green' ? 'passed accept' : item.decisionColor === 'yellow' ? 'review postpone' : 'rejected fail';
+          const outcomeStr = item.decisionColor === 'green' ? 'passed accept' : item.decisionColor === 'yellow' ? 'review postpone' : item.decisionColor === 'red' ? 'rejected fail' : item.decisionColor === 'blue' ? 'hold blue' : '';
           return outcomeStr.includes(query);
         } else if (searchColumn.startsWith('[Ref] ')) {
           const rawKey = searchColumn.replace('[Ref] ', '');
@@ -879,6 +890,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             {t.badgeRejected}
           </span>
         );
+      case 'blue':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-bold text-white bg-blue-600 shadow-xs tracking-wider">
+            <PauseCircle className="w-3.5 h-3.5 stroke-[2.5]" />
+            {t.badgeHold}
+          </span>
+        );
       default:
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold text-slate-600 bg-slate-100">
@@ -901,14 +919,15 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     { key: 'green', label: t.filterGreen, count: stats.greenCount, dot: 'bg-emerald-500', active: 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-300' },
     { key: 'yellow', label: t.filterYellow, count: stats.yellowCount, dot: 'bg-amber-500', active: 'border-amber-300 bg-amber-50 ring-2 ring-amber-300' },
     { key: 'red', label: t.filterRed, count: stats.redCount, dot: 'bg-rose-500', active: 'border-rose-300 bg-rose-50 ring-2 ring-rose-300' },
-    { key: 'unmatched', label: t.filterUnmatched, count: stats.unmatchedCount, dot: 'bg-blue-500', active: 'border-blue-300 bg-blue-50 ring-2 ring-blue-300' },
+    { key: 'blue', label: t.filterBlue, count: stats.blueCount, dot: 'bg-blue-600', active: 'border-blue-300 bg-blue-50 ring-2 ring-blue-300' },
+    { key: 'unmatched', label: t.filterUnmatched, count: stats.unmatchedCount, dot: 'bg-violet-500', active: 'border-violet-300 bg-violet-50 ring-2 ring-violet-300' },
   ];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* 1. Results overview: clickable KPI stat cards (filter the table) */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5">
           {kpiDefs.map((k) => {
             const pct = totalResults > 0 ? Math.round((k.count / totalResults) * 100) : 0;
             const isActive = activeFilter === k.key;
@@ -983,6 +1002,26 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 group-hover:rotate-180 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
               <span>{t.dashRefresh}</span>
             </button>
+
+            {/* Hold Keys filter button (studio only) */}
+            {!isPreviewMode && onHoldKeysChange && (
+              <button
+                onClick={() => {
+                  setHoldKeysDraft(holdKeys.join('\n'));
+                  setShowHoldKeysDialog(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100/80 border border-blue-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0"
+                title={t.dashHoldKeysTitle}
+              >
+                <PauseCircle className="w-3.5 h-3.5" />
+                <span>{t.dashHoldKeys}</span>
+                {holdKeys.length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-600 text-white font-bold">
+                    {holdKeys.length}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* Save Column View & Sync button (Main Results page) */}
             {!isPreviewMode && (
@@ -1485,6 +1524,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   const isGreen = row.decisionColor === 'green';
                   const isYellow = row.decisionColor === 'yellow';
                   const isRed = row.decisionColor === 'red';
+                  const isBlue = row.decisionColor === 'blue';
                   // Opaque background for the frozen columns (must cover scrolled content)
                   const frozenBg = isGreen
                     ? 'bg-emerald-50'
@@ -1492,6 +1532,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     ? 'bg-amber-50'
                     : isRed
                     ? 'bg-rose-50'
+                    : isBlue
+                    ? 'bg-blue-50'
                     : 'bg-white';
 
                   return (
@@ -1504,6 +1546,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           ? 'bg-amber-50/30 hover:bg-amber-50/70 border-l-[4px] border-l-amber-500'
                           : isRed
                           ? 'bg-rose-50/30 hover:bg-rose-50/70 border-l-[4px] border-l-rose-500'
+                          : isBlue
+                          ? 'bg-blue-50/40 hover:bg-blue-50/80 border-l-[4px] border-l-blue-600'
                           : 'even:bg-slate-50/40 hover:bg-slate-50 border-l-[4px] border-l-transparent'
                       }`}
                     >
@@ -1743,6 +1787,68 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           )}
         </div>
       </div>
+
+      {/* Hold Keys Dialog */}
+      {showHoldKeysDialog && onHoldKeysChange && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <PauseCircle className="w-5 h-5 text-blue-600" />
+                <h4 className="text-sm font-bold text-slate-900">{t.dashHoldKeysDialogTitle}</h4>
+              </div>
+              <button
+                onClick={() => setShowHoldKeysDialog(false)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500">{t.dashHoldKeysDialogDesc}</p>
+
+            <textarea
+              value={holdKeysDraft}
+              onChange={(e) => setHoldKeysDraft(e.target.value)}
+              placeholder={t.dashHoldKeysPlaceholder}
+              rows={5}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 font-mono"
+              autoFocus
+            />
+
+            <div className="flex justify-between items-center gap-2 pt-3 border-t border-slate-200">
+              <button
+                onClick={() => {
+                  setHoldKeysDraft('');
+                  onHoldKeysChange([]);
+                  setShowHoldKeysDialog(false);
+                }}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 rounded-lg"
+              >
+                {t.dashHoldKeysClear}
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowHoldKeysDialog(false)}
+                  className="px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 rounded-lg"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  onClick={() => {
+                    const keys = holdKeysDraft.split(/\n/).map((k) => k.trim()).filter((k) => k.length > 0);
+                    onHoldKeysChange(Array.from(new Set(keys)));
+                    setShowHoldKeysDialog(false);
+                  }}
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow-sm"
+                >
+                  {t.dashHoldKeysSave}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Row Inspection Modal */}
       <RowDetailModal
