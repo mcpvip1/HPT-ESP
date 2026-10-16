@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
   SlidersHorizontal,
@@ -9,6 +9,8 @@ import {
   ArrowRight,
   Database,
   Sparkles,
+  PauseCircle,
+  Search,
 } from 'lucide-react';
 import {
   WorkbookData,
@@ -37,6 +39,10 @@ interface RulesLogicModalProps {
   isProcessing: boolean;
   language: Language;
   onShowToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+  holdColumn: string;
+  holdValues: string[];
+  holdReason: string;
+  onHoldSettingsChange: (column: string, values: string[], reason: string) => void;
 }
 
 export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
@@ -55,8 +61,59 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
   isProcessing,
   language,
   onShowToast,
+  holdColumn,
+  holdValues,
+  holdReason,
+  onHoldSettingsChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<'mapping' | 'decision'>('mapping');
+  const [activeTab, setActiveTab] = useState<'mapping' | 'decision' | 'hold'>('mapping');
+  const [holdValueSearch, setHoldValueSearch] = useState('');
+  const [holdReasonDraft, setHoldReasonDraft] = useState(holdReason);
+  const [holdLegacyDraft, setHoldLegacyDraft] = useState(holdValues.join('\n'));
+
+  // Sync drafts whenever the modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setHoldReasonDraft(holdReason);
+      setHoldLegacyDraft(holdValues.join('\n'));
+      setHoldValueSearch('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // Distinct values of the chosen hold column from the Incoming workbook
+  const holdDistinctValues = useMemo(() => {
+    if (!comparisonWb || !holdColumn) return [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const row of comparisonWb.rows) {
+      const v = String(row[holdColumn] ?? '').trim();
+      if (!v || v === '-') continue;
+      const k = v.toLowerCase();
+      if (!seen.has(k)) {
+        seen.add(k);
+        out.push(v);
+      }
+    }
+    return out.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [comparisonWb, holdColumn]);
+
+  const updateHold = (column: string, values: string[], reason: string) => {
+    onHoldSettingsChange(column, values, reason);
+  };
+
+  const toggleHoldValue = (v: string) => {
+    const nv = holdValues.includes(v)
+      ? holdValues.filter((x) => x !== v)
+      : [...holdValues, v];
+    updateHold(holdColumn, nv, holdReason);
+  };
+
+  const filteredHoldValues = useMemo(() => {
+    const q = holdValueSearch.trim().toLowerCase();
+    if (!q) return holdDistinctValues;
+    return holdDistinctValues.filter((v) => v.toLowerCase().includes(q));
+  }, [holdDistinctValues, holdValueSearch]);
   const [justSaved, setJustSaved] = useState(false);
   const t = translations[language];
 
@@ -163,6 +220,23 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
                 {layers.length}
               </span>
             </button>
+
+            <button
+              onClick={() => setActiveTab('hold')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                activeTab === 'hold'
+                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <PauseCircle className="w-3.5 h-3.5 text-blue-600" />
+              <span>{t.rulesTabHold}</span>
+              {holdValues.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-blue-600 text-white font-bold">
+                  {holdValues.length}
+                </span>
+              )}
+            </button>
           </div>
 
           <div className="text-[11px] text-slate-400 hidden md:block">
@@ -185,7 +259,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
                 onShowToast={onShowToast}
               />
             </div>
-          ) : (
+          ) : activeTab === 'decision' ? (
             <div className="space-y-6 animate-in fade-in duration-150">
               <DecisionLayers
                 referenceWb={referenceWb}
@@ -196,6 +270,125 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
                 isProcessing={isProcessing}
                 language={language}
               />
+            </div>
+          ) : (
+            <div className="space-y-5 animate-in fade-in duration-150">
+              {/* Hold column picker */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <PauseCircle className="w-4 h-4 text-blue-600" />
+                  <h4 className="text-sm font-bold text-slate-900">{t.rulesTabHold}</h4>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">{t.rulesHoldColumnLabel}</label>
+                  <select
+                    value={holdColumn}
+                    onChange={(e) => {
+                      setHoldValueSearch('');
+                      updateHold(e.target.value, [], holdReason);
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">{t.rulesHoldColumnLegacy}</option>
+                    {(comparisonWb?.headers || []).map((h) => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {holdColumn ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-700">
+                        {t.rulesHoldValuesLabel}
+                        {holdValues.length > 0 && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-600 text-white font-bold">
+                            {holdValues.length}
+                          </span>
+                        )}
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => updateHold(holdColumn, holdDistinctValues, holdReason)}
+                          className="text-[11px] font-semibold text-blue-600 hover:underline"
+                        >
+                          {t.rulesHoldSelectAll}
+                        </button>
+                        <button
+                          onClick={() => updateHold(holdColumn, [], holdReason)}
+                          className="text-[11px] font-semibold text-slate-500 hover:underline"
+                        >
+                          {t.rulesHoldClearSel}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        value={holdValueSearch}
+                        onChange={(e) => setHoldValueSearch(e.target.value)}
+                        placeholder={t.rulesHoldValuesSearch}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="max-h-56 overflow-y-auto border border-slate-200 rounded-lg bg-slate-50/60 divide-y divide-slate-100">
+                      {filteredHoldValues.length === 0 && (
+                        <div className="px-3 py-4 text-xs text-slate-400 text-center">
+                          {comparisonWb ? t.rulesHoldNoValues : t.rulesHoldNoData}
+                        </div>
+                      )}
+                      {filteredHoldValues.map((v) => (
+                        <label
+                          key={v}
+                          className="flex items-center gap-2.5 px-3 py-2 hover:bg-blue-50/60 cursor-pointer transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={holdValues.includes(v)}
+                            onChange={() => toggleHoldValue(v)}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-xs text-slate-800 font-mono truncate">{v}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">{t.rulesHoldLegacyLabel}</label>
+                    <p className="text-[11px] text-slate-500">{t.rulesHoldLegacyDesc}</p>
+                    <textarea
+                      value={holdLegacyDraft}
+                      onChange={(e) => setHoldLegacyDraft(e.target.value)}
+                      onBlur={() => {
+                        const vals = holdLegacyDraft.split(/\n/).map((x) => x.trim()).filter((x) => x.length > 0);
+                        updateHold('', Array.from(new Set(vals)), holdReason);
+                      }}
+                      rows={4}
+                      placeholder={t.rulesHoldLegacyPlaceholder}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1.5 pt-1 border-t border-slate-100">
+                  <label className="text-xs font-bold text-slate-700">{t.dashHoldReasonLabel}</label>
+                  <input
+                    value={holdReasonDraft}
+                    onChange={(e) => setHoldReasonDraft(e.target.value)}
+                    onBlur={() => {
+                      if (holdReasonDraft.trim() !== holdReason) {
+                        updateHold(holdColumn, holdValues, holdReasonDraft.trim());
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                    }}
+                    placeholder={t.dashHoldReasonPlaceholder}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
             </div>
           )}
         </div>
