@@ -8,6 +8,7 @@ export interface SharedPreviewPayload {
   stats: MatchingStats;
   results: MatchedRow[];
   filter?: 'all' | 'green' | 'yellow' | 'red' | 'unmatched';
+  onlyAccept?: boolean;
   searchTerm?: string;
   searchColumn?: string;
   columnConfigs?: ColumnConfigItem[];
@@ -23,6 +24,7 @@ interface CompactPreviewPayload {
   t: number;
   n: string;
   f?: string;
+  oa?: number; // 1 = Only Accept on, 0 = off (absent = default on)
   s?: string;
   sc?: string;
   st: [number, number, number, number, number]; // [total, green, yellow, red, matched]
@@ -85,6 +87,7 @@ export function packCompact(payload: SharedPreviewPayload): CompactPreviewPayloa
     t: payload.createdAt || Date.now(),
     n: payload.comparisonWbName || 'Evaluation_Results',
     f: payload.filter !== 'all' ? payload.filter : undefined,
+    oa: payload.onlyAccept ? 1 : 0,
     s: payload.searchTerm ? payload.searchTerm : undefined,
     sc: payload.searchColumn !== 'all' ? payload.searchColumn : undefined,
     st: [
@@ -159,6 +162,7 @@ export function unpackCompact(compact: CompactPreviewPayload): SharedPreviewPayl
     createdAt: compact.t || Date.now(),
     comparisonWbName: compact.n || 'Evaluation_Results',
     filter: (compact.f as any) || 'all',
+    onlyAccept: compact.oa !== 0,
     searchTerm: compact.s || '',
     searchColumn: compact.sc || 'all',
     columnConfigs: compact.cols,

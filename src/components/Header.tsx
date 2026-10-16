@@ -78,7 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
           {isPreviewMode && (
             <div className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 min-w-0">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span className="truncate">Result Preview</span>
+              <span className="hidden min-[420px]:inline truncate">Result Preview</span>
               <span className="hidden sm:inline text-slate-500 font-normal">
                 · Live Interactive Table
               </span>
