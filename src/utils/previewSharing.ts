@@ -231,6 +231,30 @@ export function generatePreviewLink(payload: SharedPreviewPayload): {
 }
 
 /**
+ * Reads a public live-share id from the URL (?share=... or #share=...).
+ * Share links open the preview without requiring sign-in.
+ */
+export function getShareIdFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('share');
+    if (q) return q;
+    const m = window.location.hash.match(/share=([A-Za-z0-9]+)/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Builds the public live-share preview link for a share id.
+ */
+export function getSharePreviewUrl(shareId: string): string {
+  return `${getShortPreviewUrl()}?share=${shareId}`;
+}
+
+/**
  * Checks if the current page was loaded via a preview link:
  * - pathname ending with /preview or /preview/
  * - hash #/preview or #preview=...
