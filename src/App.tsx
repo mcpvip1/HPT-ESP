@@ -52,6 +52,7 @@ import {
   fetchWorkbooks,
   publishResultsState,
   fetchResultsState,
+  deleteResultsState,
   defaultResultFilters,
 } from './lib/cloudSync';
 import type { ResultFilters } from './lib/cloudSync';
@@ -403,8 +404,12 @@ export default function App() {
   // Publish evaluated results (+ view filters) to the cloud whenever they
   // change, so signing in on another device restores the same results.
   // Pull-applied results are skipped via pulledResultsRef (no echo).
+  // The generation guard drops a pending publish after the results were
+  // cleared (e.g. file removed) so stale results can't be resurrected.
+  const resultsPublishGenRef = useRef(0);
   const debouncedPublishResults = useRef(
-    debounce((uid: string, state: { results: MatchedRow[]; stats: MatchingStats; filters: ResultFilters }) => {
+    debounce((uid: string, state: { results: MatchedRow[]; stats: MatchingStats; filters: ResultFilters }, gen: number) => {
+      if (gen !== resultsPublishGenRef.current) return;
       publishResultsState(uid, state).then((ok) => {
         if (!ok) console.warn('Cloud sync: results publish failed');
       });
@@ -419,7 +424,7 @@ export default function App() {
       pulledResultsRef.current = null; // pull echo accounted for — skip
       return;
     }
-    debouncedPublishResults.current(cloudUser.uid, { results, stats, filters: resultFilters });
+    debouncedPublishResults.current(cloudUser.uid, { results, stats, filters: resultFilters }, resultsPublishGenRef.current);
   }, [cloudUser, isPreviewMode, localReady, results, stats, resultFilters, debouncedPublishResults]);
 
   const VALID_FILTERS = ['all', 'green', 'yellow', 'red', 'blue', 'unmatched'] as const;
@@ -731,6 +736,19 @@ export default function App() {
     };
   }, [authResolved, cloudUser?.uid]);
 
+  // Clear results everywhere: local state, IDB cache and the cloud doc, so a
+  // removed file leaves no stale results behind on any device.
+  const clearResultsEverywhere = async () => {
+    resultsPublishGenRef.current++; // invalidate any pending results publish
+    pulledResultsRef.current = null;
+    setResults([]);
+    setStats(null);
+    try { await deleteFromIDB(StorageKeys.RESULTS_STATE); } catch { /* ignore */ }
+    if (cloudUser) {
+      try { await deleteResultsState(cloudUser.uid); } catch (e) { console.warn('Failed to delete cloud results', e); }
+    }
+  };
+
   // Replace the Reference Workbook (Main File) with a newly uploaded file.
   // The old workbook is swapped out wholesale (never mutated in place); if the
   // Incoming file is already loaded, results are regenerated immediately so the
@@ -823,14 +841,28 @@ export default function App() {
       }
     } else {
       await deleteFromIDB(StorageKeys.REFERENCE_WORKBOOK);
+      // The old file is gone — its results must go too (cloud included)
+      await clearResultsEverywhere();
     }
     publishWorkbooksNow(wb, comparisonWb);
   };
 
   const handleSetComparisonWb = async (wb: WorkbookData | null, autoEvaluate = true) => {
+    const prevWb = comparisonWb;
     setComparisonWb(wb);
     if (wb) {
       await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, wb);
+      // A genuinely new file invalidates row-positional release state
+      // (row ids can't survive a file swap); key-based hold values are kept.
+      if (
+        prevWb &&
+        (prevWb.name !== wb.name ||
+          prevWb.rows.length !== wb.rows.length ||
+          prevWb.headers.join('|') !== wb.headers.join('|'))
+      ) {
+        setReleasedRowIds([]);
+        try { await deleteFromIDB(StorageKeys.RELEASED_ROWS); } catch { /* ignore */ }
+      }
       let effectiveMappings = mappings;
       // If user has not yet defined any mappings, attempt auto-mapping
       if (effectiveMappings.length === 0 && referenceWb) {
@@ -848,6 +880,8 @@ export default function App() {
       }
     } else {
       await deleteFromIDB(StorageKeys.COMPARISON_WORKBOOK);
+      // The old file is gone — its results must go too (cloud included)
+      await clearResultsEverywhere();
     }
     publishWorkbooksNow(referenceWb, wb);
   };
