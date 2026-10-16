@@ -185,6 +185,7 @@ export const StorageKeys = {
   LANGUAGE: 'language',
   SAVED_MAPPING_PRESETS: 'saved_mapping_presets',
   SAVED_DECISION_PRESETS: 'saved_decision_presets',
+  HOLD_KEYS: 'hold_keys',
 };
 
 export const defaultNormalizationRules: NormalizationRules = {

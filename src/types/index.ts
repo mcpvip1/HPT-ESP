@@ -102,6 +102,10 @@ export interface MatchedRow {
   mergedRow: ExcelRow;
   supersededByAccept?: boolean;
   reconciledPostponeInfo?: ReconciledPostponeInfo;
+  /** True when the row was forced into the Hold tab by a hold-key filter match. */
+  isHold?: boolean;
+  /** The hold-key term that matched this row (when isHold). */
+  holdKey?: string;
 }
 
 export interface MatchingStats {
@@ -112,6 +116,7 @@ export interface MatchingStats {
   greenCount: number;
   yellowCount: number;
   redCount: number;
+  blueCount: number;
   otherCount: number;
   unmatchedItems?: { rowIndex: number; identifier: string; reason: string }[];
 }
