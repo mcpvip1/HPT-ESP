@@ -58,7 +58,8 @@ export interface CloudRulesState {
   normalization: NormalizationRules;
   layers: DecisionLayer[];
   mappings: ColumnMapping[];
-  holdKeys: string[];
+  holdColumn: string;
+  holdValues: string[];
   holdReason: string;
   releasedRowIds: string[];
   updatedAt: number;
