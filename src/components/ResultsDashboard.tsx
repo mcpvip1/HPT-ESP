@@ -35,10 +35,18 @@ import {
 } from '../types';
 import { translations } from '../translations';
 import { exportStyledExcel, exportCsv } from '../utils/excel';
-import { generatePreviewLink, copyPreviewLinkToClipboard } from '../utils/previewSharing';
+import { generatePreviewLink, copyPreviewLinkToClipboard, getSharePreviewUrl } from '../utils/previewSharing';
 import type { SharedPreviewPayload } from '../utils/previewSharing';
 import type { User } from 'firebase/auth';
-import { publishPreviewSnapshot, debounce } from '../lib/cloudSync';
+import {
+  publishPreviewSnapshot,
+  publishSharedSnapshot,
+  unpublishSharedSnapshot,
+  getActiveShare,
+  setActiveShare,
+  generateShareId,
+  debounce,
+} from '../lib/cloudSync';
 import { RowDetailModal } from './RowDetailModal';
 import { ColumnCustomizationModal } from './ColumnCustomizationModal';
 import { SharePreviewModal } from './SharePreviewModal';
@@ -110,6 +118,16 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [searchColumn, setSearchColumn] = useState<string>(initialSearchColumn || 'all');
   const [showShareModal, setShowShareModal] = useState(false);
   const [quickCopied, setQuickCopied] = useState(false);
+  // Public live-share: anyone with the link sees the latest snapshot, no sign-in
+  const [liveShareId, setLiveShareId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('emp_live_share_id');
+    } catch {
+      return null;
+    }
+  });
+  const [showLiveSharePanel, setShowLiveSharePanel] = useState(false);
+  const [liveShareCopied, setLiveShareCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -425,25 +443,30 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   // filter/search/columns to the shared workspace (debounced) so the preview
   // page on any signed-in device follows along automatically.
   const debouncedPublishPreview = useRef(
-    debounce((uid: string, payload: SharedPreviewPayload) => {
+    debounce((uid: string, payload: SharedPreviewPayload, shareId: string | null) => {
       publishPreviewSnapshot(uid, payload);
+      if (shareId) publishSharedSnapshot(shareId, uid, payload);
     }, 2000)
   ).current;
 
   useEffect(() => {
     if (isPreviewMode || !cloudUser) return;
     if (!results || results.length === 0 || !stats) return;
-    debouncedPublishPreview(cloudUser.uid, {
-      version: 1,
-      createdAt: Date.now(),
-      comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
-      stats,
-      results,
-      filter: activeFilter,
-      searchTerm,
-      searchColumn,
-      columnConfigs,
-    });
+    debouncedPublishPreview(
+      cloudUser.uid,
+      {
+        version: 1,
+        createdAt: Date.now(),
+        comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+        stats,
+        results,
+        filter: activeFilter,
+        searchTerm,
+        searchColumn,
+        columnConfigs,
+      },
+      liveShareId
+    );
   }, [
     isPreviewMode,
     cloudUser,
@@ -454,8 +477,28 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     searchColumn,
     columnConfigs,
     comparisonWb,
+    liveShareId,
     debouncedPublishPreview,
   ]);
+
+  // Adopt the active public share published from another signed-in device
+  useEffect(() => {
+    if (isPreviewMode || !cloudUser) return;
+    let cancelled = false;
+    getActiveShare(cloudUser.uid).then((sid) => {
+      if (!cancelled && sid) {
+        setLiveShareId(sid);
+        try {
+          localStorage.setItem('emp_live_share_id', sid);
+        } catch {
+          // ignore storage failures
+        }
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPreviewMode, cloudUser]);
 
   // Keep URL hash updated seamlessly when in preview mode as filters or columns change
   useEffect(() => {
@@ -480,6 +523,83 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       // Ignore URL length edge cases
     }
   }, [isPreviewMode, activeFilter, searchTerm, searchColumn, columnConfigs, comparisonWb, stats, results]);
+
+  const buildSharePayload = (): SharedPreviewPayload => ({
+    version: 1,
+    createdAt: Date.now(),
+    comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+    stats,
+    results,
+    filter: activeFilter,
+    searchTerm,
+    searchColumn,
+    columnConfigs,
+  });
+
+  const handleToggleLiveShare = async () => {
+    if (!cloudUser) {
+      onShowToast('Sign in with Google (Sync button) to enable live share links.', 'info');
+      return;
+    }
+    if (liveShareId) {
+      setShowLiveSharePanel((v) => !v);
+      return;
+    }
+    const sid = generateShareId();
+    try {
+      await setActiveShare(cloudUser.uid, sid);
+      try {
+        localStorage.setItem('emp_live_share_id', sid);
+      } catch {
+        // ignore storage failures
+      }
+      setLiveShareId(sid);
+      if (results.length > 0 && stats) {
+        await publishSharedSnapshot(sid, cloudUser.uid, buildSharePayload());
+      }
+      setShowLiveSharePanel(true);
+      onShowToast('Live share link created — anyone with the link sees your latest results.', 'success');
+    } catch {
+      onShowToast('Could not create the share link.', 'error');
+    }
+  };
+
+  const handleStopLiveShare = async () => {
+    if (!liveShareId) return;
+    await unpublishSharedSnapshot(liveShareId);
+    if (cloudUser) await setActiveShare(cloudUser.uid, null);
+    try {
+      localStorage.removeItem('emp_live_share_id');
+    } catch {
+      // ignore storage failures
+    }
+    setLiveShareId(null);
+    setShowLiveSharePanel(false);
+    onShowToast('Live sharing turned off — the link no longer works.', 'info');
+  };
+
+  const handleCopyLiveShareLink = async () => {
+    if (!liveShareId) return;
+    const url = getSharePreviewUrl(liveShareId);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setLiveShareCopied(true);
+      setTimeout(() => setLiveShareCopied(false), 2000);
+    } catch {
+      onShowToast('Could not copy the link.', 'error');
+    }
+  };
 
   const handleQuickCopyPreviewLink = async () => {
     try {
@@ -902,6 +1022,67 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     </>
                   )}
                 </button>
+
+                {/* Live Share Link Button (public, no sign-in needed for viewers) */}
+                <div className="relative shrink-0">
+                  <button
+                    onClick={handleToggleLiveShare}
+                    className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg shadow-xs transition-all whitespace-nowrap select-none group border ${
+                      liveShareId
+                        ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-300'
+                        : 'text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border-slate-200'
+                    }`}
+                    title={
+                      liveShareId
+                        ? 'Live share link is ON — viewers see your latest results & filter'
+                        : 'Create a public live-share link (viewers need no sign-in)'
+                    }
+                  >
+                    {liveShareId && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}
+                    <Share2 className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                    <span>{liveShareId ? 'Sharing Live' : 'Live Share'}</span>
+                  </button>
+
+                  {showLiveSharePanel && liveShareId && (
+                    <div className="absolute right-0 mt-2 w-80 rounded-xl bg-white border border-slate-200 shadow-xl p-3 z-50 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">Public live-share link</span>
+                        <button
+                          onClick={() => setShowLiveSharePanel(false)}
+                          className="p-1 rounded-md hover:bg-slate-100 text-slate-500"
+                          aria-label="Close"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-snug">
+                        Anyone with this link sees your latest results and active filter — no
+                        sign-in needed. Updates automatically as you work.
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          readOnly
+                          value={getSharePreviewUrl(liveShareId)}
+                          onFocus={(e) => e.target.select()}
+                          className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
+                        />
+                        <button
+                          onClick={handleCopyLiveShareLink}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shrink-0"
+                        >
+                          {liveShareCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{liveShareCopied ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      </div>
+                      <button
+                        onClick={handleStopLiveShare}
+                        className="w-full px-2.5 py-1.5 text-[11px] font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg"
+                      >
+                        Stop sharing (revoke link)
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 {/* Share Preview Options Button */}
                 <button
