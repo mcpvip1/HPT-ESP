@@ -281,6 +281,15 @@ export interface TranslationDict {
   dashHoldKeysPlaceholder: string;
   dashHoldKeysClear: string;
   dashHoldKeysSave: string;
+  dashHoldReasonLabel: string;
+  dashHoldReasonPlaceholder: string;
+  dashConfirmRelease: string;
+  dashConfirmReleaseTitle: string;
+  dashReleaseTitle: string;
+  dashReleaseDesc: string;
+  dashReleaseSupervisor: string;
+  dashReleaseNoReason: string;
+  dashReleasedToast: string;
   dashSaveViewTitle: string;
   dashSaveSyncView: string;
   dashSaveView: string;
