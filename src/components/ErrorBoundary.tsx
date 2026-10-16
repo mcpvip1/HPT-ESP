@@ -1,5 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
+import { Language } from '../types';
+import { translations } from '../translations';
 
 interface Props {
   children: ReactNode;
@@ -46,6 +48,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      let lang: Language = 'en';
+      try {
+        const saved = localStorage.getItem('excelmatch_language');
+        if (saved === 'my' || saved === 'th' || saved === 'zh' || saved === 'en') lang = saved;
+      } catch { /* ignore */ }
+      const t = translations[lang];
       return (
         <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-slate-900 border border-rose-900/50 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6 text-center">
@@ -55,10 +63,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
             <div className="space-y-2">
               <h1 className="text-xl font-bold text-white tracking-tight">
-                Application Recovered from Error
+                {t.errorBoundaryTitle}
               </h1>
               <p className="text-xs text-slate-400 leading-relaxed">
-                An unexpected exception occurred while rendering. You can safely reload the page or reset the workspace cache.
+                {t.errorBoundaryDesc}
               </p>
             </div>
 
@@ -74,16 +82,16 @@ export class ErrorBoundary extends Component<Props, State> {
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-colors shadow-sm"
               >
                 <RefreshCw className="w-4 h-4" />
-                <span>Reload Page</span>
+                <span>{t.errorBoundaryReload}</span>
               </button>
 
               <button
                 onClick={this.handleClearStorage}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-colors"
-                title="Clears corrupted local cache and restarts fresh"
+                title={t.errorBoundaryResetTitle}
               >
                 <Trash2 className="w-4 h-4 text-rose-400" />
-                <span>Reset Data</span>
+                <span>{t.errorBoundaryReset}</span>
               </button>
             </div>
           </div>

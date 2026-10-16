@@ -1,13 +1,26 @@
 import React from 'react';
 import { Database, FileSpreadsheet, Loader2, Sparkles } from 'lucide-react';
+import { Language } from '../types';
+import { translations } from '../translations';
 
 interface GlobalLoadingSkeletonProps {
   message?: string;
+  language?: Language;
 }
 
 export const GlobalLoadingSkeleton: React.FC<GlobalLoadingSkeletonProps> = ({
-  message = 'Restoring workbooks, column mappings, and decision rules...',
+  message,
+  language,
 }) => {
+  let resolved: Language | undefined = language;
+  if (!resolved) {
+    try {
+      const saved = localStorage.getItem('excelmatch_language');
+      if (saved === 'my' || saved === 'th' || saved === 'zh') resolved = saved;
+    } catch { /* ignore */ }
+  }
+  const t = translations[resolved || 'en'];
+  const displayMessage = message || t.loadingRestoreMessage;
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none animate-in fade-in duration-300">
       {/* 1. Header Bar Skeleton */}
@@ -21,7 +34,7 @@ export const GlobalLoadingSkeleton: React.FC<GlobalLoadingSkeletonProps> = ({
               <span className="font-bold text-base text-white tracking-tight">ExcelMatch</span>
               <span className="text-emerald-400 font-bold text-base">Pro</span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-semibold hidden sm:inline-flex items-center gap-1">
-                <Database className="w-3 h-3" /> IndexedDB Active
+                <Database className="w-3 h-3" /> {t.loadingIndexedDbActive}
               </span>
             </div>
             <div className="h-2.5 w-48 bg-slate-800 rounded animate-pulse" />
@@ -62,11 +75,11 @@ export const GlobalLoadingSkeleton: React.FC<GlobalLoadingSkeletonProps> = ({
 
             <div className="space-y-1">
               <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center justify-center gap-2">
-                <span>Loading Enterprise Workspace</span>
+                <span>{t.loadingWorkspaceTitle}</span>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
               </h2>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
-                {message}
+                {displayMessage}
               </p>
             </div>
 

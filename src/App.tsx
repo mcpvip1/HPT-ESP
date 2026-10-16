@@ -223,7 +223,7 @@ export default function App() {
             l: cloudRules.layers,
             m: cloudRules.mappings,
           });
-          showToast('Cloud workspace synced — rules & mappings match your other devices.', 'success');
+          showToast(t.toastCloudRulesSynced, 'success');
         } else {
           const cur = rulesStateRef.current;
           await publishRulesState(cloudUser.uid, cur);
@@ -254,7 +254,7 @@ export default function App() {
             await deleteFromIDB(StorageKeys.COMPARISON_WORKBOOK);
             effComp = null;
           }
-          showToast('Files synced from the cloud — same history on this device.', 'success');
+          showToast(t.toastCloudFilesSynced, 'success');
         } else {
           await publishWorkbooks(cloudUser.uid, { reference: effRef, comparison: effComp });
         }
@@ -305,7 +305,7 @@ export default function App() {
       if (meta === null) {
         if (!shareRevokedToastShownRef.current) {
           shareRevokedToastShownRef.current = true;
-          showToast('Live sharing was turned off — showing the last received snapshot.', 'info');
+          showToast(t.toastShareRevoked, 'info');
         }
         return;
       }
@@ -313,7 +313,7 @@ export default function App() {
       lastCloudPreviewAtRef.current = meta.updatedAt;
       const pData = await fetchSharedSnapshot(shareId);
       if (pData && checkAndApplyPreview(pData)) {
-        showToast('Preview synced with the latest changes.', 'success');
+        showToast(t.toastPreviewSynced, 'success');
       }
     });
     return () => unsub();
@@ -328,7 +328,7 @@ export default function App() {
       lastCloudPreviewAtRef.current = meta.updatedAt;
       const pData = await fetchPreviewSnapshot(cloudUser.uid);
       if (pData && checkAndApplyPreview(pData)) {
-        showToast('Preview synced with the latest changes.', 'success');
+        showToast(t.toastPreviewSynced, 'success');
       }
     });
     return () => unsub();
@@ -338,14 +338,14 @@ export default function App() {
     try {
       await signInWithGoogle();
     } catch (e: any) {
-      showToast(e?.message || 'Google sign-in failed.', 'error');
+      showToast(e?.message || t.toastSignInFailed, 'error');
     }
   };
 
   const handleCloudSignOut = async () => {
     try {
       await signOutGoogle();
-      showToast('Signed out of cloud sync.', 'info');
+      showToast(t.toastSignedOut, 'info');
     } catch (e) {
       console.warn('Sign-out failed', e);
     }
@@ -423,7 +423,10 @@ export default function App() {
         }
 
         const savedLang = await getFromIDB<Language>(StorageKeys.LANGUAGE);
-        if (savedLang && isMounted) setLanguage(savedLang);
+        if (savedLang && isMounted) {
+          setLanguage(savedLang);
+          try { localStorage.setItem('excelmatch_language', savedLang); } catch { /* ignore */ }
+        }
 
         const savedRef = await getFromIDB<WorkbookData>(
           StorageKeys.REFERENCE_WORKBOOK
@@ -546,7 +549,7 @@ export default function App() {
 
       if (comparisonWb) {
         showToast(
-          `Loaded ${wb.name}! Regenerating Results & Export with saved Rules & Logic Settings...`,
+          t.toastRefLoadedRegen.replace('{name}', wb.name),
           'info'
         );
         handleExecuteMatching(wb, comparisonWb, effectiveMappings, true);
@@ -573,7 +576,7 @@ export default function App() {
 
       // If reference file is ready and autoEvaluate is enabled, immediately run matching and jump to Results & Export directly!
       if (referenceWb && autoEvaluate) {
-        showToast(`Imported ${wb.name}! Generating Results & Export with saved Rules & Logic Settings...`, 'info');
+        showToast(t.toastCompImported.replace('{name}', wb.name), 'info');
         handleExecuteMatching(referenceWb, wb, effectiveMappings, true);
       }
     } else {
@@ -606,14 +609,14 @@ export default function App() {
       }
 
       showToast(
-        `Switched Main File sheet to "${sheetName}" (${updatedWb.rows.length.toLocaleString()} rows, ${updatedWb.headers.length} columns). Updating results...`,
+        t.toastRefSheetSwitched.replace('{sheet}', sheetName).replace('{rows}', updatedWb.rows.length.toLocaleString()).replace('{cols}', String(updatedWb.headers.length)),
         'info'
       );
 
       handleExecuteMatching(updatedWb, comparisonWb, effectiveMappings, true);
     } else {
       showToast(
-        `Switched Main File sheet to "${sheetName}" (${updatedWb.rows.length.toLocaleString()} rows, ${updatedWb.headers.length} columns).`,
+        t.toastRefSheetSwitchedDone.replace('{sheet}', sheetName).replace('{rows}', updatedWb.rows.length.toLocaleString()).replace('{cols}', String(updatedWb.headers.length)),
         'success'
       );
     }
@@ -642,14 +645,14 @@ export default function App() {
       }
 
       showToast(
-        `Switched Incoming File sheet to "${sheetName}" (${updatedWb.rows.length.toLocaleString()} rows, ${updatedWb.headers.length} columns). Updating results...`,
+        t.toastCompSheetSwitched.replace('{sheet}', sheetName).replace('{rows}', updatedWb.rows.length.toLocaleString()).replace('{cols}', String(updatedWb.headers.length)),
         'info'
       );
 
       handleExecuteMatching(referenceWb, updatedWb, effectiveMappings, true);
     } else {
       showToast(
-        `Switched Incoming File sheet to "${sheetName}" (${updatedWb.rows.length.toLocaleString()} rows, ${updatedWb.headers.length} columns).`,
+        t.toastCompSheetSwitchedDone.replace('{sheet}', sheetName).replace('{rows}', updatedWb.rows.length.toLocaleString()).replace('{cols}', String(updatedWb.headers.length)),
         'success'
       );
     }
@@ -673,6 +676,7 @@ export default function App() {
 
   const handleLanguageChange = async (newLang: Language) => {
     setLanguage(newLang);
+    try { localStorage.setItem('excelmatch_language', newLang); } catch { /* ignore */ }
     await saveToIDB(StorageKeys.LANGUAGE, newLang);
   };
 
@@ -685,7 +689,7 @@ export default function App() {
     } else {
       window.location.hash = '';
     }
-    showToast('Exited Live Preview mode. Full studio controls restored.', 'info');
+    showToast(t.toastExitedPreview, 'info');
   };
 
   // Explicit Save Settings confirmation for user
@@ -694,7 +698,7 @@ export default function App() {
     await saveToIDB(StorageKeys.NORMALIZATION_RULES, normalization);
     await saveToIDB(StorageKeys.DECISION_LAYERS, layers);
     showToast(
-      'Rules & Logic Settings saved! Saved once, future file imports will automatically evaluate and show Results & Export directly.',
+      t.toastRulesSaved,
       'success'
     );
   };
@@ -714,7 +718,7 @@ export default function App() {
     await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, demo.comparison);
     publishWorkbooksNow(demo.reference, demo.comparison);
 
-    showToast('Enterprise Procurement & Inspection Sample loaded! Evaluating...', 'success');
+    showToast(t.toastSampleLoaded, 'success');
     handleExecuteMatching(demo.reference, demo.comparison, auto, true);
   };
 
@@ -729,7 +733,7 @@ export default function App() {
     const comp = customComp !== undefined ? customComp : comparisonWb;
 
     if (!ref || !comp) {
-      showToast('Both Reference and Comparison workbooks are required.', 'error');
+      showToast(t.toastBothFilesRequired, 'error');
       return;
     }
 
@@ -743,7 +747,7 @@ export default function App() {
     }
 
     if (effectiveMappings.length === 0) {
-      showToast('Please specify at least one column mapping in Rules & Logic Setting.', 'error');
+      showToast(t.toastMappingRequired, 'error');
       setIsRulesModalOpen(true);
       return;
     }
@@ -784,12 +788,12 @@ export default function App() {
 
         if (notifySuccess) {
           showToast(
-            `Evaluated ${evaluatedStats.totalIncoming} rows: ${evaluatedStats.greenCount} passed, ${evaluatedStats.yellowCount} review, ${evaluatedStats.redCount} rejected.`,
+            t.toastEvaluatedSummary.replace('{total}', String(evaluatedStats.totalIncoming)).replace('{green}', String(evaluatedStats.greenCount)).replace('{yellow}', String(evaluatedStats.yellowCount)).replace('{red}', String(evaluatedStats.redCount)),
             'success'
           );
         }
       } catch (err: any) {
-        showToast(err.message || 'Error occurred during matching.', 'error');
+        showToast(err.message || t.toastMatchingError, 'error');
       } finally {
         setIsProcessing(false);
       }
@@ -797,7 +801,7 @@ export default function App() {
   };
 
   if (isStorageLoading) {
-    return <GlobalLoadingSkeleton />;
+    return <GlobalLoadingSkeleton language={language} />;
   }
 
   return (
@@ -841,7 +845,7 @@ export default function App() {
                   if (pData) {
                     checkAndApplyPreview(pData);
                   }
-                  showToast('Preview results refreshed', 'success');
+                  showToast(t.toastPreviewRefreshed, 'success');
                 }}
               />
             ) : (
@@ -850,10 +854,10 @@ export default function App() {
                   <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-900">
-                  No Matching Results Yet
+                  {t.previewNoResultsTitle}
                 </h3>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  The shared result preview link does not contain results data, or the link expired.
+                  {t.previewNoResultsDesc}
                 </p>
               </div>
             )}
@@ -935,7 +939,7 @@ export default function App() {
       />
 
       {/* Toast Notifications */}
-      <Toast toasts={toasts} onDismiss={dismissToast} />
+      <Toast toasts={toasts} onDismiss={dismissToast} language={language} />
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import React from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { Language } from '../types';
+import { translations } from '../translations';
 
 export interface ToastMessage {
   id: string;
@@ -10,9 +12,11 @@ export interface ToastMessage {
 interface ToastProps {
   toasts: ToastMessage[];
   onDismiss: (id: string) => void;
+  language?: Language;
 }
 
-export const Toast: React.FC<ToastProps> = ({ toasts, onDismiss }) => {
+export const Toast: React.FC<ToastProps> = ({ toasts, onDismiss, language = 'en' }) => {
+  const t = translations[language];
   if (toasts.length === 0) return null;
 
   return (
@@ -43,7 +47,7 @@ export const Toast: React.FC<ToastProps> = ({ toasts, onDismiss }) => {
           <button
             onClick={() => onDismiss(toast.id)}
             className="text-slate-400 hover:text-slate-200 transition-colors p-1"
-            aria-label="Dismiss"
+            aria-label={t.toastDismiss}
           >
             <X className="w-4 h-4" />
           </button>
