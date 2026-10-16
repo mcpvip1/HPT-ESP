@@ -7,7 +7,7 @@ export interface SharedPreviewPayload {
   comparisonWbName: string;
   stats: MatchingStats;
   results: MatchedRow[];
-  filter?: 'all' | 'green' | 'yellow' | 'red' | 'unmatched';
+  filter?: 'all' | 'green' | 'yellow' | 'red' | 'blue' | 'unmatched';
   onlyAccept?: boolean;
   searchTerm?: string;
   searchColumn?: string;
@@ -27,7 +27,7 @@ interface CompactPreviewPayload {
   oa?: number; // 1 = Only Accept on, 0 = off (absent = default on)
   s?: string;
   sc?: string;
-  st: [number, number, number, number, number]; // [total, green, yellow, red, matched]
+  st: [number, number, number, number, number, number?]; // [total, green, yellow, red, matched, blue?]
   cols?: ColumnConfigItem[];
   ch: string[]; // comparison headers
   rh: string[]; // reference headers
@@ -96,6 +96,7 @@ export function packCompact(payload: SharedPreviewPayload): CompactPreviewPayloa
       payload.stats.yellowCount,
       payload.stats.redCount,
       payload.stats.matchedCount,
+      payload.stats.blueCount || 0,
     ],
     cols: payload.columnConfigs,
     ch,
@@ -154,6 +155,7 @@ export function unpackCompact(compact: CompactPreviewPayload): SharedPreviewPayl
   const yellowCount = compact.st ? compact.st[2] : results.filter((r) => r.decisionColor === 'yellow').length;
   const redCount = compact.st ? compact.st[3] : results.filter((r) => r.decisionColor === 'red').length;
   const matchedCount = compact.st ? compact.st[4] : results.filter((r) => r.isMatched).length;
+  const blueCount = compact.st && compact.st[5] !== undefined ? compact.st[5] : results.filter((r) => r.decisionColor === 'blue').length;
   const unmatchedCount = Math.max(0, totalIncoming - matchedCount);
   const matchRate = totalIncoming > 0 ? Number(((matchedCount / totalIncoming) * 100).toFixed(1)) : 0;
 
@@ -174,7 +176,8 @@ export function unpackCompact(compact: CompactPreviewPayload): SharedPreviewPayl
       greenCount,
       yellowCount,
       redCount,
-      otherCount: Math.max(0, totalIncoming - (greenCount + yellowCount + redCount)),
+      blueCount,
+      otherCount: Math.max(0, totalIncoming - (greenCount + yellowCount + redCount + blueCount)),
       unmatchedItems: [],
     },
     results,
