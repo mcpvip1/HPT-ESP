@@ -57,6 +57,8 @@ import {
   fetchResultsState,
   deleteResultsState,
   isCloudDocUploading,
+  publishSyncHistory,
+  fetchSyncHistory,
   defaultResultFilters,
 } from './lib/cloudSync';
 import type { ResultFilters } from './lib/cloudSync';
@@ -169,6 +171,7 @@ export default function App() {
   const t = translations[language];
   const tRef = useRef(t);
   tRef.current = t;
+  const uidRef = useRef<string | null>(null);
 
   const showToast = useCallback(
     (text: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -215,6 +218,7 @@ export default function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setCloudUser(u);
+      uidRef.current = u ? u.uid : null;
       setAuthResolved(true);
       if (!u) didCloudPullRef.current = false; // allow a fresh pull on the next sign-in
     });
@@ -253,13 +257,39 @@ export default function App() {
     const pullSafety = setTimeout(() => setIsCloudPulling(false), 30000);
     (async () => {
       try {
-        const [cloudRules, cloudWbs, cloudResults, wbsUploading, resultsUploading] = await Promise.all([
+        const [cloudRules, cloudWbs, cloudResults, wbsUploading, resultsUploading, cloudHistory] = await Promise.all([
           fetchRulesState(cloudUser.uid),
           fetchWorkbooks(cloudUser.uid),
           fetchResultsState(cloudUser.uid),
           isCloudDocUploading(cloudUser.uid, 'workbooks'),
           isCloudDocUploading(cloudUser.uid, 'results'),
+          fetchSyncHistory(cloudUser.uid),
         ]);
+
+        // Upload history: merge the cloud log with this device's log so every
+        // device sees every upload (union by id, newest first, capped).
+        // A cloud-side clear (clearedAt) drops entries from before the clear.
+        if (cloudHistory) {
+          const clearedAt = cloudHistory.clearedAt || 0;
+          const seen = new Set<string>();
+          const merged: SyncHistoryEntry[] = [];
+          const consider = (e: SyncHistoryEntry) => {
+            if (!e || !e.id || seen.has(e.id)) return;
+            if (e.time < clearedAt) return;
+            seen.add(e.id);
+            merged.push(e);
+          };
+          syncHistoryRef.current.forEach(consider);
+          cloudHistory.entries.forEach(consider);
+          merged.sort((a, b) => b.time - a.time);
+          const capped = merged.slice(0, 50);
+          syncHistoryRef.current = capped;
+          setSyncHistory(capped);
+          await saveToIDB(StorageKeys.SYNC_HISTORY, capped);
+        } else if (syncHistoryRef.current.length > 0) {
+          // First device with history seeds the cloud log
+          await publishSyncHistory(cloudUser.uid, syncHistoryRef.current);
+        }
 
         let effMappings = rulesStateRef.current.mappings;
         let effHoldColumn = rulesStateRef.current.holdColumn;
@@ -436,6 +466,12 @@ export default function App() {
     pickActiveUpload();
   }, [pickActiveUpload]);
 
+  const debouncedPublishHistory = useRef(
+    debounce((uid: string, history: SyncHistoryEntry[]) => {
+      publishSyncHistory(uid, history);
+    }, 2000)
+  ).current;
+
   const endUpload = useCallback((entry: { kind: 'file' | 'settings' | 'results'; title: string; status: 'done' | 'failed' }) => {
     delete activeUploadsRef.current[entry.kind];
     pickActiveUpload();
@@ -448,7 +484,9 @@ export default function App() {
     syncHistoryRef.current = next;
     setSyncHistory(next);
     saveToIDB(StorageKeys.SYNC_HISTORY, next).catch(() => {});
-  }, [pickActiveUpload]);
+    // Sync the log to the cloud so other devices see this upload too
+    if (uidRef.current) debouncedPublishHistory(uidRef.current, next);
+  }, [pickActiveUpload, debouncedPublishHistory]);
 
   // Human-readable reason for a settings upload, by diffing rule sections
   const describeRulesChange = useCallback((prevJson: string | null, cur: Record<string, unknown>): string => {
@@ -470,6 +508,9 @@ export default function App() {
     syncHistoryRef.current = [];
     setSyncHistory([]);
     try { await deleteFromIDB(StorageKeys.SYNC_HISTORY); } catch { /* ignore */ }
+    if (uidRef.current) {
+      try { await publishSyncHistory(uidRef.current, [], Date.now()); } catch { /* ignore */ }
+    }
   }, []);
 
   // Publish rule settings to the cloud whenever they change (debounced).
