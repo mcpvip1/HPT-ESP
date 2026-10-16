@@ -107,7 +107,8 @@ const CHUNK_CHARS = 700_000;
 async function publishSnapshotTo(
   metaRef: DocumentReference,
   payload: SharedPreviewPayload,
-  extraFields: Record<string, unknown> = {}
+  extraFields: Record<string, unknown> = {},
+  chunkFields: Record<string, unknown> = {}
 ): Promise<boolean> {
   try {
     const json = JSON.stringify(packCompact(payload));
@@ -123,7 +124,7 @@ async function publishSnapshotTo(
     const batch = writeBatch(db);
     const chunksCol = collection(metaRef, 'chunks');
     chunks.forEach((data, i) => {
-      batch.set(doc(chunksCol, String(i)), { data });
+      batch.set(doc(chunksCol, String(i)), { data, ...chunkFields });
     });
     // Remove stale chunks left over from a previously larger payload
     for (let i = chunks.length; i < prevCount; i++) {
@@ -210,7 +211,7 @@ export async function publishSharedSnapshot(
   uid: string,
   payload: SharedPreviewPayload
 ): Promise<boolean> {
-  return publishSnapshotTo(shareDoc(shareId), payload, { ownerUid: uid });
+  return publishSnapshotTo(shareDoc(shareId), payload, { ownerUid: uid }, { ownerUid: uid });
 }
 
 /** Deletes a share and all its chunks. Firestore rules enforce owner-only delete. */
