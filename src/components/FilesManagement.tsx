@@ -72,14 +72,14 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
   const handleRefUpload = async (file: File) => {
     try {
       setLoadingRef(true);
-      setRefProgress({ percent: 10, text: 'Opening file...' });
+      setRefProgress({ percent: 10, text: t.filesOpeningFile });
       await new Promise((r) => setTimeout(r, 40));
 
       const parsed = await parseExcelFile(file, (percent, text) => {
         setRefProgress({ percent, text });
-      });
+      }, t);
 
-      setRefProgress({ percent: 95, text: 'Saving to secure storage...' });
+      setRefProgress({ percent: 95, text: t.filesSavingStorage });
       await new Promise((r) => setTimeout(r, 20));
 
       onSetReferenceWb(parsed);
@@ -97,17 +97,17 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
   const handleCompUpload = async (file: File) => {
     try {
       setLoadingComp(true);
-      setCompProgress({ percent: 10, text: 'Opening file...' });
+      setCompProgress({ percent: 10, text: t.filesOpeningFile });
       await new Promise((r) => setTimeout(r, 40));
 
       const parsed = await parseExcelFile(file, (percent, text) => {
         setCompProgress({ percent, text });
-      });
+      }, t);
 
       // Pass true for autoEvaluate so it jumps straight to Results & Export if reference file exists
       onSetComparisonWb(parsed, true);
       if (!referenceWb) {
-        onShowToast(`Loaded ${parsed.name} (${parsed.rows.length.toLocaleString()} rows). Please upload Reference file to complete evaluation.`, 'info');
+        onShowToast(t.filesLoadedNeedsRef.replace('{name}', parsed.name).replace('{rows}', parsed.rows.length.toLocaleString()), 'info');
       }
     } catch (err: any) {
       console.error('File parsing error:', err);
@@ -132,7 +132,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-900 tracking-tight">{t.referenceFile}</h3>
-                <p className="text-xs text-slate-500">Master baseline dataset</p>
+                <p className="text-xs text-slate-500">{t.filesMasterBaseline}</p>
               </div>
             </div>
 
@@ -150,7 +150,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
               <div className="w-10 h-10 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
               <div className="text-center">
                 <div className="text-xs font-semibold text-slate-700">
-                  {refProgress?.text || 'Processing spreadsheet...'}
+                  {refProgress?.text || t.filesProcessing}
                 </div>
                 <div className="w-52 bg-slate-200 rounded-full h-1.5 mt-3 overflow-hidden mx-auto">
                   <div
@@ -200,15 +200,15 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
                         <Layers className="w-4 h-4 text-emerald-600" />
-                        <span>Select Main File Sheet:</span>
+                        <span>{t.filesSelectMainSheet}</span>
                         {referenceWb.sheetNames.length > 1 && (
                           <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
-                            {referenceWb.sheetNames.length} Sheets
+                            {t.filesSheetsCount.replace('{count}', String(referenceWb.sheetNames.length))}
                           </span>
                         )}
                       </div>
                       <span className="text-[11px] text-slate-500 font-mono">
-                        Active: <strong className="text-emerald-700 font-bold">{referenceWb.activeSheet}</strong>
+                        {t.filesActiveSheetLabel} <strong className="text-emerald-700 font-bold">{referenceWb.activeSheet}</strong>
                       </span>
                     </div>
 
@@ -218,7 +218,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                           value={referenceWb.activeSheet}
                           onChange={(e) => onSelectReferenceSheet?.(e.target.value)}
                           className="w-full bg-slate-50 hover:bg-slate-100/90 border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-xs cursor-pointer font-mono"
-                          aria-label="Select Reference File Sheet"
+                          aria-label={t.filesSelectRefSheetAria}
                         >
                           {referenceWb.sheetNames.map((sheet) => {
                             const sheetInfo = referenceWb.sheets?.[sheet];
@@ -226,7 +226,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                             const cCount = sheetInfo ? sheetInfo.headers.length : (sheet === referenceWb.activeSheet ? referenceWb.headers.length : '?');
                             return (
                               <option key={sheet} value={sheet}>
-                                📄 {sheet} ({rCount.toLocaleString()} rows · {cCount} columns)
+                                {t.filesSheetOption.replace('{sheet}', sheet).replace('{rows}', rCount.toLocaleString()).replace('{cols}', String(cCount))}
                               </option>
                             );
                           })}
@@ -266,17 +266,17 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                     ) : (
                       <div className="text-xs font-medium text-slate-700 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 flex items-center justify-between">
                         <span className="font-semibold text-slate-800 font-mono">📄 {referenceWb.activeSheet}</span>
-                        <span className="text-[11px] text-slate-400">Single Sheet File</span>
+                        <span className="text-[11px] text-slate-400">{t.filesSingleSheet}</span>
                       </div>
                     )}
                   </div>
                 )}
 
                 <div className="text-xs text-slate-600">
-                  <span className="font-bold text-slate-700">Columns Detected ({referenceWb.headers.length}): </span>
+                  <span className="font-bold text-slate-700">{t.filesColumnsDetected.replace('{count}', String(referenceWb.headers.length))} </span>
                   <span className="text-slate-600 font-mono text-[11px]">
                     {referenceWb.headers.slice(0, 5).join(', ')}
-                    {referenceWb.headers.length > 5 ? ` +${referenceWb.headers.length - 5} more` : ''}
+                    {referenceWb.headers.length > 5 ? t.filesMoreColumns.replace('{count}', String(referenceWb.headers.length - 5)) : ''}
                   </span>
                 </div>
               </div>
@@ -370,13 +370,13 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-900 tracking-tight">{t.incomingFile}</h3>
-                <p className="text-xs text-slate-500">Dynamic file to inspect & classify</p>
+                <p className="text-xs text-slate-500">{t.filesIncomingDesc}</p>
               </div>
             </div>
 
             {comparisonWb && !loadingComp && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                READY TO EVALUATE
+                {t.filesReadyToEvaluate}
               </span>
             )}
           </div>
@@ -387,7 +387,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
               <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
               <div className="text-center">
                 <div className="text-xs font-semibold text-slate-700">
-                  {compProgress?.text || 'Processing spreadsheet...'}
+                  {compProgress?.text || t.filesProcessing}
                 </div>
                 <div className="w-52 bg-slate-200 rounded-full h-1.5 mt-3 overflow-hidden mx-auto">
                   <div
@@ -437,15 +437,15 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
                         <Layers className="w-4 h-4 text-blue-600" />
-                        <span>Select Incoming File Sheet:</span>
+                        <span>{t.filesSelectIncomingSheet}</span>
                         {comparisonWb.sheetNames.length > 1 && (
                           <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-blue-50 text-blue-700 font-bold border border-blue-200">
-                            {comparisonWb.sheetNames.length} Sheets
+                            {t.filesSheetsCount.replace('{count}', String(comparisonWb.sheetNames.length))}
                           </span>
                         )}
                       </div>
                       <span className="text-[11px] text-slate-500 font-mono">
-                        Active: <strong className="text-blue-700 font-bold">{comparisonWb.activeSheet}</strong>
+                        {t.filesActiveSheetLabel} <strong className="text-blue-700 font-bold">{comparisonWb.activeSheet}</strong>
                       </span>
                     </div>
 
@@ -455,7 +455,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                           value={comparisonWb.activeSheet}
                           onChange={(e) => onSelectComparisonSheet?.(e.target.value)}
                           className="w-full bg-slate-50 hover:bg-slate-100/90 border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-xs cursor-pointer font-mono"
-                          aria-label="Select Comparison File Sheet"
+                          aria-label={t.filesSelectCompSheetAria}
                         >
                           {comparisonWb.sheetNames.map((sheet) => {
                             const sheetInfo = comparisonWb.sheets?.[sheet];
@@ -463,7 +463,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                             const cCount = sheetInfo ? sheetInfo.headers.length : (sheet === comparisonWb.activeSheet ? comparisonWb.headers.length : '?');
                             return (
                               <option key={sheet} value={sheet}>
-                                📄 {sheet} ({rCount.toLocaleString()} rows · {cCount} columns)
+                                {t.filesSheetOption.replace('{sheet}', sheet).replace('{rows}', rCount.toLocaleString()).replace('{cols}', String(cCount))}
                               </option>
                             );
                           })}
@@ -503,17 +503,17 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
                     ) : (
                       <div className="text-xs font-medium text-slate-700 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 flex items-center justify-between">
                         <span className="font-semibold text-slate-800 font-mono">📄 {comparisonWb.activeSheet}</span>
-                        <span className="text-[11px] text-slate-400">Single Sheet File</span>
+                        <span className="text-[11px] text-slate-400">{t.filesSingleSheet}</span>
                       </div>
                     )}
                   </div>
                 )}
 
                 <div className="text-xs text-slate-600">
-                  <span className="font-bold text-slate-700">Columns Detected ({comparisonWb.headers.length}): </span>
+                  <span className="font-bold text-slate-700">{t.filesColumnsDetected.replace('{count}', String(comparisonWb.headers.length))} </span>
                   <span className="text-slate-600 font-mono text-[11px]">
                     {comparisonWb.headers.slice(0, 5).join(', ')}
-                    {comparisonWb.headers.length > 5 ? ` +${comparisonWb.headers.length - 5} more` : ''}
+                    {comparisonWb.headers.length > 5 ? t.filesMoreColumns.replace('{count}', String(comparisonWb.headers.length - 5)) : ''}
                   </span>
                 </div>
               </div>
