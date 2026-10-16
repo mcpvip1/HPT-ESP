@@ -185,6 +185,24 @@ export default function App() {
     return () => unsub();
   }, []);
 
+  // Publish the workbooks to the cloud whenever they change (debounced).
+  // Called from the file handlers below — never from an effect, so a cloud
+  // pull can never echo back into a publish. Retries transient failures and
+  // surfaces a toast when the files can't be synced, so a failed upload is
+  // never silent (a silent failure is exactly how files went missing on
+  // other devices before the byte-safe chunking fix).
+  const publishWorkbooksWithRetry = async (
+    uid: string,
+    wbs: { reference: WorkbookData | null; comparison: WorkbookData | null },
+    attempts = 3
+  ): Promise<boolean> => {
+    for (let i = 0; i < attempts; i++) {
+      if (await publishWorkbooks(uid, wbs)) return true;
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+    }
+    return false;
+  };
+
   // Once local data is loaded and the user is signed in, pull the shared
   // workspace (rules + workbooks) so every device opens the same files,
   // mappings, results and history; then regenerate results from that state.
@@ -256,7 +274,8 @@ export default function App() {
           }
           showToast(t.toastCloudFilesSynced, 'success');
         } else {
-          await publishWorkbooks(cloudUser.uid, { reference: effRef, comparison: effComp });
+          const seeded = await publishWorkbooksWithRetry(cloudUser.uid, { reference: effRef, comparison: effComp });
+          if (!seeded) showToast(t.toastCloudFilesSyncFailed, 'error');
         }
 
         if (effRef && effComp) {
@@ -284,12 +303,11 @@ export default function App() {
     debouncedPublishRules(cloudUser.uid, rulesStateRef.current);
   }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, debouncedPublishRules]);
 
-  // Publish the workbooks to the cloud whenever they change (debounced).
-  // Called from the file handlers below — never from an effect, so a cloud
-  // pull can never echo back into a publish.
   const debouncedPublishWorkbooks = useRef(
     debounce((uid: string, wbs: { reference: WorkbookData | null; comparison: WorkbookData | null }) => {
-      publishWorkbooks(uid, wbs);
+      publishWorkbooksWithRetry(uid, wbs).then((ok) => {
+        if (!ok) showToast(t.toastCloudFilesSyncFailed, 'error');
+      });
     }, 2000)
   ).current;
 
