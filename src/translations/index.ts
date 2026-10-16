@@ -216,6 +216,19 @@ export interface TranslationDict {
   toastCloudSettingsSyncFailed: string;
   toastCloudResultsUploaded: string;
   toastCloudResultsSyncFailed: string;
+  syncUploading: string;
+  syncPanelTitle: string;
+  syncAllSynced: string;
+  syncHistory: string;
+  syncClearHistory: string;
+  syncNoHistory: string;
+  syncFilesLabel: string;
+  syncSettingsLabel: string;
+  syncResultsLabel: string;
+  syncReasonMappings: string;
+  syncReasonNormalization: string;
+  syncReasonLayers: string;
+  syncReasonHold: string;
   toastCloudFilesSyncFailed: string;
   toastShareRevoked: string;
   toastPreviewSynced: string;
@@ -778,6 +791,19 @@ export const translations: Record<Language, TranslationDict> = {
     toastCloudSettingsSyncFailed: "Couldn't upload settings to the cloud.",
     toastCloudResultsUploaded: "Results uploaded to the cloud.",
     toastCloudResultsSyncFailed: "Couldn't upload results to the cloud.",
+    syncUploading: "Uploading to cloud…",
+    syncPanelTitle: "Sync status & history",
+    syncAllSynced: "All synced",
+    syncHistory: "History",
+    syncClearHistory: "Clear history",
+    syncNoHistory: "No uploads yet",
+    syncFilesLabel: "Files",
+    syncSettingsLabel: "Settings",
+    syncResultsLabel: "Results",
+    syncReasonMappings: "Column mappings",
+    syncReasonNormalization: "Normalization rules",
+    syncReasonLayers: "Decision layers",
+    syncReasonHold: "Hold settings",
     toastCloudFilesSyncFailed: "Couldn't sync your files to the cloud. Will retry automatically — check your connection if this persists.",
     toastShareRevoked: "Live sharing was turned off — showing the last received snapshot.",
     toastPreviewSynced: "Preview synced with the latest changes.",
@@ -1057,6 +1083,19 @@ export const translations: Record<Language, TranslationDict> = {
     toastCloudSettingsSyncFailed: "ဆက်တင်များ cloud သို့ upload လုပ်၍မရပါ။",
     toastCloudResultsUploaded: "ရလဒ်များ cloud သို့ upload လုပ်ပြီးပါပြီ။",
     toastCloudResultsSyncFailed: "ရလဒ်များ cloud သို့ upload လုပ်၍မရပါ။",
+    syncUploading: "Cloud သို့ upload လုပ်နေသည်…",
+    syncPanelTitle: "Sync အခြေအနေနှင့် မှတ်တမ်း",
+    syncAllSynced: "အားလုံး synced ပြီးပါပြီ",
+    syncHistory: "မှတ်တမ်း",
+    syncClearHistory: "မှတ်တမ်းရှင်းရန်",
+    syncNoHistory: "Upload လုပ်ထားခြင်းမရှိသေးပါ",
+    syncFilesLabel: "ဖိုင်များ",
+    syncSettingsLabel: "ဆက်တင်များ",
+    syncResultsLabel: "ရလဒ်များ",
+    syncReasonMappings: "ကော်လံမြေပုံများ",
+    syncReasonNormalization: "Normalization စည်းမျဉ်းများ",
+    syncReasonLayers: "Decision အလွှာများ",
+    syncReasonHold: "Hold ဆက်တင်များ",
     toastCloudFilesSyncFailed: "သင့်ဖိုင်များကို cloud သို့ ထပ်တူညီ၍မရပါ။ အလိုအလျောက် ပြန်လည်ကြိုးစားပါမည်။",
     toastShareRevoked: "တိုက်ရိုက် မျှဝေမှုကို ပိတ်လိုက်ပြီ — နောက်ဆုံး ရရှိထားသော snapshot ကို ပြသနေသည်။",
     toastPreviewSynced: "အစမ်းကြည့်မှုကို နောက်ဆုံး ပြောင်းလဲမှုများနှင့် ထပ်တူညီပြီးပြီ။",
@@ -1336,6 +1375,19 @@ export const translations: Record<Language, TranslationDict> = {
     toastCloudSettingsSyncFailed: "อัปโหลดการตั้งค่าขึ้นคลาวด์ไม่สำเร็จ",
     toastCloudResultsUploaded: "อัปโหลดผลลัพธ์ขึ้นคลาวด์แล้ว",
     toastCloudResultsSyncFailed: "อัปโหลดผลลัพธ์ขึ้นคลาวด์ไม่สำเร็จ",
+    syncUploading: "กำลังอัปโหลดขึ้นคลาวด์…",
+    syncPanelTitle: "สถานะการซิงค์และประวัติ",
+    syncAllSynced: "ซิงค์ครบแล้ว",
+    syncHistory: "ประวัติ",
+    syncClearHistory: "ล้างประวัติ",
+    syncNoHistory: "ยังไม่มีการอัปโหลด",
+    syncFilesLabel: "ไฟล์",
+    syncSettingsLabel: "การตั้งค่า",
+    syncResultsLabel: "ผลลัพธ์",
+    syncReasonMappings: "การจับคู่คอลัมน์",
+    syncReasonNormalization: "กฎ normalization",
+    syncReasonLayers: "เลเยอร์การตัดสินใจ",
+    syncReasonHold: "การตั้งค่า Hold",
     toastCloudFilesSyncFailed: "ไม่สามารถซิงค์ไฟล์ของคุณไปยังคลาวด์ได้ จะลองใหม่โดยอัตโนมัติ",
     toastShareRevoked: "ปิดการแชร์สดแล้ว — กำลังแสดงสแนปช็อตล่าสุดที่ได้รับ",
     toastPreviewSynced: "ซิงค์ตัวอย่างกับการเปลี่ยนแปลงล่าสุดแล้ว",
@@ -1615,6 +1667,19 @@ export const translations: Record<Language, TranslationDict> = {
     toastCloudSettingsSyncFailed: "设置上传到云端失败。",
     toastCloudResultsUploaded: "结果已上传到云端。",
     toastCloudResultsSyncFailed: "结果上传到云端失败。",
+    syncUploading: "正在上传到云端…",
+    syncPanelTitle: "同步状态与历史",
+    syncAllSynced: "已全部同步",
+    syncHistory: "历史记录",
+    syncClearHistory: "清除历史",
+    syncNoHistory: "暂无上传记录",
+    syncFilesLabel: "文件",
+    syncSettingsLabel: "设置",
+    syncResultsLabel: "结果",
+    syncReasonMappings: "列映射",
+    syncReasonNormalization: "规范化规则",
+    syncReasonLayers: "决策层",
+    syncReasonHold: "Hold 设置",
     toastCloudFilesSyncFailed: "无法将您的文件同步到云端，将自动重试。",
     toastShareRevoked: "已关闭实时共享 — 正在显示最后收到的快照。",
     toastPreviewSynced: "预览已与最新更改同步。",

@@ -146,3 +146,12 @@ export interface SavedDecisionPreset {
   layers: DecisionLayer[];
   description?: string;
 }
+
+// Cloud sync upload history (per-device log of what was uploaded to Firebase)
+export interface SyncHistoryEntry {
+  id: string;
+  time: number;
+  kind: 'file' | 'settings' | 'results';
+  title: string;
+  status: 'done' | 'failed';
+}
