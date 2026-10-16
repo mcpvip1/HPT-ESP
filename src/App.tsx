@@ -48,6 +48,8 @@ import {
   subscribeSharedSnapshot,
   fetchSharedSnapshot,
   debounce,
+  publishWorkbooks,
+  fetchWorkbooks,
 } from './lib/cloudSync';
 import {
   FileSpreadsheet,
@@ -93,6 +95,11 @@ export default function App() {
   // Workbooks
   const [referenceWb, setReferenceWb] = useState<WorkbookData | null>(null);
   const [comparisonWb, setComparisonWb] = useState<WorkbookData | null>(null);
+  const [localReady, setLocalReady] = useState(false);
+  const refWbRef = useRef<WorkbookData | null>(null);
+  const compWbRef = useRef<WorkbookData | null>(null);
+  refWbRef.current = referenceWb;
+  compWbRef.current = comparisonWb;
 
   // Rules & Configuration
   const [mappings, setMappings] = useState<ColumnMapping[]>([]);
@@ -167,48 +174,98 @@ export default function App() {
   }, []);
 
   // ---- Cloud sync: auth, shared rules, live preview -----------------------
-  // Sign in: pull the shared rule settings so this device matches the others.
-  // First sign-in on the account seeds the cloud with this device's settings.
+  // Track Firebase auth state (sign-in/out happens through the header Sync button).
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
       setCloudUser(u);
-      if (!u) return;
+      if (!u) didCloudPullRef.current = false; // allow a fresh pull on the next sign-in
+    });
+    return () => unsub();
+  }, []);
+
+  // Once local data is loaded and the user is signed in, pull the shared
+  // workspace (rules + workbooks) so every device opens the same files,
+  // mappings, results and history; then regenerate results from that state.
+  // First sign-in on the account seeds the cloud with this device's data.
+  const didCloudPullRef = useRef(false);
+  useEffect(() => {
+    if (!cloudUser || !localReady || isPreviewMode || didCloudPullRef.current) return;
+    didCloudPullRef.current = true;
+    (async () => {
       try {
-        const cloud = await fetchRulesState(u.uid);
-        if (cloud && cloud.updatedAt) {
-          if (cloud.normalization) {
-            setNormalization(cloud.normalization);
-            await saveToIDB(StorageKeys.NORMALIZATION_RULES, cloud.normalization);
+        const [cloudRules, cloudWbs] = await Promise.all([
+          fetchRulesState(cloudUser.uid),
+          fetchWorkbooks(cloudUser.uid),
+        ]);
+
+        let effMappings = rulesStateRef.current.mappings;
+        let effRef = refWbRef.current;
+        let effComp = compWbRef.current;
+
+        if (cloudRules && cloudRules.updatedAt) {
+          if (cloudRules.normalization) {
+            setNormalization(cloudRules.normalization);
+            await saveToIDB(StorageKeys.NORMALIZATION_RULES, cloudRules.normalization);
           }
-          if (cloud.layers && cloud.layers.length > 0) {
-            setLayers(cloud.layers);
-            await saveToIDB(StorageKeys.DECISION_LAYERS, cloud.layers);
+          if (cloudRules.layers && cloudRules.layers.length > 0) {
+            setLayers(cloudRules.layers);
+            await saveToIDB(StorageKeys.DECISION_LAYERS, cloudRules.layers);
           }
-          if (cloud.mappings) {
-            setMappings(cloud.mappings);
-            await saveToIDB(StorageKeys.COLUMN_MAPPINGS, cloud.mappings);
+          if (cloudRules.mappings) {
+            setMappings(cloudRules.mappings);
+            await saveToIDB(StorageKeys.COLUMN_MAPPINGS, cloudRules.mappings);
+            effMappings = cloudRules.mappings;
           }
           lastRulesPublishRef.current = JSON.stringify({
-            n: cloud.normalization,
-            l: cloud.layers,
-            m: cloud.mappings,
+            n: cloudRules.normalization,
+            l: cloudRules.layers,
+            m: cloudRules.mappings,
           });
           showToast('Cloud workspace synced — rules & mappings match your other devices.', 'success');
         } else {
           const cur = rulesStateRef.current;
-          await publishRulesState(u.uid, cur);
+          await publishRulesState(cloudUser.uid, cur);
           lastRulesPublishRef.current = JSON.stringify({
             n: cur.normalization,
             l: cur.layers,
             m: cur.mappings,
           });
         }
+
+        if (cloudWbs && cloudWbs.updatedAt) {
+          if (cloudWbs.reference) {
+            setReferenceWb(cloudWbs.reference);
+            await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, cloudWbs.reference);
+            effRef = cloudWbs.reference;
+          } else if (effRef) {
+            // Cleared on another device — mirror the clear locally
+            setReferenceWb(null);
+            await deleteFromIDB(StorageKeys.REFERENCE_WORKBOOK);
+            effRef = null;
+          }
+          if (cloudWbs.comparison) {
+            setComparisonWb(cloudWbs.comparison);
+            await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, cloudWbs.comparison);
+            effComp = cloudWbs.comparison;
+          } else if (effComp) {
+            setComparisonWb(null);
+            await deleteFromIDB(StorageKeys.COMPARISON_WORKBOOK);
+            effComp = null;
+          }
+          showToast('Files synced from the cloud — same history on this device.', 'success');
+        } else {
+          await publishWorkbooks(cloudUser.uid, { reference: effRef, comparison: effComp });
+        }
+
+        if (effRef && effComp) {
+          handleExecuteMatching(effRef, effComp, effMappings, false);
+        }
       } catch (e) {
-        console.warn('Cloud rules sync failed', e);
+        console.warn('Cloud workspace pull failed', e);
       }
-    });
-    return () => unsub();
-  }, []);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudUser, localReady, isPreviewMode]);
 
   // Publish rule settings to the cloud whenever they change (debounced).
   const debouncedPublishRules = useRef(
@@ -221,9 +278,22 @@ export default function App() {
   ).current;
 
   useEffect(() => {
-    if (!cloudUser || isPreviewMode) return;
+    if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current) return;
     debouncedPublishRules(cloudUser.uid, rulesStateRef.current);
-  }, [cloudUser, isPreviewMode, normalization, layers, mappings, debouncedPublishRules]);
+  }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, debouncedPublishRules]);
+
+  // Publish the workbooks to the cloud whenever they change (debounced).
+  // Called from the file handlers below — never from an effect, so a cloud
+  // pull can never echo back into a publish.
+  const debouncedPublishWorkbooks = useRef(
+    debounce((uid: string, wbs: { reference: WorkbookData | null; comparison: WorkbookData | null }) => {
+      publishWorkbooks(uid, wbs);
+    }, 2000)
+  ).current;
+
+  const publishWorkbooksNow = (refWb: WorkbookData | null, compWb: WorkbookData | null) => {
+    if (cloudUser) debouncedPublishWorkbooks(cloudUser.uid, { reference: refWb, comparison: compWb });
+  };
 
   // Live public share: follow the shared snapshot in real time (no sign-in).
   // If the owner turns sharing off, the last received snapshot stays visible.
@@ -356,6 +426,9 @@ export default function App() {
         const savedRef = await getFromIDB<WorkbookData>(
           StorageKeys.REFERENCE_WORKBOOK
         );
+        const savedComp = await getFromIDB<WorkbookData>(
+          StorageKeys.COMPARISON_WORKBOOK
+        );
         const savedMappings = await getFromIDB<ColumnMapping[]>(
           StorageKeys.COLUMN_MAPPINGS
         );
@@ -372,7 +445,15 @@ export default function App() {
         if (savedRef && isMounted) {
           setReferenceWb(savedRef);
           if (savedMappings) setMappings(savedMappings);
-        } else if (isMounted) {
+        }
+        if (savedComp && isMounted) {
+          setComparisonWb(savedComp);
+        }
+        // Regenerate results from the restored files so reopening shows the
+        // same incoming file, results and history as when you left.
+        if (savedRef && savedComp && isMounted) {
+          handleExecuteMatching(savedRef, savedComp, savedMappings || [], false);
+        } else if (isMounted && !savedRef) {
           // Preload enterprise demo datasets on very first visit so user has immediate working experience
           const demo = generateSampleDatasets();
           setReferenceWb(demo.reference);
@@ -380,6 +461,7 @@ export default function App() {
           const auto = autoMapColumns(demo.reference.headers, demo.comparison.headers);
           setMappings(auto);
           await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, demo.reference);
+          await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, demo.comparison);
           await saveToIDB(StorageKeys.COLUMN_MAPPINGS, auto);
         }
       } catch (e) {
@@ -388,6 +470,7 @@ export default function App() {
         if (isMounted) {
           clearTimeout(safetyTimer);
           setIsStorageLoading(false);
+          setLocalReady(true);
         }
       }
     }
@@ -469,11 +552,13 @@ export default function App() {
     } else {
       await deleteFromIDB(StorageKeys.REFERENCE_WORKBOOK);
     }
+    publishWorkbooksNow(wb, comparisonWb);
   };
 
   const handleSetComparisonWb = async (wb: WorkbookData | null, autoEvaluate = true) => {
     setComparisonWb(wb);
     if (wb) {
+      await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, wb);
       let effectiveMappings = mappings;
       // If user has not yet defined any mappings, attempt auto-mapping
       if (effectiveMappings.length === 0 && referenceWb) {
@@ -489,7 +574,10 @@ export default function App() {
         showToast(`Imported ${wb.name}! Generating Results & Export with saved Rules & Logic Settings...`, 'info');
         handleExecuteMatching(referenceWb, wb, effectiveMappings, true);
       }
+    } else {
+      await deleteFromIDB(StorageKeys.COMPARISON_WORKBOOK);
     }
+    publishWorkbooksNow(referenceWb, wb);
   };
 
   // Switch Active Sheet for Main Reference File
@@ -499,6 +587,7 @@ export default function App() {
     const updatedWb = changeWorkbookSheet(referenceWb, sheetName);
     setReferenceWb(updatedWb);
     await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, updatedWb);
+    publishWorkbooksNow(updatedWb, comparisonWb);
 
     // If new sheet has different columns, re-evaluate column mappings
     let effectiveMappings = mappings;
@@ -534,6 +623,8 @@ export default function App() {
 
     const updatedWb = changeWorkbookSheet(comparisonWb, sheetName);
     setComparisonWb(updatedWb);
+    await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, updatedWb);
+    publishWorkbooksNow(referenceWb, updatedWb);
 
     let effectiveMappings = mappings;
     if (referenceWb) {
@@ -618,6 +709,8 @@ export default function App() {
     }
 
     await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, demo.reference);
+    await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, demo.comparison);
+    publishWorkbooksNow(demo.reference, demo.comparison);
 
     showToast('Enterprise Procurement & Inspection Sample loaded! Evaluating...', 'success');
     handleExecuteMatching(demo.reference, demo.comparison, auto, true);
