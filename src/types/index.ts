@@ -106,6 +106,8 @@ export interface MatchedRow {
   isHold?: boolean;
   /** The hold-key term that matched this row (when isHold). */
   holdKey?: string;
+  /** True when the row was released from hold by supervisor confirmation but did not pass (forced yellow). */
+  releasedFromHold?: boolean;
 }
 
 export interface MatchingStats {

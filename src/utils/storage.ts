@@ -186,6 +186,8 @@ export const StorageKeys = {
   SAVED_MAPPING_PRESETS: 'saved_mapping_presets',
   SAVED_DECISION_PRESETS: 'saved_decision_presets',
   HOLD_KEYS: 'hold_keys',
+  HOLD_REASON: 'hold_reason',
+  RELEASED_ROWS: 'released_rows',
 };
 
 export const defaultNormalizationRules: NormalizationRules = {
