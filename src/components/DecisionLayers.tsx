@@ -111,7 +111,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
     const defaultCols = getColumnsForSource('merged');
     const newLayer: DecisionLayer = {
       id: `layer_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      name: `Decision Layer ${layers.length + 1}`,
+      name: t.layerDefaultName.replace('{n}', String(layers.length + 1)),
       source: 'merged',
       primaryColumn: defaultCols[0] || '',
       rules: [
@@ -120,21 +120,21 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
           condition: 'contains',
           value: 'Accept',
           color: 'green',
-          label: 'Accepted Item',
+          label: t.layerRuleAccepted,
         },
         {
           id: `r_${Date.now()}_2`,
           condition: 'contains',
           value: 'Review',
           color: 'yellow',
-          label: 'Requires Review',
+          label: t.layerRuleReview,
         },
         {
           id: `r_${Date.now()}_3`,
           condition: 'contains',
           value: 'Reject',
           color: 'red',
-          label: 'Rejected Defect',
+          label: t.layerRuleRejected,
         },
       ],
       fallbackToOriginalFill: false,
@@ -171,7 +171,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
       condition: 'contains',
       value: '',
       color: 'green',
-      label: 'Rule Definition',
+      label: t.layerRuleDefinition,
     };
 
     handleUpdateLayer(layerId, {
@@ -213,7 +213,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
 
     const presetLayer: DecisionLayer = {
       id: `layer_preset_${Date.now()}`,
-      name: 'Inspection Decision (Waive / Accept → Green, Else → Yellow)',
+      name: t.layerInspectionPresetName,
       source: 'merged',
       primaryColumn: pri,
       secondaryColumn: sec,
@@ -225,7 +225,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
           condition: 'contains',
           value: 'Waive',
           color: 'green',
-          label: `${pri} contains "Waive"`,
+          label: t.layerRuleContains.replace('{col}', pri).replace('{val}', 'Waive'),
         },
         {
           id: `r_accept_${Date.now()}`,
@@ -233,7 +233,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
           condition: 'contains',
           value: 'Accept',
           color: 'green',
-          label: `${sec} contains "Accept"`,
+          label: t.layerRuleContains.replace('{col}', sec).replace('{val}', 'Accept'),
         },
         {
           id: `r_any_waive_${Date.now()}`,
@@ -241,7 +241,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
           condition: 'contains',
           value: 'Waive',
           color: 'green',
-          label: 'Either contains "Waive"',
+          label: t.layerRuleEitherContains.replace('{val}', 'Waive'),
         },
         {
           id: `r_any_accept_${Date.now()}`,
@@ -249,7 +249,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
           condition: 'contains',
           value: 'Accept',
           color: 'green',
-          label: 'Either contains "Accept"',
+          label: t.layerRuleEitherContains.replace('{val}', 'Accept'),
         },
       ],
       fallbackToOriginalFill: false,
@@ -262,13 +262,13 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
   // Save current layers as preset
   const handleSaveCurrentPreset = async () => {
     if (layers.length === 0) return;
-    const name = newPresetName.trim() || `Decision Rule Set (${layers[0].name})`;
+    const name = newPresetName.trim() || t.layerDefaultPresetName.replace('{name}', layers[0].name);
     const preset: SavedDecisionPreset = {
       id: `preset_dec_${Date.now()}`,
       name,
       createdAt: Date.now(),
       layers: JSON.parse(JSON.stringify(layers)),
-      description: `${layers.length} layer${layers.length > 1 ? 's' : ''}, ${layers.reduce((sum, l) => sum + l.rules.length, 0)} rules`,
+      description: t.layerPresetDesc.replace('{layers}', String(layers.length)).replace('{rules}', String(layers.reduce((sum, l) => sum + l.rules.length, 0))),
     };
 
     try {
@@ -298,12 +298,12 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
   // Built-in Industry Decision Templates
   const industryDecisionTemplates: { name: string; desc: string; layers: DecisionLayer[] }[] = [
     {
-      name: 'Inspection Decision (Waive / Accept → Green, Else → Yellow)',
-      desc: 'If Inspection Status has "Waive" or Result has "Accept" → Green; otherwise Yellow review.',
+      name: t.layerInspectionPresetName,
+      desc: t.layerTplInspectionDesc,
       layers: [
         {
           id: `tpl_waive_accept_${Date.now()}`,
-          name: 'Inspection Decision (Waive / Accept → Green, Else → Yellow)',
+          name: t.layerInspectionPresetName,
           source: 'merged',
           primaryColumn: 'Inspection Status',
           secondaryColumn: 'Inspection Result',
@@ -315,7 +315,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
               condition: 'contains',
               value: 'Waive',
               color: 'green',
-              label: 'Inspection Status contains "Waive"',
+              label: t.layerRuleContains.replace('{col}', 'Inspection Status').replace('{val}', 'Waive'),
             },
             {
               id: 'tpl_r_accept',
@@ -323,7 +323,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
               condition: 'contains',
               value: 'Accept',
               color: 'green',
-              label: 'Inspection Result contains "Accept"',
+              label: t.layerRuleContains.replace('{col}', 'Inspection Result').replace('{val}', 'Accept'),
             },
             {
               id: 'tpl_r_any_w',
@@ -331,7 +331,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
               condition: 'contains',
               value: 'Waive',
               color: 'green',
-              label: 'Either contains "Waive"',
+              label: t.layerRuleEitherContains.replace('{val}', 'Waive'),
             },
             {
               id: 'tpl_r_any_a',
@@ -339,7 +339,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
               condition: 'contains',
               value: 'Accept',
               color: 'green',
-              label: 'Either contains "Accept"',
+              label: t.layerRuleEitherContains.replace('{val}', 'Accept'),
             },
           ],
           fallbackToOriginalFill: false,
@@ -348,18 +348,18 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
       ],
     },
     {
-      name: 'Quality Assurance 3-Tier (Accept / Review / Reject)',
-      desc: 'Full triage with Accept (Green), Pending/Review (Yellow), and Reject/Defect (Red).',
+      name: t.layerTplQaName,
+      desc: t.layerTplQaDesc,
       layers: [
         {
           id: `tpl_3tier_${Date.now()}`,
-          name: 'QA 3-Tier Outcome',
+          name: t.layerTplQaLayerName,
           source: 'merged',
           primaryColumn: 'Inspection Result',
           rules: [
-            { id: 'r_acc', condition: 'contains', value: 'Accept', color: 'green', label: 'Accepted Pass' },
-            { id: 'r_rev', condition: 'contains', value: 'Review', color: 'yellow', label: 'Needs Engineering Review' },
-            { id: 'r_rej', condition: 'contains', value: 'Reject', color: 'red', label: 'Rejected Defect' },
+            { id: 'r_acc', condition: 'contains', value: 'Accept', color: 'green', label: t.layerTplAcceptedPass },
+            { id: 'r_rev', condition: 'contains', value: 'Review', color: 'yellow', label: t.layerTplNeedsReview },
+            { id: 'r_rej', condition: 'contains', value: 'Reject', color: 'red', label: t.layerRuleRejected },
           ],
           fallbackToOriginalFill: false,
           fallbackColor: 'yellow',
@@ -367,17 +367,17 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
       ],
     },
     {
-      name: 'Strict Pass / Fail Verification',
-      desc: 'Binary gatekeeper: exact "Pass" or "Approved" is Green, anything else triggers Red alert.',
+      name: t.layerTplStrictName,
+      desc: t.layerTplStrictDesc,
       layers: [
         {
           id: `tpl_strict_${Date.now()}`,
-          name: 'Strict Compliance Gate',
+          name: t.layerTplStrictLayerName,
           source: 'merged',
           primaryColumn: 'Inspection Status',
           rules: [
-            { id: 'r_pass', condition: 'contains', value: 'Pass', color: 'green', label: 'Passed Inspection' },
-            { id: 'r_app', condition: 'contains', value: 'Approved', color: 'green', label: 'Officially Approved' },
+            { id: 'r_pass', condition: 'contains', value: 'Pass', color: 'green', label: t.layerTplPassed },
+            { id: 'r_app', condition: 'contains', value: 'Approved', color: 'green', label: t.layerTplApproved },
           ],
           fallbackToOriginalFill: false,
           fallbackColor: 'red',
@@ -414,10 +414,10 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
           <button
             onClick={() => setShowPresetsModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100/80 border border-amber-200 rounded-lg transition-colors select-none shadow-xs"
-            title="View saved recent decision layers (hierarchical rules)"
+            title={t.layerPresetsBtnTitle}
           >
             <Bookmark className="w-3.5 h-3.5 text-amber-600" />
-            <span>Saved & Recent Rules</span>
+            <span>{t.layerSavedRecentRules}</span>
             {savedPresets.length > 0 && (
               <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-200 text-amber-800 font-bold">
                 {savedPresets.length}
@@ -433,10 +433,10 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                 setShowSaveDialog(true);
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors select-none shadow-xs"
-              title="Save current hierarchical decision rules as a named preset"
+              title={t.layerSaveRulesBtnTitle}
             >
               <Save className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Save Rules</span>
+              <span>{t.layerSaveRules}</span>
             </button>
           )}
 
@@ -455,12 +455,12 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-xs font-bold text-emerald-700">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Active Decision Rule: Waive or Accept → Green, Else → Yellow
+            {t.layerActiveRuleTitle}
           </div>
           <p className="text-[11px] text-slate-600">
-            If <span className="font-mono text-emerald-700 font-bold">Inspection Status</span> contains <span className="font-mono text-emerald-700 font-bold">"Waive"</span> → Green.
-            Otherwise, if <span className="font-mono text-emerald-700 font-bold">Inspection Result</span> contains <span className="font-mono text-emerald-700 font-bold">"Accept"</span> → Green.
-            If neither rule matches → Yellow.
+            {t.layerActiveRuleDesc1.replace('{col}', 'Inspection Status').replace('{val}', '"Waive"')}{' '}
+            {t.layerActiveRuleDesc2.replace('{col}', 'Inspection Result').replace('{val}', '"Accept"')}{' '}
+            {t.layerActiveRuleDesc3}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -468,7 +468,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
             onClick={handleApplyInspectionPreset}
             className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg shrink-0 transition-colors shadow-xs"
           >
-            Reset to Standard Rule
+            {t.layerResetStandardRule}
           </button>
         </div>
       </div>
@@ -508,7 +508,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                     onClick={() => handleMoveLayer(lIdx, 'up')}
                     disabled={lIdx === 0}
                     className="p-1.5 text-slate-400 hover:text-slate-800 disabled:opacity-20 rounded"
-                    title="Move Layer Up in Hierarchy"
+                    title={t.layerMoveUpTitle}
                   >
                     <ArrowUp className="w-4 h-4" />
                   </button>
@@ -516,14 +516,14 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                     onClick={() => handleMoveLayer(lIdx, 'down')}
                     disabled={lIdx === layers.length - 1}
                     className="p-1.5 text-slate-400 hover:text-slate-800 disabled:opacity-20 rounded"
-                    title="Move Layer Down in Hierarchy"
+                    title={t.layerMoveDownTitle}
                   >
                     <ArrowDown className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteLayer(layer.id)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors ml-2"
-                    title="Delete Decision Layer"
+                    title={t.layerDeleteLayerTitle}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -535,7 +535,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                 {/* Column 1: Primary Target Column */}
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Primary Evaluation Column
+                    {t.layerPrimaryColumn}
                   </label>
                   <select
                     value={layer.primaryColumn}
@@ -557,7 +557,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                 {/* Column 2: Secondary Evaluation Column */}
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Secondary Column (Optional Multi-Column)
+                    {t.layerSecondaryColumn}
                   </label>
                   <select
                     value={layer.secondaryColumn || ''}
@@ -570,7 +570,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                       !isSecondaryReady ? 'border-amber-500 text-amber-800' : 'border-slate-200'
                     }`}
                   >
-                    <option value="">-- None (Single Column) --</option>
+                    <option value="">{t.layerNoSecondary}</option>
                     {availableCols.map((c) => (
                       <option key={c} value={c}>
                         {c}
@@ -582,7 +582,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                 {/* Column 3: Multi-column logic */}
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Evaluation Combination Logic
+                    {t.layerComboLogic}
                   </label>
                   <select
                     value={layer.matchLogic || 'or'}
@@ -594,8 +594,8 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                     disabled={!layer.secondaryColumn}
                     className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 disabled:opacity-40 font-mono shadow-xs"
                   >
-                    <option value="or">OR (Either condition matches)</option>
-                    <option value="and">AND (Both conditions match)</option>
+                    <option value="or">{t.layerLogicOr}</option>
+                    <option value="and">{t.layerLogicAnd}</option>
                   </select>
                 </div>
               </div>
@@ -604,7 +604,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-700">
-                    Value Rules ({layer.rules.length})
+                    {t.layerValueRules.replace('{count}', String(layer.rules.length))}
                   </span>
                   <button
                     onClick={() => handleAddRule(layer.id)}
@@ -636,9 +636,9 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                         }
                         className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none shadow-xs"
                       >
-                        <option value="any">Either Col</option>
-                        <option value="primary">Primary Col</option>
-                        <option value="secondary">Secondary Col</option>
+                        <option value="any">{t.layerTargetAny}</option>
+                        <option value="primary">{t.layerTargetPrimary}</option>
+                        <option value="secondary">{t.layerTargetSecondary}</option>
                       </select>
                     )}
 
@@ -668,7 +668,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                           value: e.target.value,
                         })
                       }
-                      placeholder='e.g. "Waive" or "Accept"'
+                      placeholder={t.layerValuePlaceholder}
                       className="flex-1 bg-white border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-mono shadow-xs"
                     />
 
@@ -689,9 +689,9 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                             : 'bg-rose-600 text-white border-rose-600'
                         }`}
                       >
-                        <option value="green" className="bg-white text-emerald-700">Green (Passed / Waive)</option>
-                        <option value="yellow" className="bg-white text-amber-700">Yellow (Review)</option>
-                        <option value="red" className="bg-white text-rose-700">Red (Rejected Defect)</option>
+                        <option value="green" className="bg-white text-emerald-700">{t.layerColorGreen}</option>
+                        <option value="yellow" className="bg-white text-amber-700">{t.layerColorYellow}</option>
+                        <option value="red" className="bg-white text-rose-700">{t.layerColorRed}</option>
                       </select>
                     </div>
 
@@ -699,7 +699,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                     <button
                       onClick={() => handleDeleteRule(layer.id, rule.id)}
                       className="p-1 text-slate-400 hover:text-rose-600 self-end sm:self-auto"
-                      title="Delete Rule"
+                      title={t.layerDeleteRuleTitle}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -722,12 +722,12 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                     className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                   />
                   <label htmlFor={`fallback_${layer.id}`} className="cursor-pointer text-slate-700 font-medium">
-                    Use original cell fill when no value rule matches
+                    {t.layerUseOriginalFill}
                   </label>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-slate-500">If no rule matches:</span>
+                  <span className="text-[11px] text-slate-500">{t.layerIfNoRuleMatch}</span>
                   <select
                     value={layer.fallbackColor || 'none'}
                     onChange={(e) =>
@@ -737,10 +737,10 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                     }
                     className="bg-white border border-slate-200 rounded px-2 py-0.5 text-xs text-slate-700 focus:outline-none shadow-xs"
                   >
-                    <option value="none">No highlight</option>
-                    <option value="yellow">Yellow Highlight</option>
-                    <option value="red">Red Highlight</option>
-                    <option value="green">Green Highlight</option>
+                    <option value="none">{t.layerFallbackNone}</option>
+                    <option value="yellow">{t.layerFallbackYellow}</option>
+                    <option value="red">{t.layerFallbackRed}</option>
+                    <option value="green">{t.layerFallbackGreen}</option>
                   </select>
                 </div>
               </div>
@@ -753,7 +753,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
       <div className="flex items-center justify-between pt-6 border-t border-slate-200">
         <div className="text-xs text-slate-500 flex items-center gap-1.5">
           <HelpCircle className="w-4 h-4 text-slate-400" />
-          <span>Rules evaluate hierarchically; first matching rule styles the row.</span>
+          <span>{t.layerHierarchyHint}</span>
         </div>
 
         <button
@@ -773,7 +773,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
                 <Bookmark className="w-5 h-5 text-amber-600" />
-                <h4 className="text-sm font-bold text-slate-900">Save Current Decision Layers</h4>
+                <h4 className="text-sm font-bold text-slate-900">{t.layerSaveDialogTitle}</h4>
               </div>
               <button
                 onClick={() => setShowSaveDialog(false)}
@@ -785,19 +785,18 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Preset Name
+                {t.layerPresetNameLabel}
               </label>
               <input
                 type="text"
                 value={newPresetName}
                 onChange={(e) => setNewPresetName(e.target.value)}
-                placeholder="e.g. Standard Inspection QA Rules"
+                placeholder={t.layerPresetNamePh}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 font-medium"
                 autoFocus
               />
               <p className="text-[11px] text-slate-500 mt-1.5">
-                Will save {layers.length} decision layer{layers.length > 1 ? 's' : ''} containing{' '}
-                {layers.reduce((acc, l) => acc + l.rules.length, 0)} total rules.
+                {t.layerWillSave.replace('{layers}', String(layers.length)).replace('{rules}', String(layers.reduce((acc, l) => acc + l.rules.length, 0)))}
               </p>
             </div>
 
@@ -806,13 +805,13 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                 onClick={() => setShowSaveDialog(false)}
                 className="px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 rounded-lg"
               >
-                Cancel
+                {t.cancel}
               </button>
               <button
                 onClick={handleSaveCurrentPreset}
                 className="px-4 py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 rounded-lg shadow-sm"
               >
-                Save Preset
+                {t.layerSavePreset}
               </button>
             </div>
           </div>
@@ -831,10 +830,10 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900">
-                    Saved & Recent Decision Layers (Hierarchical Rules)
+                    {t.layerPresetsModalTitle}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Switch between saved rule presets, restore recent sessions, or apply industry standards.
+                    {t.layerPresetsModalDesc}
                   </p>
                 </div>
               </div>
@@ -857,7 +856,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                 }`}
               >
                 <Bookmark className="w-3.5 h-3.5" />
-                <span>Saved Presets ({savedPresets.length})</span>
+                <span>{t.layerTabSaved.replace('{count}', String(savedPresets.length))}</span>
               </button>
               <button
                 onClick={() => setPresetTab('recent')}
@@ -868,7 +867,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                 }`}
               >
                 <History className="w-3.5 h-3.5" />
-                <span>Recent History ({recentHistory.length})</span>
+                <span>{t.layerTabRecent.replace('{count}', String(recentHistory.length))}</span>
               </button>
               <button
                 onClick={() => setPresetTab('templates')}
@@ -879,7 +878,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                 }`}
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Standard Rules ({industryDecisionTemplates.length})</span>
+                <span>{t.layerTabStandard.replace('{count}', String(industryDecisionTemplates.length))}</span>
               </button>
             </div>
 
@@ -900,7 +899,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                               {preset.name}
                             </span>
                             <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-slate-100 text-slate-600 font-bold border border-slate-200">
-                              {preset.layers.length} layer{preset.layers.length > 1 ? 's' : ''}
+                              {t.layerCountBadge.replace('{count}', String(preset.layers.length))}
                             </span>
                           </div>
                           <div className="text-[11px] text-slate-600 truncate font-mono">
@@ -908,7 +907,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                           </div>
                           <div className="text-[10px] text-slate-400 flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            <span>Saved {new Date(preset.createdAt).toLocaleDateString()}</span>
+                            <span>{t.layerSavedOn.replace('{date}', new Date(preset.createdAt).toLocaleDateString())}</span>
                           </div>
                         </div>
 
@@ -916,7 +915,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                           <button
                             onClick={(e) => handleDeleteSavedPreset(preset.id, e)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                            title="Delete preset"
+                            title={t.layerDeletePresetTitle}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -924,7 +923,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                             onClick={() => handleApplyPreset(preset.layers)}
                             className="px-3 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg shadow-xs transition-colors"
                           >
-                            Apply Rules
+                            {t.layerApplyRules}
                           </button>
                         </div>
                       </div>
@@ -932,9 +931,9 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                   ) : (
                     <div className="py-10 text-center space-y-2">
                       <Bookmark className="w-8 h-8 text-slate-400 mx-auto" />
-                      <p className="text-xs text-slate-600 font-medium">No custom decision rule presets saved yet.</p>
+                      <p className="text-xs text-slate-600 font-medium">{t.layerNoPresets}</p>
                       <p className="text-[11px] text-slate-500">
-                        Customize your decision layers above and click "Save Rules" to save them.
+                        {t.layerNoPresetsHint}
                       </p>
                     </div>
                   )}
@@ -953,10 +952,10 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                         <div className="space-y-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-slate-900">
-                              Recent Rule State #{idx + 1}
+                              {t.layerRecentState.replace('{n}', String(idx + 1))}
                             </span>
                             <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-sky-50 text-sky-700 border border-sky-200 font-bold">
-                              Auto-Saved
+                              {t.layerAutoSaved}
                             </span>
                             <span className="text-[10px] text-slate-500">
                               {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -971,13 +970,13 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                           onClick={() => handleApplyPreset(item.layers)}
                           className="px-3 py-1.5 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-lg shadow-xs transition-colors shrink-0 self-end sm:self-auto"
                         >
-                          Restore
+                          {t.mapRestore}
                         </button>
                       </div>
                     ))
                   ) : (
                     <div className="py-10 text-center text-xs text-slate-500">
-                      No recent rule history recorded yet.
+                      {t.layerNoHistory}
                     </div>
                   )}
                 </div>
@@ -995,7 +994,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                         <div className="text-xs font-bold text-emerald-800">{template.name}</div>
                         <div className="text-[11px] text-slate-600">{template.desc}</div>
                         <div className="text-[10px] text-slate-500 font-mono">
-                          {template.layers.length} layer · {template.layers[0]?.rules.length} value rules
+                          {t.layerTemplateMeta.replace('{layers}', String(template.layers.length)).replace('{rules}', String(template.layers[0]?.rules.length ?? 0))}
                         </div>
                       </div>
 
@@ -1003,7 +1002,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                         onClick={() => handleApplyPreset(template.layers)}
                         className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-xs transition-colors shrink-0 self-end sm:self-auto"
                       >
-                        Apply Rule
+                        {t.layerApplyRule}
                       </button>
                     </div>
                   ))}
@@ -1013,12 +1012,12 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
 
             {/* Footer */}
             <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500">
-              <span>Decision layers evaluate in sequence from top to bottom.</span>
+              <span>{t.layerFooterNote}</span>
               <button
                 onClick={() => setShowPresetsModal(false)}
                 className="px-4 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 rounded-lg shadow-xs"
               >
-                Close
+                {t.close}
               </button>
             </div>
           </div>
