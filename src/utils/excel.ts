@@ -725,8 +725,9 @@ export function processMatching(
   mappings: ColumnMapping[],
   normalization: NormalizationRules,
   layers: DecisionLayer[],
-  holdKeys: string[] = [],
-  releasedRowIds: string[] = []
+  holdValues: string[] = [],
+  releasedRowIds: string[] = [],
+  holdColumn: string = ''
 ): {
   results: MatchedRow[];
   stats: MatchingStats;
@@ -1034,13 +1035,23 @@ export function processMatching(
     }
   }
 
-  // Hold-key filter (final override): if a hold key is found among the row's
-  // key values, the row moves to the Hold tab and shows blue — even when all
-  // mapping keys are the same and the row would otherwise be Accept/green.
-  const normalizedHoldKeys = holdKeys
+  // Hold-key filter (final override): if a hold value is found for the row,
+  // the row moves to the Hold tab and shows blue — even when all mapping keys
+  // are the same and the row would otherwise be Accept/green.
+  // Two modes: exact match against a chosen column, or legacy substring match
+  // against the row's key values.
+  const normalizedHoldValues = holdValues
     .map((k) => String(k ?? '').trim().toLowerCase())
     .filter((k) => k.length > 0);
-  if (normalizedHoldKeys.length > 0) {
+  if (normalizedHoldValues.length > 0) {
+    const markHold = (r: MatchedRow, term: string) => {
+      r.decisionColor = 'blue';
+      r.decisionReason = `On Hold (key "${term}" found in row)`;
+      r.isHold = true;
+      r.holdKey = term;
+      // Hold takes precedence: never hide a held row under "Only Accept"
+      r.supersededByAccept = false;
+    };
     const HOLD_ID_COLS = new Set([
       'po', 'ponumber', 'purchaseorder', 'orderid', 'material', 'materialcode',
       'item', 'itemcode', 'partnumber', 'lot', 'lotno', 'lotnumber',
@@ -1062,16 +1073,18 @@ export function processMatching(
       collect(r.matchedMainRow);
       return vals;
     };
-    for (const r of results) {
-      const vals = holdKeyValues(r);
-      const term = normalizedHoldKeys.find((hk) => vals.some((v) => v.includes(hk)));
-      if (term) {
-        r.decisionColor = 'blue';
-        r.decisionReason = `On Hold (key "${term}" found in row)`;
-        r.isHold = true;
-        r.holdKey = term;
-        // Hold takes precedence: never hide a held row under "Only Accept"
-        r.supersededByAccept = false;
+    if (holdColumn) {
+      // Exact mode: the chosen comparison column's value must equal a hold value
+      for (const r of results) {
+        const v = String(r.comparisonRow[holdColumn] ?? '').trim().toLowerCase();
+        if (v && normalizedHoldValues.includes(v)) markHold(r, v);
+      }
+    } else {
+      // Legacy mode: substring match against the row's key values
+      for (const r of results) {
+        const vals = holdKeyValues(r);
+        const term = normalizedHoldValues.find((hk) => vals.some((v) => v.includes(hk)));
+        if (term) markHold(r, term);
       }
     }
   }
