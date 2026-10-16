@@ -863,104 +863,91 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     }
   };
 
+  // KPI stat cards double as the result filters (redesigned overview header)
+  const totalResults = results.length;
+  const kpiDefs: {
+    key: FilterType;
+    label: string;
+    count: number;
+    dot: string;
+    active: string;
+  }[] = [
+    { key: 'all', label: t.filterAll, count: totalResults, dot: 'bg-slate-400', active: 'border-slate-300 bg-slate-50 ring-2 ring-slate-300' },
+    { key: 'green', label: t.filterGreen, count: stats.greenCount, dot: 'bg-emerald-500', active: 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-300' },
+    { key: 'yellow', label: t.filterYellow, count: stats.yellowCount, dot: 'bg-amber-500', active: 'border-amber-300 bg-amber-50 ring-2 ring-amber-300' },
+    { key: 'red', label: t.filterRed, count: stats.redCount, dot: 'bg-rose-500', active: 'border-rose-300 bg-rose-50 ring-2 ring-rose-300' },
+    { key: 'unmatched', label: t.filterUnmatched, count: stats.unmatchedCount, dot: 'bg-blue-500', active: 'border-blue-300 bg-blue-50 ring-2 ring-blue-300' },
+  ];
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      {/* 1. Interactive Control Bar (Filters & Clean Professional Export) */}
+      {/* 1. Results overview: clickable KPI stat cards (filter the table) */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          {/* Segmented Filter Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
-            <button
-              onClick={() => {
-                setActiveFilter('all');
-                setPage(1);
-              }}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${
-                activeFilter === 'all'
-                  ? 'bg-white text-slate-900 shadow-xs font-bold border border-slate-200'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {t.filterAll} ({results.length})
-            </button>
-            <button
-              onClick={() => {
-                setActiveFilter('green');
-                setPage(1);
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap shrink-0 ${
-                activeFilter === 'green'
-                  ? 'bg-emerald-600 text-white shadow-xs font-bold'
-                  : 'text-emerald-700 hover:bg-emerald-50'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${activeFilter === 'green' ? 'bg-white' : 'bg-emerald-500'}`} />
-              <span>{t.filterGreen} ({stats.greenCount})</span>
-            </button>
-            <button
-              onClick={() => {
-                setActiveFilter('yellow');
-                setPage(1);
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap shrink-0 ${
-                activeFilter === 'yellow'
-                  ? 'bg-amber-500 text-white shadow-xs font-bold'
-                  : 'text-amber-700 hover:bg-amber-50'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${activeFilter === 'yellow' ? 'bg-white' : 'bg-amber-500'}`} />
-              <span>{t.filterYellow} ({stats.yellowCount})</span>
-            </button>
-            <button
-              onClick={() => {
-                setActiveFilter('red');
-                setPage(1);
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap shrink-0 ${
-                activeFilter === 'red'
-                  ? 'bg-rose-600 text-white shadow-xs font-bold'
-                  : 'text-rose-700 hover:bg-rose-50'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${activeFilter === 'red' ? 'bg-white' : 'bg-rose-500'}`} />
-              <span>{t.filterRed} ({stats.redCount})</span>
-            </button>
-            <button
-              onClick={() => {
-                setActiveFilter('unmatched');
-                setPage(1);
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap shrink-0 ${
-                activeFilter === 'unmatched'
-                  ? 'bg-blue-600 text-white shadow-xs font-bold'
-                  : 'text-blue-700 hover:bg-blue-50'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${activeFilter === 'unmatched' ? 'bg-white' : 'bg-blue-500'}`} />
-              <span>{t.filterUnmatched} ({stats.unmatchedCount})</span>
-            </button>
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2.5">
+          {kpiDefs.map((k) => {
+            const pct = totalResults > 0 ? Math.round((k.count / totalResults) * 100) : 0;
+            const isActive = activeFilter === k.key;
+            return (
+              <button
+                key={k.key}
+                onClick={() => {
+                  setActiveFilter(k.key);
+                  setPage(1);
+                }}
+                className={`rounded-xl border p-3 text-left transition-all ${
+                  isActive ? k.active : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${k.dot}`} />
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 truncate">
+                    {k.label}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex items-baseline gap-1.5">
+                  <span className="text-2xl font-extrabold tabular-nums text-slate-900">
+                    {k.count.toLocaleString()}
+                  </span>
+                  {k.key !== 'all' && (
+                    <span className="text-[11px] font-semibold text-slate-400">{pct}%</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
 
-            {/* Deduplicate: Only Show Accept Toggle */}
-            <div className="h-4 w-px bg-slate-300 mx-1 hidden sm:block" />
-            <button
-              onClick={() => {
-                setHideSupersededPostpone(!hideSupersededPostpone);
-                setPage(1);
-              }}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${
-                hideSupersededPostpone
-                  ? 'bg-emerald-600 text-white shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+        {/* 2. Action toolbar — grouped View / Share / Export actions */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-3 pt-3 border-t border-slate-100">
+          {/* Only Accept toggle */}
+          <button
+            onClick={() => {
+              setHideSupersededPostpone(!hideSupersededPostpone);
+              setPage(1);
+            }}
+            className="flex items-center gap-2.5 group pr-1"
+            title="Filter to only show Accept records (hiding superseded Postpone rows for duplicate keys)"
+          >
+            <span
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                hideSupersededPostpone ? 'bg-emerald-600' : 'bg-slate-300'
               }`}
-              title="Filter to only show Accept records (hiding superseded Postpone rows for duplicate keys)"
             >
-              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Only Accept</span>
-            </button>
-          </div>
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  hideSupersededPostpone ? 'translate-x-4' : 'translate-x-0.5'
+                }`}
+              />
+            </span>
+            <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 whitespace-nowrap">
+              Only Accept
+            </span>
+          </button>
 
-          {/* Action Toolbar: Refresh, Save Column View, Columns Settings, Share, Export */}
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="h-6 w-px bg-slate-200 hidden md:block" />
+
+          {/* View group */}
+          <div className="flex flex-wrap items-center gap-2">
             {/* Refresh Button */}
             <button
               onClick={handleRefresh}
@@ -1001,9 +988,12 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               </span>
             </button>
 
-            {/* In Preview Mode: Keep page clean to ONLY show Result Table */}
-            {!isPreviewMode && (
-              <>
+          </div>
+          {!isPreviewMode && (
+            <>
+              <div className="h-6 w-px bg-slate-200 hidden md:block" />
+              {/* Share group */}
+              <div className="flex flex-wrap items-center gap-2">
                 {/* Quick 1-Click Copy Preview Link */}
                 <button
                   onClick={handleQuickCopyPreviewLink}
@@ -1094,6 +1084,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   <span>Share Preview</span>
                 </button>
 
+              </div>
+              <div className="h-6 w-px bg-slate-200 hidden md:block" />
+              {/* Export group */}
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={handleExportExcel}
                   className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0"
@@ -1111,10 +1105,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   <Download className="w-3.5 h-3.5 text-slate-200" />
                   <span>{t.exportCsv}</span>
                 </button>
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
+
 
         {/* 3. DEDICATED REAL-TIME SEARCH BAR & SCOPE SELECTOR */}
         <div className="pt-3 border-t border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
