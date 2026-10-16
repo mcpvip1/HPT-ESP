@@ -108,16 +108,18 @@ export default function App() {
     defaultNormalizationRules
   );
   const [layers, setLayers] = useState<DecisionLayer[]>(defaultDecisionLayers);
-  // Hold-key filter: rows containing any of these keys move to the Hold tab (blue)
-  const [holdKeys, setHoldKeys] = useState<string[]>([]);
+  // Hold filter: rows whose chosen column value is in holdValues move to the Hold tab (blue).
+  // holdColumn '' = legacy substring matching against key columns.
+  const [holdColumn, setHoldColumn] = useState<string>('');
+  const [holdValues, setHoldValues] = useState<string[]>([]);
   // Why the items are on hold (shown at supervisor release) + rows released via supervisor confirm
   const [holdReason, setHoldReason] = useState<string>('');
   const [releasedRowIds, setReleasedRowIds] = useState<string[]>([]);
 
   // Cloud sync (Firebase): one shared workspace across every device
   const [cloudUser, setCloudUser] = useState<User | null>(null);
-  const rulesStateRef = useRef({ normalization, layers, mappings, holdKeys, holdReason, releasedRowIds });
-  rulesStateRef.current = { normalization, layers, mappings, holdKeys, holdReason, releasedRowIds };
+  const rulesStateRef = useRef({ normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds });
+  rulesStateRef.current = { normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds };
   const lastRulesPublishRef = useRef<string>('');
   const lastCloudPreviewAtRef = useRef<number>(0);
 
@@ -224,7 +226,8 @@ export default function App() {
         ]);
 
         let effMappings = rulesStateRef.current.mappings;
-        let effHoldKeys = rulesStateRef.current.holdKeys;
+        let effHoldColumn = rulesStateRef.current.holdColumn;
+        let effHoldValues = rulesStateRef.current.holdValues;
         let effReleased = rulesStateRef.current.releasedRowIds;
         let effRef = refWbRef.current;
         let effComp = compWbRef.current;
@@ -243,10 +246,18 @@ export default function App() {
             await saveToIDB(StorageKeys.COLUMN_MAPPINGS, cloudRules.mappings);
             effMappings = cloudRules.mappings;
           }
-          if (cloudRules.holdKeys) {
-            setHoldKeys(cloudRules.holdKeys);
-            await saveToIDB(StorageKeys.HOLD_KEYS, cloudRules.holdKeys);
-            effHoldKeys = cloudRules.holdKeys;
+          if (typeof cloudRules.holdColumn === 'string') {
+            setHoldColumn(cloudRules.holdColumn);
+            await saveToIDB(StorageKeys.HOLD_COLUMN, cloudRules.holdColumn);
+            effHoldColumn = cloudRules.holdColumn;
+          }
+          {
+            const vals = cloudRules.holdValues || (cloudRules as any).holdKeys;
+            if (vals) {
+              setHoldValues(vals);
+              await saveToIDB(StorageKeys.HOLD_VALUES, vals);
+              effHoldValues = vals;
+            }
           }
           if (typeof cloudRules.holdReason === 'string') {
             setHoldReason(cloudRules.holdReason);
@@ -261,7 +272,8 @@ export default function App() {
             n: cloudRules.normalization,
             l: cloudRules.layers,
             m: cloudRules.mappings,
-            h: cloudRules.holdKeys,
+            hc: cloudRules.holdColumn,
+            h: cloudRules.holdValues,
             hr: cloudRules.holdReason,
             rr: cloudRules.releasedRowIds,
           });
@@ -273,7 +285,8 @@ export default function App() {
             n: cur.normalization,
             l: cur.layers,
             m: cur.mappings,
-            h: cur.holdKeys,
+            hc: cur.holdColumn,
+            h: cur.holdValues,
             hr: cur.holdReason,
             rr: cur.releasedRowIds,
           });
@@ -318,7 +331,7 @@ export default function App() {
         }
 
         if (effRef && effComp) {
-          handleExecuteMatching(effRef, effComp, effMappings, false, effHoldKeys, effReleased);
+          handleExecuteMatching(effRef, effComp, effMappings, false, effHoldValues, effReleased, effHoldColumn);
         }
       } catch (e) {
         console.warn('Cloud workspace pull failed', e);
@@ -329,8 +342,8 @@ export default function App() {
 
   // Publish rule settings to the cloud whenever they change (debounced).
   const debouncedPublishRules = useRef(
-    debounce((uid: string, st: { normalization: NormalizationRules; layers: DecisionLayer[]; mappings: ColumnMapping[]; holdKeys: string[]; holdReason: string; releasedRowIds: string[] }) => {
-      const key = JSON.stringify({ n: st.normalization, l: st.layers, m: st.mappings, h: st.holdKeys, hr: st.holdReason, rr: st.releasedRowIds });
+    debounce((uid: string, st: { normalization: NormalizationRules; layers: DecisionLayer[]; mappings: ColumnMapping[]; holdColumn: string; holdValues: string[]; holdReason: string; releasedRowIds: string[] }) => {
+      const key = JSON.stringify({ n: st.normalization, l: st.layers, m: st.mappings, hc: st.holdColumn, h: st.holdValues, hr: st.holdReason, rr: st.releasedRowIds });
       if (key === lastRulesPublishRef.current) return;
       lastRulesPublishRef.current = key;
       publishRulesState(uid, st);
@@ -340,7 +353,7 @@ export default function App() {
   useEffect(() => {
     if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current) return;
     debouncedPublishRules(cloudUser.uid, rulesStateRef.current);
-  }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, holdKeys, holdReason, releasedRowIds, debouncedPublishRules]);
+  }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds, debouncedPublishRules]);
 
   const debouncedPublishWorkbooks = useRef(
     debounce((uid: string, wbs: { reference: WorkbookData | null; comparison: WorkbookData | null }) => {
@@ -500,13 +513,16 @@ export default function App() {
         const savedLayers = await getFromIDB<DecisionLayer[]>(
           StorageKeys.DECISION_LAYERS
         );
-        const savedHoldKeys = await getFromIDB<string[]>(StorageKeys.HOLD_KEYS);
+        const savedHoldColumn = await getFromIDB<string>(StorageKeys.HOLD_COLUMN);
+        const savedHoldValues = await getFromIDB<string[]>(StorageKeys.HOLD_VALUES);
+        const legacyHoldKeys = await getFromIDB<string[]>(StorageKeys.HOLD_KEYS);
         const savedHoldReason = await getFromIDB<string>(StorageKeys.HOLD_REASON);
         const savedReleased = await getFromIDB<string[]>(StorageKeys.RELEASED_ROWS);
 
         if (savedNorm && isMounted) setNormalization(savedNorm);
         if (savedLayers && savedLayers.length > 0 && isMounted) setLayers(savedLayers);
-        if (savedHoldKeys && isMounted) setHoldKeys(savedHoldKeys);
+        if (savedHoldColumn !== null && savedHoldColumn !== undefined && isMounted) setHoldColumn(savedHoldColumn);
+        if (isMounted) setHoldValues(savedHoldValues || legacyHoldKeys || []);
         if (savedHoldReason !== null && savedHoldReason !== undefined && isMounted) setHoldReason(savedHoldReason);
         if (savedReleased && isMounted) setReleasedRowIds(savedReleased);
 
@@ -588,35 +604,61 @@ export default function App() {
   // The old workbook is swapped out wholesale (never mutated in place); if the
   // Incoming file is already loaded, results are regenerated immediately so the
   // results and all data stay in sync until the next change.
-  // Hold-key filter changes: persist, sync via the rules publish effect, and re-run matching
-  const handleHoldSettingsChange = async (keys: string[], reason: string) => {
-    setHoldKeys(keys);
+  // Hold filter changes: persist, sync via the rules publish effect, and re-run matching
+  const handleHoldSettingsChange = async (column: string, values: string[], reason: string) => {
+    setHoldColumn(column);
+    setHoldValues(values);
     setHoldReason(reason);
-    await saveToIDB(StorageKeys.HOLD_KEYS, keys);
+    await saveToIDB(StorageKeys.HOLD_COLUMN, column);
+    await saveToIDB(StorageKeys.HOLD_VALUES, values);
     await saveToIDB(StorageKeys.HOLD_REASON, reason);
     if (referenceWb && comparisonWb) {
-      handleExecuteMatching(referenceWb, comparisonWb, mappings, false, keys);
+      handleExecuteMatching(referenceWb, comparisonWb, mappings, false, values, undefined, column);
     }
   };
 
-  // Supervisor-confirmed release: delete the key from the hold settings, then
+  // Supervisor-confirmed release: delete the value from the hold settings, then
   // re-run matching. Released rows that matched & passed turn green; the rest
   // are forced to yellow (review) via releasedRowIds.
   const handleReleaseHoldKey = async (key: string) => {
-    const affected = results.filter((r) => r.isHold && r.holdKey === key);
-    const newHoldKeys = holdKeys.filter((k) => k !== key);
+    const normKey = key.trim().toLowerCase();
+    const affected = results.filter((r) => r.isHold && (r.holdKey || '').toLowerCase() === normKey);
+    // Delete by normalized comparison: stored values keep their original case
+    const newHoldValues = holdValues.filter((v) => String(v ?? '').trim().toLowerCase() !== normKey);
     const newReleased = [...releasedRowIds];
     for (const r of affected) {
       if (!newReleased.includes(r.id)) newReleased.push(r.id);
     }
-    setHoldKeys(newHoldKeys);
+    setHoldValues(newHoldValues);
     setReleasedRowIds(newReleased);
-    await saveToIDB(StorageKeys.HOLD_KEYS, newHoldKeys);
+    await saveToIDB(StorageKeys.HOLD_VALUES, newHoldValues);
     await saveToIDB(StorageKeys.RELEASED_ROWS, newReleased);
+    // Original-case form of the key for display
+    const displayKey = holdValues.find((v) => String(v ?? '').trim().toLowerCase() === normKey) ?? key;
+    let green = 0;
+    let yellow = 0;
     if (referenceWb && comparisonWb) {
-      handleExecuteMatching(referenceWb, comparisonWb, mappings, false, newHoldKeys, newReleased);
+      // Synchronous evaluation so the toast can report where the key data went
+      const effMappings = mappings.length > 0 ? mappings : autoMapColumns(referenceWb.headers, comparisonWb.headers);
+      const { results: next } = processMatching(
+        referenceWb,
+        comparisonWb,
+        effMappings,
+        normalization,
+        layers,
+        newHoldValues,
+        newReleased,
+        holdColumn
+      );
+      for (const r of next) {
+        if (newReleased.includes(r.id)) {
+          if (r.decisionColor === 'green') green++;
+          else if (r.decisionColor === 'yellow') yellow++;
+        }
+      }
+      handleExecuteMatching(referenceWb, comparisonWb, mappings, false, newHoldValues, newReleased, holdColumn);
     }
-    return affected.length;
+    return { key: displayKey, green, yellow, total: affected.length };
   };
 
   const handleSetReferenceWb = async (wb: WorkbookData | null) => {
@@ -822,8 +864,9 @@ export default function App() {
     customComp?: WorkbookData | null,
     customMappings?: ColumnMapping[],
     notifySuccess = true,
-    customHoldKeys?: string[],
-    customReleasedRowIds?: string[]
+    customHoldValues?: string[],
+    customReleasedRowIds?: string[],
+    customHoldColumn?: string
   ) => {
     const ref = customRef !== undefined ? customRef : referenceWb;
     const comp = customComp !== undefined ? customComp : comparisonWb;
@@ -858,8 +901,9 @@ export default function App() {
           effectiveMappings,
           normalization,
           layers,
-          customHoldKeys !== undefined ? customHoldKeys : holdKeys,
-          customReleasedRowIds !== undefined ? customReleasedRowIds : releasedRowIds
+          customHoldValues !== undefined ? customHoldValues : holdValues,
+          customReleasedRowIds !== undefined ? customReleasedRowIds : releasedRowIds,
+          customHoldColumn !== undefined ? customHoldColumn : holdColumn
         );
 
         setResults(evaluatedResults);
@@ -888,6 +932,12 @@ export default function App() {
           showToast(
             t.toastEvaluatedSummary.replace('{total}', String(evaluatedStats.totalIncoming)).replace('{green}', String(evaluatedStats.greenCount)).replace('{yellow}', String(evaluatedStats.yellowCount)).replace('{red}', String(evaluatedStats.redCount)),
             'success'
+          );
+        }
+        if (evaluatedStats.blueCount > 0) {
+          showToast(
+            t.toastHoldFound.replace('{n}', String(evaluatedStats.blueCount)),
+            'info'
           );
         }
       } catch (err: any) {
@@ -990,9 +1040,7 @@ export default function App() {
                   isPreviewMode={false}
                   initialColumnConfigs={previewColumnConfigs}
                   cloudUser={cloudUser}
-                  holdKeys={holdKeys}
                   holdReason={holdReason}
-                  onHoldSettingsChange={handleHoldSettingsChange}
                   onReleaseHoldKey={handleReleaseHoldKey}
                 />
               </div>
@@ -1018,6 +1066,10 @@ export default function App() {
         isProcessing={isProcessing}
         language={language}
         onShowToast={showToast}
+        holdColumn={holdColumn}
+        holdValues={holdValues}
+        holdReason={holdReason}
+        onHoldSettingsChange={handleHoldSettingsChange}
       />
 
 
