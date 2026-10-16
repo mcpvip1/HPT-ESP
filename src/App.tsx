@@ -8,6 +8,7 @@ import {
   MatchedRow,
   MatchingStats,
   ColumnConfigItem,
+  SyncHistoryEntry,
 } from './types';
 import {
   saveToIDB,
@@ -29,6 +30,7 @@ import { RulesLogicModal } from './components/RulesLogicModal';
 import { ResultsDashboard } from './components/ResultsDashboard';
 import { DataPreviewModal } from './components/DataPreviewModal';
 import { Toast, ToastMessage } from './components/Toast';
+import { SyncHistoryModal } from './components/SyncHistoryModal';
 import { GlobalLoadingSkeleton } from './components/GlobalLoadingSkeleton';
 import { translations } from './translations';
 import {
@@ -132,6 +134,13 @@ export default function App() {
   const [studioSession, setStudioSession] = useState(0);
   // True while the login pull is downloading the workspace from the cloud
   const [isCloudPulling, setIsCloudPulling] = useState(false);
+  // Cloud upload tracking: header arrow animation + history panel
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadLabel, setUploadLabel] = useState('');
+  const [syncHistory, setSyncHistory] = useState<SyncHistoryEntry[]>([]);
+  const [isSyncPanelOpen, setIsSyncPanelOpen] = useState(false);
+  const pendingUploadsRef = useRef(0);
+  const syncHistoryRef = useRef<SyncHistoryEntry[]>([]);
   // Tracks results that came straight from a cloud pull (skip re-publish echo)
   const pulledResultsRef = useRef<MatchedRow[] | null>(null);
   const rulesStateRef = useRef({ normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds });
@@ -396,23 +405,76 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cloudUser, localReady, isPreviewMode]);
 
+  const beginUpload = useCallback((label: string) => {
+    pendingUploadsRef.current += 1;
+    setUploadLabel(label);
+    setIsUploading(true);
+  }, []);
+
+  const endUpload = useCallback((entry: { kind: 'file' | 'settings' | 'results'; title: string; status: 'done' | 'failed' }) => {
+    pendingUploadsRef.current = Math.max(0, pendingUploadsRef.current - 1);
+    const full: SyncHistoryEntry = {
+      ...entry,
+      id: `sh_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      time: Date.now(),
+    };
+    const next = [full, ...syncHistoryRef.current].slice(0, 50);
+    syncHistoryRef.current = next;
+    setSyncHistory(next);
+    saveToIDB(StorageKeys.SYNC_HISTORY, next).catch(() => {});
+    if (pendingUploadsRef.current === 0) {
+      setIsUploading(false);
+      setUploadLabel('');
+    }
+  }, []);
+
+  // Human-readable reason for a settings upload, by diffing rule sections
+  const describeRulesChange = useCallback((prevJson: string | null, cur: Record<string, unknown>): string => {
+    const tt = tRef.current;
+    let prev: Record<string, unknown> | null = null;
+    try { prev = prevJson ? JSON.parse(prevJson) as Record<string, unknown> : null; } catch { prev = null; }
+    if (!prev) return tt.syncSettingsLabel;
+    const eq = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+    const parts: string[] = [];
+    if (!eq(prev.m, cur.m)) parts.push(tt.syncReasonMappings);
+    if (!eq(prev.n, cur.n)) parts.push(tt.syncReasonNormalization);
+    if (!eq(prev.l, cur.l)) parts.push(tt.syncReasonLayers);
+    if (!eq(prev.hc, cur.hc) || !eq(prev.h, cur.h) || !eq(prev.hr, cur.hr) || !eq(prev.rr, cur.rr)) parts.push(tt.syncReasonHold);
+    const unique = [...new Set(parts)];
+    return unique.length > 0 ? unique.join(', ') : tt.syncSettingsLabel;
+  }, []);
+
+  const clearSyncHistory = useCallback(async () => {
+    syncHistoryRef.current = [];
+    setSyncHistory([]);
+    try { await deleteFromIDB(StorageKeys.SYNC_HISTORY); } catch { /* ignore */ }
+  }, []);
+
   // Publish rule settings to the cloud whenever they change (debounced).
   const debouncedPublishRules = useRef(
-    debounce((uid: string, st: { normalization: NormalizationRules; layers: DecisionLayer[]; mappings: ColumnMapping[]; holdColumn: string; holdValues: string[]; holdReason: string; releasedRowIds: string[] }) => {
+    debounce((uid: string, st: { normalization: NormalizationRules; layers: DecisionLayer[]; mappings: ColumnMapping[]; holdColumn: string; holdValues: string[]; holdReason: string; releasedRowIds: string[] }, reason: string) => {
       const key = JSON.stringify({ n: st.normalization, l: st.layers, m: st.mappings, hc: st.holdColumn, h: st.holdValues, hr: st.holdReason, rr: st.releasedRowIds });
       if (key === lastRulesPublishRef.current) return;
       lastRulesPublishRef.current = key;
+      const tt = tRef.current;
+      beginUpload(tt.syncSettingsLabel);
       publishRulesState(uid, st).then((ok) => {
-        if (ok) showToast(tRef.current.toastCloudSettingsUploaded, 'success');
-        else showToast(tRef.current.toastCloudSettingsSyncFailed, 'error');
+        endUpload({ kind: 'settings', title: reason, status: ok ? 'done' : 'failed' });
+        if (ok) showToast(tt.toastCloudSettingsUploaded, 'success');
+        else showToast(tt.toastCloudSettingsSyncFailed, 'error');
       });
     }, 1500)
   ).current;
 
   useEffect(() => {
     if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current) return;
-    debouncedPublishRules(cloudUser.uid, rulesStateRef.current);
-  }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds, debouncedPublishRules]);
+    const cur = rulesStateRef.current;
+    const reason = describeRulesChange(lastRulesPublishRef.current, {
+      n: cur.normalization, l: cur.layers, m: cur.mappings,
+      hc: cur.holdColumn, h: cur.holdValues, hr: cur.holdReason, rr: cur.releasedRowIds,
+    });
+    debouncedPublishRules(cloudUser.uid, cur, reason);
+  }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds, debouncedPublishRules, describeRulesChange]);
 
   // Publish evaluated results (+ view filters) to the cloud whenever they
   // change, so signing in on another device restores the same results.
@@ -423,9 +485,12 @@ export default function App() {
   const debouncedPublishResults = useRef(
     debounce((uid: string, state: { results: MatchedRow[]; stats: MatchingStats; filters: ResultFilters }, gen: number) => {
       if (gen !== resultsPublishGenRef.current) return;
+      const tt = tRef.current;
+      beginUpload(tt.syncResultsLabel);
       publishResultsState(uid, state).then((ok) => {
-        if (ok) showToast(tRef.current.toastCloudResultsUploaded, 'success');
-        else showToast(tRef.current.toastCloudResultsSyncFailed, 'error');
+        endUpload({ kind: 'results', title: `${tt.syncResultsLabel} (${state.results.length})`, status: ok ? 'done' : 'failed' });
+        if (ok) showToast(tt.toastCloudResultsUploaded, 'success');
+        else showToast(tt.toastCloudResultsSyncFailed, 'error');
       });
       // Keep the local instant-paint cache in step
       saveToIDB(StorageKeys.RESULTS_STATE, state).catch(() => {});
@@ -459,9 +524,13 @@ export default function App() {
 
   const debouncedPublishWorkbooks = useRef(
     debounce((uid: string, wbs: { reference: WorkbookData | null; comparison: WorkbookData | null }) => {
+      const tt = tRef.current;
+      const names = [wbs.reference?.name, wbs.comparison?.name].filter(Boolean).join(' + ') || tt.syncFilesLabel;
+      beginUpload(tt.syncFilesLabel);
       publishWorkbooksWithRetry(uid, wbs).then((ok) => {
-        if (ok) showToast(tRef.current.toastCloudFilesUploaded, 'success');
-        else showToast(tRef.current.toastCloudFilesSyncFailed, 'error');
+        endUpload({ kind: 'file', title: names, status: ok ? 'done' : 'failed' });
+        if (ok) showToast(tt.toastCloudFilesUploaded, 'success');
+        else showToast(tt.toastCloudFilesSyncFailed, 'error');
       });
     }, 2000)
   ).current;
@@ -534,6 +603,11 @@ export default function App() {
       setResultFilters(defaultResultFilters);
       pulledResultsRef.current = null;
       setLocalReady(false);
+      syncHistoryRef.current = [];
+      setSyncHistory([]);
+      setIsSyncPanelOpen(false);
+      pendingUploadsRef.current = 0;
+      setIsUploading(false);
       setStudioSession((n) => n + 1);
       for (const k of [
         StorageKeys.REFERENCE_WORKBOOK,
@@ -547,6 +621,7 @@ export default function App() {
         StorageKeys.HOLD_REASON,
         StorageKeys.RELEASED_ROWS,
         StorageKeys.RESULTS_STATE,
+        StorageKeys.SYNC_HISTORY,
       ]) {
         try { await deleteFromIDB(k); } catch { /* ignore */ }
       }
@@ -672,6 +747,11 @@ export default function App() {
           stats: MatchingStats;
           filters: ResultFilters;
         }>(StorageKeys.RESULTS_STATE);
+        const savedHistory = await getFromIDB<SyncHistoryEntry[]>(StorageKeys.SYNC_HISTORY);
+        if (savedHistory && isMounted) {
+          syncHistoryRef.current = savedHistory;
+          setSyncHistory(savedHistory);
+        }
 
         if (savedNorm && isMounted) setNormalization(savedNorm);
         if (savedLayers && savedLayers.length > 0 && isMounted) setLayers(savedLayers);
@@ -1197,6 +1277,8 @@ export default function App() {
         cloudUser={cloudUser}
         onCloudSignIn={handleCloudSignIn}
         onCloudSignOut={handleCloudSignOut}
+        isUploading={isUploading}
+        onOpenSyncPanel={() => setIsSyncPanelOpen(true)}
         onOpenRulesSetting={() => setIsRulesModalOpen(true)}
         hasRefFile={!!referenceWb}
         hasCompFile={!!comparisonWb}
@@ -1290,6 +1372,17 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Cloud Sync Status & History */}
+      <SyncHistoryModal
+        isOpen={isSyncPanelOpen}
+        onClose={() => setIsSyncPanelOpen(false)}
+        language={language}
+        isUploading={isUploading}
+        uploadLabel={uploadLabel}
+        history={syncHistory}
+        onClearHistory={clearSyncHistory}
+      />
 
       {/* Rules & Logic Settings Modal */}
       <RulesLogicModal
