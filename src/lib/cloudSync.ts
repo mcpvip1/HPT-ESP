@@ -108,38 +108,44 @@ async function publishSnapshotTo(
   metaRef: DocumentReference,
   payload: SharedPreviewPayload,
   extraFields: Record<string, unknown> = {}
-): Promise<void> {
-  const json = JSON.stringify(packCompact(payload));
-  const chunks: string[] = [];
-  for (let i = 0; i < json.length; i += CHUNK_CHARS) {
-    chunks.push(json.slice(i, i + CHUNK_CHARS));
-  }
+): Promise<boolean> {
+  try {
+    const json = JSON.stringify(packCompact(payload));
+    const chunks: string[] = [];
+    for (let i = 0; i < json.length; i += CHUNK_CHARS) {
+      chunks.push(json.slice(i, i + CHUNK_CHARS));
+    }
 
-  const prevSnap = await getDoc(metaRef).catch(() => null);
-  const prevCount =
-    prevSnap && prevSnap.exists() ? (prevSnap.data() as CloudPreviewMeta).chunkCount || 0 : 0;
+    const prevSnap = await getDoc(metaRef).catch(() => null);
+    const prevCount =
+      prevSnap && prevSnap.exists() ? (prevSnap.data() as CloudPreviewMeta).chunkCount || 0 : 0;
 
-  const batch = writeBatch(db);
-  const chunksCol = collection(metaRef, 'chunks');
-  chunks.forEach((data, i) => {
-    batch.set(doc(chunksCol, String(i)), { data });
-  });
-  // Remove stale chunks left over from a previously larger payload
-  for (let i = chunks.length; i < prevCount; i++) {
-    batch.delete(doc(chunksCol, String(i)));
+    const batch = writeBatch(db);
+    const chunksCol = collection(metaRef, 'chunks');
+    chunks.forEach((data, i) => {
+      batch.set(doc(chunksCol, String(i)), { data });
+    });
+    // Remove stale chunks left over from a previously larger payload
+    for (let i = chunks.length; i < prevCount; i++) {
+      batch.delete(doc(chunksCol, String(i)));
+    }
+    batch.set(metaRef, {
+      updatedAt: payload.createdAt || Date.now(),
+      comparisonWbName: payload.comparisonWbName,
+      filter: payload.filter || 'all',
+      searchTerm: payload.searchTerm || '',
+      searchColumn: payload.searchColumn || 'all',
+      columnConfigs: payload.columnConfigs || [],
+      stats: payload.stats,
+      chunkCount: chunks.length,
+      ...extraFields,
+    } satisfies CloudPreviewMeta);
+    await batch.commit();
+    return true;
+  } catch (e) {
+    console.warn('Cloud sync: failed to publish snapshot', e);
+    return false;
   }
-  batch.set(metaRef, {
-    updatedAt: payload.createdAt || Date.now(),
-    comparisonWbName: payload.comparisonWbName,
-    filter: payload.filter || 'all',
-    searchTerm: payload.searchTerm || '',
-    searchColumn: payload.searchColumn || 'all',
-    columnConfigs: payload.columnConfigs || [],
-    stats: payload.stats,
-    chunkCount: chunks.length,
-    ...extraFields,
-  } satisfies CloudPreviewMeta);
-  await batch.commit();
 }
 
 async function fetchSnapshotFrom(metaRef: DocumentReference): Promise<SharedPreviewPayload | null> {
@@ -203,16 +209,12 @@ export async function publishSharedSnapshot(
   shareId: string,
   uid: string,
   payload: SharedPreviewPayload
-): Promise<void> {
-  try {
-    await publishSnapshotTo(shareDoc(shareId), payload, { ownerUid: uid });
-  } catch (e) {
-    console.warn('Cloud sync: failed to publish shared snapshot', e);
-  }
+): Promise<boolean> {
+  return publishSnapshotTo(shareDoc(shareId), payload, { ownerUid: uid });
 }
 
 /** Deletes a share and all its chunks. Firestore rules enforce owner-only delete. */
-export async function unpublishSharedSnapshot(shareId: string): Promise<void> {
+export async function unpublishSharedSnapshot(shareId: string): Promise<boolean> {
   try {
     const metaRef = shareDoc(shareId);
     const colSnap = await getDocs(collection(metaRef, 'chunks'));
@@ -220,8 +222,10 @@ export async function unpublishSharedSnapshot(shareId: string): Promise<void> {
     colSnap.forEach((d) => batch.delete(d.ref));
     batch.delete(metaRef);
     await batch.commit();
+    return true;
   } catch (e) {
     console.warn('Cloud sync: failed to unpublish share', e);
+    return false;
   }
 }
 
@@ -261,14 +265,16 @@ export async function getActiveShare(uid: string): Promise<string | null> {
   }
 }
 
-export async function setActiveShare(uid: string, shareId: string | null): Promise<void> {
+export async function setActiveShare(uid: string, shareId: string | null): Promise<boolean> {
   try {
     if (shareId) {
       await setDoc(stateDoc(uid, 'sharing'), { shareId, updatedAt: Date.now() });
     } else {
-      await deleteDoc(stateDoc(uid, 'sharing')).catch(() => undefined);
+      await deleteDoc(stateDoc(uid, 'sharing'));
     }
+    return true;
   } catch (e) {
     console.warn('Cloud sync: failed to set active share', e);
+    return false;
   }
 }
