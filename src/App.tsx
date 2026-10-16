@@ -34,6 +34,7 @@ import { translations } from './translations';
 import {
   parsePreviewFromUrl,
   copyPreviewLinkToClipboard,
+  getShareIdFromUrl,
   SharedPreviewPayload,
 } from './utils/previewSharing';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -44,6 +45,8 @@ import {
   fetchRulesState,
   subscribePreviewSnapshot,
   fetchPreviewSnapshot,
+  subscribeSharedSnapshot,
+  fetchSharedSnapshot,
   debounce,
 } from './lib/cloudSync';
 import {
@@ -62,7 +65,7 @@ export default function App() {
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
 
-  // Live Preview Mode State (activated via /preview route, #preview, or ?preview)
+  // Live Preview Mode State (activated via /preview route, #preview, ?preview, or ?share=)
   const [isPreviewMode, setIsPreviewMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
@@ -73,11 +76,15 @@ export default function App() {
         path.endsWith('/preview/') ||
         hash.startsWith('#/preview') ||
         hash.includes('preview') ||
-        search.includes('preview')
+        search.includes('preview') ||
+        getShareIdFromUrl() !== null
       );
     }
     return false;
   });
+  // Public live-share id from ?share=... (viewable without sign-in)
+  const [shareId, setShareId] = useState<string | null>(() => getShareIdFromUrl());
+  const shareRevokedToastShownRef = useRef(false);
   const [previewFilter, setPreviewFilter] = useState<'all' | 'green' | 'yellow' | 'red' | 'unmatched'>('all');
   const [previewSearchTerm, setPreviewSearchTerm] = useState<string>('');
   const [previewSearchColumn, setPreviewSearchColumn] = useState<string>('all');
@@ -218,6 +225,28 @@ export default function App() {
     debouncedPublishRules(cloudUser.uid, rulesStateRef.current);
   }, [cloudUser, isPreviewMode, normalization, layers, mappings, debouncedPublishRules]);
 
+  // Live public share: follow the shared snapshot in real time (no sign-in).
+  // If the owner turns sharing off, the last received snapshot stays visible.
+  useEffect(() => {
+    if (!shareId || !isPreviewMode) return;
+    const unsub = subscribeSharedSnapshot(shareId, async (meta) => {
+      if (meta === null) {
+        if (!shareRevokedToastShownRef.current) {
+          shareRevokedToastShownRef.current = true;
+          showToast('Live sharing was turned off — showing the last received snapshot.', 'info');
+        }
+        return;
+      }
+      if (!meta.updatedAt || meta.updatedAt <= lastCloudPreviewAtRef.current) return;
+      lastCloudPreviewAtRef.current = meta.updatedAt;
+      const pData = await fetchSharedSnapshot(shareId);
+      if (pData && checkAndApplyPreview(pData)) {
+        showToast('Preview synced with the latest changes.', 'success');
+      }
+    });
+    return () => unsub();
+  }, [shareId, isPreviewMode, checkAndApplyPreview, showToast]);
+
   // Live cloud preview: while signed in, the preview page follows the latest
   // snapshot published by the studio — on any device, no refresh needed.
   useEffect(() => {
@@ -266,6 +295,27 @@ export default function App() {
           window.location.hash.startsWith('#/preview') ||
           window.location.hash.includes('preview') ||
           window.location.search.includes('preview');
+
+        // Priority 0: Public live-share link (?share=...) — no sign-in required
+        const urlShareId = getShareIdFromUrl();
+        if (urlShareId) {
+          setShareId(urlShareId);
+          setIsPreviewMode(true);
+          try {
+            const shared = await fetchSharedSnapshot(urlShareId);
+            if (shared && isMounted) {
+              lastCloudPreviewAtRef.current = shared.createdAt || 0;
+              checkAndApplyPreview(shared);
+            }
+          } catch (e) {
+            console.warn('Failed to load shared preview', e);
+          }
+          if (isMounted) {
+            clearTimeout(safetyTimer);
+            setIsStorageLoading(false);
+          }
+          return;
+        }
 
         // Priority 1: Check if page was loaded via a Live Preview Link (/preview, #preview=..., or ?preview=...)
         if (isPreviewRoute) {
@@ -346,6 +396,18 @@ export default function App() {
 
     // Listen to URL changes (e.g. clicking shared links, back/forward button, or route changes)
     const handleUrlChange = () => {
+      const sid = getShareIdFromUrl();
+      setShareId(sid);
+      if (sid) {
+        setIsPreviewMode(true);
+        fetchSharedSnapshot(sid).then((shared) => {
+          if (shared) {
+            lastCloudPreviewAtRef.current = shared.createdAt || 0;
+            checkAndApplyPreview(shared);
+          }
+        });
+        return;
+      }
       const pData = parsePreviewFromUrl();
       if (pData) {
         checkAndApplyPreview(pData);
