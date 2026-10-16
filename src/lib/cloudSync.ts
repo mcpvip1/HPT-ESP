@@ -16,6 +16,7 @@ import type {
   ColumnConfigItem,
   ColumnMapping,
   DecisionLayer,
+  MatchedRow,
   MatchingStats,
   NormalizationRules,
   WorkbookData,
@@ -412,6 +413,66 @@ export async function fetchWorkbooks(uid: string): Promise<CloudWorkbooks | null
     };
   } catch (e) {
     console.warn('Cloud sync: failed to parse workbooks', e);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Results state: the evaluated matching results (+ stats + view filters) so a
+// signed-in user gets their files, settings AND results on any device right
+// after login, without re-running the match. Chunked: result sets can be large.
+// ---------------------------------------------------------------------------
+
+export interface ResultFilters {
+  activeFilter: string;
+  searchTerm: string;
+  searchColumn: string;
+  onlyAccept: boolean;
+}
+
+export interface CloudResultsState {
+  results: MatchedRow[];
+  stats: MatchingStats;
+  filters: ResultFilters;
+  updatedAt: number;
+}
+
+export const defaultResultFilters: ResultFilters = {
+  activeFilter: 'all',
+  searchTerm: '',
+  searchColumn: 'all',
+  onlyAccept: true,
+};
+
+export async function publishResultsState(
+  uid: string,
+  state: Omit<CloudResultsState, 'updatedAt'>
+): Promise<boolean> {
+  return publishChunkedDoc(
+    stateDoc(uid, 'results'),
+    JSON.stringify({ results: state.results, stats: state.stats, filters: state.filters }),
+    { updatedAt: Date.now() }
+  );
+}
+
+export async function fetchResultsState(uid: string): Promise<CloudResultsState | null> {
+  const res = await fetchChunkedDoc(stateDoc(uid, 'results'));
+  if (!res) return null;
+  try {
+    const data = JSON.parse(res.json) as {
+      results?: MatchedRow[];
+      stats?: MatchingStats;
+      filters?: ResultFilters;
+    };
+    if (!data.results || !data.stats) return null;
+    return {
+      results: data.results,
+      stats: data.stats,
+      filters: { ...defaultResultFilters, ...(data.filters || {}) },
+      updatedAt: (res.meta.updatedAt as number) || 0,
+    };
+  } catch (e) {
+    console.warn('Cloud sync: failed to parse results state', e);
     return null;
   }
 }
