@@ -433,18 +433,38 @@ export default function App() {
     };
   }, []);
 
-  // Auto-save Reference Workbook to Persistent Storage
+  // Replace the Reference Workbook (Main File) with a newly uploaded file.
+  // The old workbook is swapped out wholesale (never mutated in place); if the
+  // Incoming file is already loaded, results are regenerated immediately so the
+  // results and all data stay in sync until the next change.
   const handleSetReferenceWb = async (wb: WorkbookData | null) => {
     setReferenceWb(wb);
     if (wb) {
       await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, wb);
-      // Only auto-map if there are no existing saved mappings
-      if (mappings.length === 0 && comparisonWb) {
+      let effectiveMappings = mappings;
+      // Drop mappings that reference columns no longer present in the new file
+      const validMappings = mappings.filter((m) => wb.headers.includes(m.mainCol));
+      if (validMappings.length === 0 && comparisonWb) {
         const auto = autoMapColumns(wb.headers, comparisonWb.headers);
         if (auto.length > 0) {
+          effectiveMappings = auto;
           setMappings(auto);
           await saveToIDB(StorageKeys.COLUMN_MAPPINGS, auto);
+        } else {
+          effectiveMappings = [];
         }
+      } else if (validMappings.length !== mappings.length) {
+        effectiveMappings = validMappings;
+        setMappings(validMappings);
+        await saveToIDB(StorageKeys.COLUMN_MAPPINGS, validMappings);
+      }
+
+      if (comparisonWb) {
+        showToast(
+          `Loaded ${wb.name}! Regenerating Results & Export with saved Rules & Logic Settings...`,
+          'info'
+        );
+        handleExecuteMatching(wb, comparisonWb, effectiveMappings, true);
       }
     } else {
       await deleteFromIDB(StorageKeys.REFERENCE_WORKBOOK);
