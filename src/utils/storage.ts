@@ -178,6 +178,7 @@ export async function deleteFromIDB(key: string): Promise<void> {
 
 export const StorageKeys = {
   REFERENCE_WORKBOOK: 'reference_workbook',
+  COMPARISON_WORKBOOK: 'comparison_workbook',
   COLUMN_MAPPINGS: 'column_mappings',
   NORMALIZATION_RULES: 'normalization_rules',
   DECISION_LAYERS: 'decision_layers',

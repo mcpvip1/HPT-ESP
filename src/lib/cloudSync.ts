@@ -18,6 +18,7 @@ import type {
   DecisionLayer,
   MatchingStats,
   NormalizationRules,
+  WorkbookData,
 } from '../types';
 
 /** Tiny debounce helper for cloud publishes. */
@@ -104,14 +105,13 @@ export interface CloudPreviewMeta {
 
 const CHUNK_CHARS = 700_000;
 
-async function publishSnapshotTo(
+async function publishChunkedDoc(
   metaRef: DocumentReference,
-  payload: SharedPreviewPayload,
-  extraFields: Record<string, unknown> = {},
+  json: string,
+  metaFields: Record<string, unknown>,
   chunkFields: Record<string, unknown> = {}
 ): Promise<boolean> {
   try {
-    const json = JSON.stringify(packCompact(payload));
     const chunks: string[] = [];
     for (let i = 0; i < json.length; i += CHUNK_CHARS) {
       chunks.push(json.slice(i, i + CHUNK_CHARS));
@@ -119,7 +119,9 @@ async function publishSnapshotTo(
 
     const prevSnap = await getDoc(metaRef).catch(() => null);
     const prevCount =
-      prevSnap && prevSnap.exists() ? (prevSnap.data() as CloudPreviewMeta).chunkCount || 0 : 0;
+      prevSnap && prevSnap.exists()
+        ? ((prevSnap.data() as { chunkCount?: number }).chunkCount || 0)
+        : 0;
 
     const batch = writeBatch(db);
     const chunksCol = collection(metaRef, 'chunks');
@@ -130,36 +132,75 @@ async function publishSnapshotTo(
     for (let i = chunks.length; i < prevCount; i++) {
       batch.delete(doc(chunksCol, String(i)));
     }
-    batch.set(metaRef, {
-      updatedAt: payload.createdAt || Date.now(),
-      comparisonWbName: payload.comparisonWbName,
-      filter: payload.filter || 'all',
-      searchTerm: payload.searchTerm || '',
-      searchColumn: payload.searchColumn || 'all',
-      columnConfigs: payload.columnConfigs || [],
-      stats: payload.stats,
-      chunkCount: chunks.length,
-      ...extraFields,
-    } satisfies CloudPreviewMeta);
+    batch.set(metaRef, { ...metaFields, chunkCount: chunks.length });
     await batch.commit();
     return true;
   } catch (e) {
-    console.warn('Cloud sync: failed to publish snapshot', e);
+    console.warn('Cloud sync: failed to publish chunked doc', e);
     return false;
   }
 }
 
-async function fetchSnapshotFrom(metaRef: DocumentReference): Promise<SharedPreviewPayload | null> {
-  const metaSnap = await getDoc(metaRef);
-  if (!metaSnap.exists()) return null;
-  const colSnap = await getDocs(collection(metaSnap.ref, 'chunks'));
-  const parts: string[] = [];
-  colSnap.forEach((d) => {
-    parts[parseInt(d.id, 10)] = (d.data() as { data: string }).data;
-  });
-  if (parts.length === 0 || parts.some((p) => p === undefined)) return null;
-  return unpackCompact(JSON.parse(parts.join('')));
+async function fetchChunkedDoc(
+  metaRef: DocumentReference
+): Promise<{ meta: Record<string, unknown>; json: string } | null> {
+  try {
+    const metaSnap = await getDoc(metaRef);
+    if (!metaSnap.exists()) return null;
+    const colSnap = await getDocs(collection(metaSnap.ref, 'chunks'));
+    const parts: string[] = [];
+    colSnap.forEach((d) => {
+      parts[parseInt(d.id, 10)] = (d.data() as { data: string }).data;
+    });
+    if (parts.length === 0 || parts.some((p) => p === undefined)) return null;
+    return { meta: metaSnap.data() as Record<string, unknown>, json: parts.join('') };
+  } catch (e) {
+    console.warn('Cloud sync: failed to fetch chunked doc', e);
+    return null;
+  }
 }
+
+function previewMetaFields(
+  payload: SharedPreviewPayload,
+  extra: Record<string, unknown> = {}
+): Record<string, unknown> {
+  return {
+    updatedAt: payload.createdAt || Date.now(),
+    comparisonWbName: payload.comparisonWbName,
+    filter: payload.filter || 'all',
+    searchTerm: payload.searchTerm || '',
+    searchColumn: payload.searchColumn || 'all',
+    columnConfigs: payload.columnConfigs || [],
+    stats: payload.stats,
+    ...extra,
+  };
+}
+
+async function publishSnapshotTo(
+  metaRef: DocumentReference,
+  payload: SharedPreviewPayload,
+  extraFields: Record<string, unknown> = {},
+  chunkFields: Record<string, unknown> = {}
+): Promise<boolean> {
+  return publishChunkedDoc(
+    metaRef,
+    JSON.stringify(packCompact(payload)),
+    previewMetaFields(payload, extraFields),
+    chunkFields
+  );
+}
+
+async function fetchSnapshotFrom(metaRef: DocumentReference): Promise<SharedPreviewPayload | null> {
+  const res = await fetchChunkedDoc(metaRef);
+  if (!res) return null;
+  try {
+    return unpackCompact(JSON.parse(res.json));
+  } catch (e) {
+    console.warn('Cloud sync: failed to unpack snapshot', e);
+    return null;
+  }
+}
+
 
 // ---------------------------------------------------------------------------
 // Private workspace preview: workspaces/{uid}/state/preview (+chunks).
@@ -277,5 +318,49 @@ export async function setActiveShare(uid: string, shareId: string | null): Promi
   } catch (e) {
     console.warn('Cloud sync: failed to set active share', e);
     return false;
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// Workbook sync: the actual Reference + Incoming files (headers + rows).
+// Stored chunked at workspaces/{uid}/state/workbooks so every signed-in
+// device opens the same files, history and results. Covered by the existing
+// workspaces/{uid} security rule — no rules change needed.
+// ---------------------------------------------------------------------------
+
+export interface CloudWorkbooks {
+  reference: WorkbookData | null;
+  comparison: WorkbookData | null;
+  updatedAt: number;
+}
+
+export async function publishWorkbooks(
+  uid: string,
+  wbs: { reference: WorkbookData | null; comparison: WorkbookData | null }
+): Promise<boolean> {
+  return publishChunkedDoc(
+    stateDoc(uid, 'workbooks'),
+    JSON.stringify({ reference: wbs.reference, comparison: wbs.comparison }),
+    { updatedAt: Date.now() }
+  );
+}
+
+export async function fetchWorkbooks(uid: string): Promise<CloudWorkbooks | null> {
+  const res = await fetchChunkedDoc(stateDoc(uid, 'workbooks'));
+  if (!res) return null;
+  try {
+    const data = JSON.parse(res.json) as {
+      reference?: WorkbookData | null;
+      comparison?: WorkbookData | null;
+    };
+    return {
+      reference: data.reference || null,
+      comparison: data.comparison || null,
+      updatedAt: (res.meta.updatedAt as number) || 0,
+    };
+  } catch (e) {
+    console.warn('Cloud sync: failed to parse workbooks', e);
+    return null;
   }
 }
