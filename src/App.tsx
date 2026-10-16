@@ -87,7 +87,7 @@ export default function App() {
   // Public live-share id from ?share=... (viewable without sign-in)
   const [shareId, setShareId] = useState<string | null>(() => getShareIdFromUrl());
   const shareRevokedToastShownRef = useRef(false);
-  const [previewFilter, setPreviewFilter] = useState<'all' | 'green' | 'yellow' | 'red' | 'unmatched'>('all');
+  const [previewFilter, setPreviewFilter] = useState<'all' | 'green' | 'yellow' | 'red' | 'blue' | 'unmatched'>('all');
   const [previewOnlyAccept, setPreviewOnlyAccept] = useState<boolean>(true);
   const [previewSearchTerm, setPreviewSearchTerm] = useState<string>('');
   const [previewSearchColumn, setPreviewSearchColumn] = useState<string>('all');
@@ -108,11 +108,13 @@ export default function App() {
     defaultNormalizationRules
   );
   const [layers, setLayers] = useState<DecisionLayer[]>(defaultDecisionLayers);
+  // Hold-key filter: rows containing any of these keys move to the Hold tab (blue)
+  const [holdKeys, setHoldKeys] = useState<string[]>([]);
 
   // Cloud sync (Firebase): one shared workspace across every device
   const [cloudUser, setCloudUser] = useState<User | null>(null);
-  const rulesStateRef = useRef({ normalization, layers, mappings });
-  rulesStateRef.current = { normalization, layers, mappings };
+  const rulesStateRef = useRef({ normalization, layers, mappings, holdKeys });
+  rulesStateRef.current = { normalization, layers, mappings, holdKeys };
   const lastRulesPublishRef = useRef<string>('');
   const lastCloudPreviewAtRef = useRef<number>(0);
 
@@ -219,6 +221,7 @@ export default function App() {
         ]);
 
         let effMappings = rulesStateRef.current.mappings;
+        let effHoldKeys = rulesStateRef.current.holdKeys;
         let effRef = refWbRef.current;
         let effComp = compWbRef.current;
 
@@ -236,10 +239,16 @@ export default function App() {
             await saveToIDB(StorageKeys.COLUMN_MAPPINGS, cloudRules.mappings);
             effMappings = cloudRules.mappings;
           }
+          if (cloudRules.holdKeys) {
+            setHoldKeys(cloudRules.holdKeys);
+            await saveToIDB(StorageKeys.HOLD_KEYS, cloudRules.holdKeys);
+            effHoldKeys = cloudRules.holdKeys;
+          }
           lastRulesPublishRef.current = JSON.stringify({
             n: cloudRules.normalization,
             l: cloudRules.layers,
             m: cloudRules.mappings,
+            h: cloudRules.holdKeys,
           });
           showToast(t.toastCloudRulesSynced, 'success');
         } else {
@@ -249,6 +258,7 @@ export default function App() {
             n: cur.normalization,
             l: cur.layers,
             m: cur.mappings,
+            h: cur.holdKeys,
           });
         }
 
@@ -291,7 +301,7 @@ export default function App() {
         }
 
         if (effRef && effComp) {
-          handleExecuteMatching(effRef, effComp, effMappings, false);
+          handleExecuteMatching(effRef, effComp, effMappings, false, effHoldKeys);
         }
       } catch (e) {
         console.warn('Cloud workspace pull failed', e);
@@ -302,8 +312,8 @@ export default function App() {
 
   // Publish rule settings to the cloud whenever they change (debounced).
   const debouncedPublishRules = useRef(
-    debounce((uid: string, st: { normalization: NormalizationRules; layers: DecisionLayer[]; mappings: ColumnMapping[] }) => {
-      const key = JSON.stringify({ n: st.normalization, l: st.layers, m: st.mappings });
+    debounce((uid: string, st: { normalization: NormalizationRules; layers: DecisionLayer[]; mappings: ColumnMapping[]; holdKeys: string[] }) => {
+      const key = JSON.stringify({ n: st.normalization, l: st.layers, m: st.mappings, h: st.holdKeys });
       if (key === lastRulesPublishRef.current) return;
       lastRulesPublishRef.current = key;
       publishRulesState(uid, st);
@@ -313,7 +323,7 @@ export default function App() {
   useEffect(() => {
     if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current) return;
     debouncedPublishRules(cloudUser.uid, rulesStateRef.current);
-  }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, debouncedPublishRules]);
+  }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, holdKeys, debouncedPublishRules]);
 
   const debouncedPublishWorkbooks = useRef(
     debounce((uid: string, wbs: { reference: WorkbookData | null; comparison: WorkbookData | null }) => {
@@ -473,9 +483,11 @@ export default function App() {
         const savedLayers = await getFromIDB<DecisionLayer[]>(
           StorageKeys.DECISION_LAYERS
         );
+        const savedHoldKeys = await getFromIDB<string[]>(StorageKeys.HOLD_KEYS);
 
         if (savedNorm && isMounted) setNormalization(savedNorm);
         if (savedLayers && savedLayers.length > 0 && isMounted) setLayers(savedLayers);
+        if (savedHoldKeys && isMounted) setHoldKeys(savedHoldKeys);
 
         if (savedRef && isMounted) {
           setReferenceWb(savedRef);
@@ -555,6 +567,15 @@ export default function App() {
   // The old workbook is swapped out wholesale (never mutated in place); if the
   // Incoming file is already loaded, results are regenerated immediately so the
   // results and all data stay in sync until the next change.
+  // Hold-key filter changes: persist, sync via the rules publish effect, and re-run matching
+  const handleHoldKeysChange = async (keys: string[]) => {
+    setHoldKeys(keys);
+    await saveToIDB(StorageKeys.HOLD_KEYS, keys);
+    if (referenceWb && comparisonWb) {
+      handleExecuteMatching(referenceWb, comparisonWb, mappings, false, keys);
+    }
+  };
+
   const handleSetReferenceWb = async (wb: WorkbookData | null) => {
     setReferenceWb(wb);
     if (wb) {
@@ -757,7 +778,8 @@ export default function App() {
     customRef?: WorkbookData | null,
     customComp?: WorkbookData | null,
     customMappings?: ColumnMapping[],
-    notifySuccess = true
+    notifySuccess = true,
+    customHoldKeys?: string[]
   ) => {
     const ref = customRef !== undefined ? customRef : referenceWb;
     const comp = customComp !== undefined ? customComp : comparisonWb;
@@ -791,7 +813,8 @@ export default function App() {
           comp,
           effectiveMappings,
           normalization,
-          layers
+          layers,
+          customHoldKeys !== undefined ? customHoldKeys : holdKeys
         );
 
         setResults(evaluatedResults);
@@ -922,6 +945,8 @@ export default function App() {
                   isPreviewMode={false}
                   initialColumnConfigs={previewColumnConfigs}
                   cloudUser={cloudUser}
+                  holdKeys={holdKeys}
+                  onHoldKeysChange={handleHoldKeysChange}
                 />
               </div>
             )}
