@@ -367,13 +367,163 @@ export interface TranslationDict {
   conditionGreaterThan: string;
   conditionLessThan: string;
   rulesLogicSetting: string;
+  filesOpeningFile: string;
+  filesSavingStorage: string;
+  filesLoadedNeedsRef: string;
+  filesMasterBaseline: string;
+  filesProcessing: string;
+  filesSelectMainSheet: string;
+  filesSheetsCount: string;
+  filesActiveSheetLabel: string;
+  filesSelectRefSheetAria: string;
+  filesSheetOption: string;
+  filesSingleSheet: string;
+  filesColumnsDetected: string;
+  filesMoreColumns: string;
+  filesIncomingDesc: string;
+  filesReadyToEvaluate: string;
+  filesSelectIncomingSheet: string;
+  filesSelectCompSheetAria: string;
+  excelReadingBuffer: string;
+  excelDecompressing: string;
+  excelReadingSheet: string;
+  excelDone: string;
+  mapSummaryMore: string;
+  mapNeedBothFiles: string;
+  mapAutoMappedCount: string;
+  mapNoMatchesFound: string;
+  mapNeedMappingFirst: string;
+  mapDefaultPresetName: string;
+  mapPairCount: string;
+  mapPresetSaved: string;
+  mapPresetSaveFailed: string;
+  mapPresetApplied: string;
+  mapPresetDeleted: string;
+  mapPresetDeleteFailed: string;
+  mapTplPoName: string;
+  mapTplPoDesc: string;
+  mapTplSerialName: string;
+  mapTplSerialDesc: string;
+  mapTplInvoiceName: string;
+  mapTplInvoiceDesc: string;
+  mapPresetsBtnTitle: string;
+  mapSavedRecentKeys: string;
+  mapSaveKeysBtnTitle: string;
+  mapSaveKeys: string;
+  mapRecentKeys: string;
+  mapRecentMappingName: string;
+  mapRestoreLastUsed: string;
+  mapDeleteMappingAria: string;
+  mapNormSectionDesc: string;
+  mapSaveDialogTitle: string;
+  mapPresetNameLabel: string;
+  mapPresetNamePh: string;
+  mapWillSavePairs: string;
+  mapSavePreset: string;
+  mapPresetsModalTitle: string;
+  mapPresetsModalDesc: string;
+  mapTabSaved: string;
+  mapTabRecent: string;
+  mapTabTemplates: string;
+  mapColCountBadge: string;
+  mapAllInFiles: string;
+  mapSavedOn: string;
+  mapDeletePresetTitle: string;
+  mapApplyPreset: string;
+  mapNoPresets: string;
+  mapNoPresetsHint: string;
+  mapRecentSession: string;
+  mapAutoSaved: string;
+  mapNoHistory: string;
+  mapUseTemplate: string;
+  mapPresetsStoredNote: string;
+  mapRestore: string;
+  layerDefaultName: string;
+  layerRuleAccepted: string;
+  layerRuleReview: string;
+  layerRuleRejected: string;
+  layerRuleDefinition: string;
+  layerInspectionPresetName: string;
+  layerRuleContains: string;
+  layerRuleEitherContains: string;
+  layerDefaultPresetName: string;
+  layerPresetDesc: string;
+  layerTplInspectionDesc: string;
+  layerTplQaName: string;
+  layerTplQaDesc: string;
+  layerTplQaLayerName: string;
+  layerTplAcceptedPass: string;
+  layerTplNeedsReview: string;
+  layerTplStrictName: string;
+  layerTplStrictDesc: string;
+  layerTplStrictLayerName: string;
+  layerTplPassed: string;
+  layerTplApproved: string;
+  layerPresetsBtnTitle: string;
+  layerSavedRecentRules: string;
+  layerSaveRulesBtnTitle: string;
+  layerSaveRules: string;
+  layerActiveRuleTitle: string;
+  layerActiveRuleDesc1: string;
+  layerActiveRuleDesc2: string;
+  layerActiveRuleDesc3: string;
+  layerResetStandardRule: string;
+  layerMoveUpTitle: string;
+  layerMoveDownTitle: string;
+  layerDeleteLayerTitle: string;
+  layerPrimaryColumn: string;
+  layerSecondaryColumn: string;
+  layerNoSecondary: string;
+  layerComboLogic: string;
+  layerLogicOr: string;
+  layerLogicAnd: string;
+  layerValueRules: string;
+  layerTargetAny: string;
+  layerTargetPrimary: string;
+  layerTargetSecondary: string;
+  layerValuePlaceholder: string;
+  layerColorGreen: string;
+  layerColorYellow: string;
+  layerColorRed: string;
+  layerDeleteRuleTitle: string;
+  layerUseOriginalFill: string;
+  layerIfNoRuleMatch: string;
+  layerFallbackNone: string;
+  layerFallbackYellow: string;
+  layerFallbackRed: string;
+  layerFallbackGreen: string;
+  layerHierarchyHint: string;
+  layerSaveDialogTitle: string;
+  layerPresetNameLabel: string;
+  layerPresetNamePh: string;
+  layerWillSave: string;
+  layerSavePreset: string;
+  layerPresetsModalTitle: string;
+  layerPresetsModalDesc: string;
+  layerTabSaved: string;
+  layerTabRecent: string;
+  layerTabStandard: string;
+  layerCountBadge: string;
+  layerSavedOn: string;
+  layerDeletePresetTitle: string;
+  layerApplyRules: string;
+  layerNoPresets: string;
+  layerNoPresetsHint: string;
+  layerRecentState: string;
+  layerAutoSaved: string;
+  layerNoHistory: string;
+  layerTemplateMeta: string;
+  layerApplyRule: string;
+  layerFooterNote: string;
 }
 
 import { batchB } from './batchB';
+import { batchC } from './batchC';
 
 export const translations: Record<Language, TranslationDict> = {
   en: {
     ...batchB.en,
+    ...batchC.en,
     appName: "ExcelMatch Pro",
     appSubtitle: "Intelligent Auto-Sorting, Matching & Decision Engine",
     step1: "1. Files",
@@ -638,6 +788,7 @@ export const translations: Record<Language, TranslationDict> = {
   },
   my: {
     ...batchB.my,
+    ...batchC.my,
     appName: "ExcelMatch Pro",
     appSubtitle: "အလိုအလျောက် Excel အချက်အလက်နှိုင်းယှဉ်စစ်ဆေးရေး အင်ဂျင်",
     step1: "၁. ဖိုင်များ",
@@ -902,6 +1053,7 @@ export const translations: Record<Language, TranslationDict> = {
   },
   th: {
     ...batchB.th,
+    ...batchC.th,
     appName: "ExcelMatch Pro",
     appSubtitle: "ระบบเปรียบเทียบข้อมูล จัดเรียง และประเมินผลอัตโนมัติสำหรับ Excel",
     step1: "1. ไฟล์ข้อมูล",
@@ -1166,6 +1318,7 @@ export const translations: Record<Language, TranslationDict> = {
   },
   zh: {
     ...batchB.zh,
+    ...batchC.zh,
     appName: "ExcelMatch Pro",
     appSubtitle: "企业级智能 Excel 自动比对、多列匹配与决策引擎",
     step1: "1. 数据文件",
