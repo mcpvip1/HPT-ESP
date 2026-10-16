@@ -358,7 +358,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           searchColumn,
           columnConfigs: newConfigs,
         });
-        const hashPart = linkInfo.url.split('#')[1];
+        const hashPart = linkInfo.hashUrl.split('#')[1];
         if (hashPart && window.location.hash !== `#${hashPart}`) {
           window.history.replaceState(null, '', `#${hashPart}`);
         }
@@ -431,7 +431,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         searchColumn,
         columnConfigs,
       });
-      const hashPart = linkInfo.url.split('#')[1];
+      const hashPart = linkInfo.hashUrl.split('#')[1];
       if (hashPart && window.location.hash !== `#${hashPart}`) {
         window.history.replaceState(null, '', `#${hashPart}`);
       }

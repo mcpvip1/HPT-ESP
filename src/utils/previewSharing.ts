@@ -311,7 +311,10 @@ export function parsePreviewFromUrl(): SharedPreviewPayload | null {
 export async function copyPreviewLinkToClipboard(
   payload: SharedPreviewPayload
 ): Promise<{ success: boolean; url: string }> {
-  const { url } = generatePreviewLink(payload);
+  // Copy the hash URL: it embeds the compressed payload, so the link works
+  // on any device/browser. The short clean URL carries no data and only
+  // resolves via the same browser's localStorage cache.
+  const { hashUrl: url } = generatePreviewLink(payload);
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(url);
