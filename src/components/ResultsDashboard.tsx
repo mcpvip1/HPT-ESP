@@ -158,9 +158,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         } catch {}
       }
       if (onRefresh) onRefresh();
-      onShowToast('Refreshed to latest data & column view settings', 'success');
+      onShowToast(t.dashRefreshedLatest, 'success');
     } catch {
-      onShowToast('Refresh completed', 'info');
+      onShowToast(t.dashRefreshCompleted, 'info');
     } finally {
       setTimeout(() => {
         setIsRefreshing(false);
@@ -251,7 +251,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
     // Decision & System Audit Columns moved to last columns
     items.push(
-      { id: 'decisionStatus', label: 'Decision Status', category: 'system', showInTable: true, showInExport: true },
+      { id: 'decisionStatus', label: t.colDecisionStatus, category: 'system', showInTable: true, showInExport: true },
       { id: 'matchStatus', label: t.matchedStatus || 'Match Status', category: 'system', showInTable: true, showInExport: true },
       { id: 'decisionReason', label: t.reason || 'Evaluation Reason', category: 'system', showInTable: true, showInExport: true },
     );
@@ -399,7 +399,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     } catch (e) {
       console.warn('Failed to save column settings', e);
     }
-    onShowToast('Column layout saved! Synced to preview.', 'success');
+    onShowToast(t.dashColumnLayoutSaved, 'success');
   };
 
   const handleResetDefaultColumns = () => {
@@ -409,7 +409,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       showInExport: true,
     }));
     handleSaveColumnConfigs(defaults);
-    onShowToast('All columns restored to default order and visibility', 'info');
+    onShowToast(t.dashColumnsRestored, 'info');
   };
 
   const handleToggleSyncExport = (sync: boolean) => {
@@ -552,7 +552,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
   const handleToggleLiveShare = async () => {
     if (!cloudUser) {
-      onShowToast('Sign in with Google (Sync button) to enable live share links.', 'info');
+      onShowToast(t.dashSignInForShare, 'info');
       return;
     }
     if (liveShareId) {
@@ -568,10 +568,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     if (!okShare || !okPublish) {
       // Don't leave behind a link that points at nothing
       await setActiveShare(cloudUser.uid, null);
-      onShowToast(
-        'Could not publish the share link. Check that Firestore rules allow the /shares collection, then try again.',
-        'error'
-      );
+      onShowToast(t.dashSharePublishFailed, 'error');
       return;
     }
     try {
@@ -581,14 +578,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     }
     setLiveShareId(sid);
     setShowLiveSharePanel(true);
-    onShowToast('Live share link created — anyone with the link sees your latest results.', 'success');
+    onShowToast(t.dashShareCreated, 'success');
   };
 
   const handleStopLiveShare = async () => {
     if (!liveShareId) return;
     const ok = await unpublishSharedSnapshot(liveShareId);
     if (!ok) {
-      onShowToast('Could not revoke the share link (network or permissions). Try again.', 'error');
+      onShowToast(t.dashShareRevokeFailed, 'error');
       return;
     }
     if (cloudUser) await setActiveShare(cloudUser.uid, null);
@@ -599,7 +596,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     }
     setLiveShareId(null);
     setShowLiveSharePanel(false);
-    onShowToast('Live sharing turned off — the link no longer works.', 'info');
+    onShowToast(t.dashShareStopped, 'info');
   };
 
   const handleCopyLiveShareLink = async () => {
@@ -621,7 +618,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       setLiveShareCopied(true);
       setTimeout(() => setLiveShareCopied(false), 2000);
     } catch {
-      onShowToast('Could not copy the link.', 'error');
+      onShowToast(t.dashCopyLinkFailed, 'error');
     }
   };
 
@@ -641,8 +638,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       });
       if (res.success) {
         setQuickCopied(true);
-        const filterName = activeFilter === 'all' ? 'All records' : `${activeFilter.toUpperCase()} filter`;
-        onShowToast(`Result Preview link with ${filterName} and custom columns copied! Anyone clicking it sees this result view only.`, 'success');
+        const filterName = activeFilter === 'all' ? t.dashFilterNameAll
+          : activeFilter === 'green' ? t.filterGreen
+          : activeFilter === 'yellow' ? t.filterYellow
+          : activeFilter === 'red' ? t.filterRed : t.filterUnmatched;
+        onShowToast(t.dashPreviewLinkCopied.replace('{filter}', filterName), 'success');
         setTimeout(() => setQuickCopied(false), 2500);
       } else {
         setShowShareModal(true);
@@ -657,23 +657,23 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     if (colId === 'rowIndex') return String(row.rowIndex);
     if (colId === 'decisionStatus') {
       return row.decisionColor === 'green'
-        ? 'PASSED'
+        ? t.badgePassed
         : row.decisionColor === 'yellow'
-        ? 'REVIEW'
+        ? t.badgeReview
         : row.decisionColor === 'red'
-        ? 'REJECTED'
-        : 'NO RULE';
+        ? t.badgeRejected
+        : t.badgeNoRule;
     }
     if (colId === 'matchStatus') {
-      return row.isMatched ? 'Matched' : 'Unmatched';
+      return row.isMatched ? t.dashValueMatched : t.dashValueUnmatched;
     }
     if (colId === 'decisionReason') {
-      return row.decisionReason ? String(row.decisionReason).trim() : '(Empty)';
+      return row.decisionReason ? String(row.decisionReason).trim() : t.dashValueEmpty;
     }
     if (colId.startsWith('[Ref] ')) {
       const rawKey = colId.replace('[Ref] ', '');
       const val = row.matchedMainRow?.[rawKey];
-      return val !== undefined && val !== null && String(val).trim() !== '' ? String(val) : '(Blanks)';
+      return val !== undefined && val !== null && String(val).trim() !== '' ? String(val) : t.dashValueBlanks;
     }
     let val = row.comparisonRow[colId];
     if (row.decisionColor === 'green' && typeof val === 'string' && val.toLowerCase().includes('postpone')) {
@@ -692,8 +692,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     return Array.from(counts.entries())
       .map(([value, count]) => ({ value, count }))
       .sort((a, b) => {
-        if (a.value === '(Blanks)' || a.value === '(Empty)') return 1;
-        if (b.value === '(Blanks)' || b.value === '(Empty)') return -1;
+        if (a.value === t.dashValueBlanks || a.value === t.dashValueEmpty) return 1;
+        if (b.value === t.dashValueBlanks || b.value === t.dashValueEmpty) return -1;
         return a.value.localeCompare(b.value, undefined, { numeric: true, sensitivity: 'base' });
       });
   };
@@ -840,9 +840,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     try {
       const baseName = comparisonWb?.name || 'Excel_Matching_Output';
       exportStyledExcel(results, compHeaders, stats, baseName, exportColIds);
-      onShowToast(`Professional Excel exported with ${exportColIds.length} customized columns`, 'success');
+      onShowToast(t.dashExcelExported.replace('{count}', String(exportColIds.length)), 'success');
     } catch (err: any) {
-      onShowToast(err.message || 'Export failed', 'error');
+      onShowToast(err.message || t.dashExportFailed, 'error');
     }
   };
 
@@ -850,9 +850,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     try {
       const baseName = comparisonWb?.name || 'Excel_Matching_Output';
       exportCsv(results, compHeaders, baseName, exportColIds);
-      onShowToast(`CSV exported with ${exportColIds.length} customized columns`, 'success');
+      onShowToast(t.dashCsvExported.replace('{count}', String(exportColIds.length)), 'success');
     } catch (err: any) {
-      onShowToast(err.message || 'Export failed', 'error');
+      onShowToast(err.message || t.dashExportFailed, 'error');
     }
   };
 
@@ -862,27 +862,27 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-bold text-white bg-emerald-600 shadow-xs tracking-wider">
             <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-            PASSED
+            {t.badgePassed}
           </span>
         );
       case 'yellow':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-bold text-white bg-amber-500 shadow-xs tracking-wider">
             <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5]" />
-            REVIEW
+            {t.badgeReview}
           </span>
         );
       case 'red':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-bold text-white bg-rose-600 shadow-xs tracking-wider">
             <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
-            REJECTED
+            {t.badgeRejected}
           </span>
         );
       default:
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold text-slate-600 bg-slate-100">
-            NO RULE
+            {t.badgeNoRule}
           </span>
         );
     }
@@ -951,7 +951,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               setPage(1);
             }}
             className="flex items-center gap-2.5 group pr-1"
-            title="Filter to only show Accept records (hiding superseded Postpone rows for duplicate keys)"
+            title={t.dashOnlyAcceptTitle}
           >
             <span
               className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
@@ -965,7 +965,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               />
             </span>
             <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 whitespace-nowrap">
-              Only Accept
+              {t.dashOnlyAccept}
             </span>
           </button>
 
@@ -978,10 +978,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               onClick={handleRefresh}
               disabled={isRefreshing}
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 group"
-              title="Refresh results data"
+              title={t.dashRefreshTitle}
             >
               <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 group-hover:rotate-180 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
+              <span>{t.dashRefresh}</span>
             </button>
 
             {/* Save Column View & Sync button (Main Results page) */}
@@ -993,10 +993,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-200 shadow-md ring-1 ring-emerald-400 animate-pulse'
                     : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
                 }`}
-                title="Save custom column order and visibility (syncs to preview links)"
+                title={t.dashSaveViewTitle}
               >
                 <Save className={`w-3.5 h-3.5 ${hasUnsavedColumnChanges ? 'text-white' : 'text-emerald-600'}`} />
-                <span>{hasUnsavedColumnChanges ? 'Save & Sync View' : 'Save View'}</span>
+                <span>{hasUnsavedColumnChanges ? t.dashSaveSyncView : t.dashSaveView}</span>
               </button>
             )}
 
@@ -1004,10 +1004,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             <button
               onClick={() => setShowColumnModal(true)}
               className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
-              title="Customize and reorder columns for Results Table and Excel Export"
+              title={t.dashColumnsTitle}
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
-              <span>Columns</span>
+              <span>{t.dashColumns}</span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-emerald-700 border border-emerald-200 font-bold">
                 {tableVisibleCount}
               </span>
@@ -1023,17 +1023,17 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 <button
                   onClick={handleQuickCopyPreviewLink}
                   className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
-                  title="Quick copy preview link (clean short link)"
+                  title={t.dashQuickCopyTitle}
                 >
                   {quickCopied ? (
                     <>
                       <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
-                      <span className="text-emerald-600 font-bold">Link Copied!</span>
+                      <span className="text-emerald-600 font-bold">{t.dashLinkCopied}</span>
                     </>
                   ) : (
                     <>
                       <Copy className="w-3.5 h-3.5 text-slate-500 group-hover:scale-110 transition-transform" />
-                      <span>Copy Link</span>
+                      <span>{t.dashCopyLink}</span>
                     </>
                   )}
                 </button>
@@ -1048,31 +1048,28 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         : 'text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border-slate-200'
                     }`}
                     title={
-                      liveShareId
-                        ? 'Live share link is ON — viewers see your latest results & filter'
-                        : 'Create a public live-share link (viewers need no sign-in)'
+                      liveShareId ? t.dashLiveShareOnTitle : t.dashLiveShareOffTitle
                     }
                   >
                     {liveShareId && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}
                     <Share2 className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
-                    <span>{liveShareId ? 'Sharing Live' : 'Live Share'}</span>
+                    <span>{liveShareId ? t.dashSharingLive : t.dashLiveShare}</span>
                   </button>
 
                   {showLiveSharePanel && liveShareId && (
                     <div className="absolute right-0 mt-2 w-80 rounded-xl bg-white border border-slate-200 shadow-xl p-3 z-50 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900">Public live-share link</span>
+                        <span className="text-xs font-bold text-slate-900">{t.dashPublicLiveShareLink}</span>
                         <button
                           onClick={() => setShowLiveSharePanel(false)}
                           className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
-                          aria-label="Close"
+                          aria-label={t.close}
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                       <p className="text-[11px] text-slate-500 leading-snug">
-                        Anyone with this link sees your latest results and active filter — no
-                        sign-in needed. Updates automatically as you work.
+                        {t.dashLiveShareDesc}
                       </p>
                       <div className="flex items-center gap-1.5">
                         <input
@@ -1086,14 +1083,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shrink-0"
                         >
                           {liveShareCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{liveShareCopied ? 'Copied' : 'Copy'}</span>
+                          <span>{liveShareCopied ? t.dashCopied : t.dashCopy}</span>
                         </button>
                       </div>
                       <button
                         onClick={handleStopLiveShare}
                         className="w-full px-2.5 py-1.5 text-[11px] font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg"
                       >
-                        Stop sharing (revoke link)
+                        {t.dashStopSharing}
                       </button>
                     </div>
                   )}
@@ -1103,10 +1100,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 <button
                   onClick={() => setShowShareModal(true)}
                   className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
-                  title="Configure and share result preview link with other users"
+                  title={t.dashSharePreviewTitle}
                 >
                   <Share2 className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
-                  <span>Share Preview</span>
+                  <span>{t.dashSharePreview}</span>
                 </button>
 
               </div>
@@ -1116,7 +1113,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 <button
                   onClick={handleExportExcel}
                   className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0"
-                  title="Export clean professional Excel workbook retaining solid Green, Yellow, and Red fills"
+                  title={t.dashExportExcelTitle}
                 >
                   <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
                   <span>{t.exportExcel}</span>
@@ -1125,7 +1122,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 <button
                   onClick={handleExportCsv}
                   className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0"
-                  title="Export selected columns to CSV"
+                  title={t.dashExportCsvTitle}
                 >
                   <Download className="w-3.5 h-3.5 text-slate-200" />
                   <span>{t.exportCsv}</span>
@@ -1149,14 +1146,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     setPage(1);
                   }}
                   className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 hover:text-slate-900 focus:outline-none focus:border-emerald-500 transition-colors shadow-xs"
-                  title="Search Scope"
+                  title={t.dashSearchScopeTitle}
                 >
-                  <option value="all">All Columns (Real-time)</option>
-                  <option value="outcome">Decision Outcome</option>
-                  <option value="reason">Evaluation Reason</option>
-                  <option value="unmatched">Unmatched Discrepancy</option>
-                  <option value="matchKey">Match Key</option>
-                  <optgroup label="Comparison Data Columns">
+                  <option value="all">{t.dashSearchScopeAll}</option>
+                  <option value="outcome">{t.dashSearchScopeOutcome}</option>
+                  <option value="reason">{t.dashSearchScopeReason}</option>
+                  <option value="unmatched">{t.dashSearchScopeUnmatched}</option>
+                  <option value="matchKey">{t.dashSearchScopeMatchKey}</option>
+                  <optgroup label={t.dashOptgroupComparison}>
                     {compHeaders.map((col) => (
                       <option key={col} value={col}>
                         {col}
@@ -1164,7 +1161,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     ))}
                   </optgroup>
                   {refHeaders.length > 0 && (
-                    <optgroup label="Reference Data Columns">
+                    <optgroup label={t.dashOptgroupReference}>
                       {refHeaders.map((ref) => (
                         <option key={ref} value={ref}>
                           {ref}
@@ -1186,7 +1183,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   setSearchTerm(e.target.value);
                   setPage(1);
                 }}
-                placeholder="Search rows in real-time (type anything to filter instantly)..."
+                placeholder={t.dashSearchPlaceholder}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all font-mono shadow-xs"
               />
               {searchTerm && (
@@ -1196,8 +1193,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     setPage(1);
                   }}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded transition-colors"
-                  title="Clear search"
-                  aria-label="Clear search"
+                  title={t.dashClearSearchTitle}
+                  aria-label={t.dashClearSearchTitle}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -1208,7 +1205,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             {searchTerm.trim() && (
               <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 font-mono">
                 <Filter className="w-3 h-3" />
-                {filteredRows.length} found
+                {t.dashRowsFound.replace('{count}', filteredRows.length.toLocaleString())}
               </span>
             )}
           </div>
@@ -1239,7 +1236,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           <div className="pt-2.5 border-t border-slate-200 flex flex-wrap items-center gap-2 text-xs">
             <span className="text-emerald-700 font-semibold flex items-center gap-1.5 shrink-0">
               <Filter className="w-3.5 h-3.5" />
-              <span>Excel Column Filters:</span>
+              <span>{t.dashActiveColumnFilters}</span>
             </span>
             {Object.entries(columnFilters).map(([colId, vals]) => {
               const colObj = allCandidateColumns.find((c) => c.id === colId);
@@ -1250,7 +1247,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-xs"
                 >
                   <span className="font-sans font-medium text-slate-700">{label}:</span>
-                  <span className="font-bold text-emerald-700">{vals.length} selected</span>
+                  <span className="font-bold text-emerald-700">{t.dashValsSelected.replace('{count}', String(vals.length))}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -1262,7 +1259,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       setPage(1);
                     }}
                     className="p-0.5 hover:text-slate-900 rounded hover:bg-emerald-100 transition-colors ml-0.5 text-emerald-700"
-                    title={`Clear filter on ${label}`}
+                    title={t.dashClearFilterOn.replace('{label}', label)}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -1277,7 +1274,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               }}
               className="text-xs text-rose-600 hover:text-rose-700 underline font-semibold ml-1 transition-colors"
             >
-              Clear all column filters
+              {t.dashClearAllColumnFilters}
             </button>
           </div>
         )}
@@ -1326,7 +1323,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         <div
                           onClick={handleColSort}
                           className="flex items-center gap-1.5 cursor-pointer font-mono select-none hover:text-emerald-700 transition-colors"
-                          title={`Click to sort by ${col.label}`}
+                          title={t.dashClickToSortBy.replace('{label}', col.label)}
                         >
                           {col.category === 'reference' && (
                             <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-100 text-blue-700 border border-blue-200 font-sans shadow-xs">
@@ -1362,14 +1359,15 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                   ? 'text-emerald-700 bg-emerald-100 border border-emerald-300 shadow-xs'
                                   : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
                               }`}
-                              title={`Filter ${col.label} like Excel (multi-select checklist & search)`}
-                              aria-label={`Filter ${col.label}`}
+                              title={t.dashFilterLikeExcelTitle.replace('{label}', col.label)}
+                              aria-label={t.dashFilterAria.replace('{label}', col.label)}
                             >
                               <Filter className="w-3.5 h-3.5" />
                             </button>
 
                             {openFilterColId === col.id && (
                               <ExcelColumnFilter
+                                language={language}
                                 columnId={col.id}
                                 columnLabel={col.label}
                                 uniqueValues={getColumnUniqueValues(col.id)}
@@ -1422,7 +1420,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                 }}
                                 disabled={isFirst}
                                 className="p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
-                                title="Move column left (earlier in table)"
+                                title={t.dashMoveColumnLeft}
                               >
                                 <ChevronLeft className="w-3.5 h-3.5" />
                               </button>
@@ -1434,7 +1432,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                 }}
                                 disabled={isLast}
                                 className="p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
-                                title="Move column right (later in table)"
+                                title={t.dashMoveColumnRight}
                               >
                                 <ChevronRight className="w-3.5 h-3.5" />
                               </button>
@@ -1461,22 +1459,22 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-emerald-600 mx-auto">
                         <SlidersHorizontal className="w-6 h-6" />
                       </div>
-                      <h4 className="text-sm font-bold text-slate-900">All Table Columns are Currently Hidden</h4>
+                      <h4 className="text-sm font-bold text-slate-900">{t.dashAllColumnsHidden}</h4>
                       <p className="text-xs text-slate-500 leading-relaxed">
-                        You currently have 0 columns enabled for the table view. To see data rows again, restore all columns or configure your column choices.
+                        {t.dashAllColumnsHiddenDesc}
                       </p>
                       <div className="flex justify-center gap-2.5 pt-2">
                         <button
                           onClick={handleResetDefaultColumns}
                           className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
                         >
-                          Restore All Columns
+                          {t.dashRestoreAllColumns}
                         </button>
                         <button
                           onClick={() => setShowColumnModal(true)}
                           className="px-4 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition-colors"
                         >
-                          Choose Columns
+                          {t.dashChooseColumns}
                         </button>
                       </div>
                     </div>
@@ -1535,18 +1533,18 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                               {row.isMatched ? (
                                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 px-2.5 py-1 rounded-md shadow-xs">
                                   <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
-                                  Matched
+                                  {t.dashCellMatched}
                                 </span>
                               ) : (
                                 <div className="flex flex-col gap-0.5">
                                   <div className="flex items-center gap-1.5">
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold text-white bg-amber-500 shadow-xs shrink-0">
                                       <AlertTriangle className="w-3 h-3 text-white shrink-0" />
-                                      UNMATCHED
+                                      {t.dashCellUnmatched}
                                     </span>
                                     {row.unmatchedInfo?.matchType === 'partial_mismatch' && (
                                       <span className="text-[9px] font-bold text-rose-700 bg-rose-100 px-1 py-0.2 rounded border border-rose-200 shrink-0">
-                                        Differs
+                                        {t.dashCellDiffers}
                                       </span>
                                     )}
                                   </div>
@@ -1555,15 +1553,15 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                     onClick={() => setSelectedRow(row)}
                                     title={row.unmatchedInfo?.unmatchedKeyDisplay || row.matchKey}
                                   >
-                                    {highlightText(row.unmatchedInfo?.primaryIdentifier || row.matchKey || 'Unidentified', searchTerm)}
+                                    {highlightText(row.unmatchedInfo?.primaryIdentifier || row.matchKey || t.dashUnidentified, searchTerm)}
                                   </div>
                                   <span
                                     className="text-[10px] text-slate-500 truncate max-w-[210px] font-sans"
                                     title={row.unmatchedInfo?.reason}
                                   >
                                     {row.unmatchedInfo?.matchType === 'partial_mismatch'
-                                      ? 'Ref match has differing fields'
-                                      : 'Missing in Reference file'}
+                                      ? t.dashRefDifferingFields
+                                      : t.dashMissingInRef}
                                   </span>
                                 </div>
                               )}
@@ -1649,7 +1647,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         <button
                           onClick={() => setSelectedRow(row)}
                           className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
-                          title="Inspect row discrepancy"
+                          title={t.dashInspectRowTitle}
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -1669,7 +1667,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         onClick={() => setSearchTerm('')}
                         className="text-xs text-emerald-600 hover:underline inline-block mt-1 font-semibold"
                       >
-                        Clear search filter ({searchTerm})
+                        {t.dashClearSearchFilter.replace('{term}', searchTerm)}
                       </button>
                     )}
                   </td>
@@ -1685,16 +1683,16 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             <div className="w-full flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-slate-800 font-mono">
-                  Showing all {currentPageRows.length.toLocaleString()} rows
+                  {t.dashShowingAllRows.replace('{count}', currentPageRows.length.toLocaleString())}
                 </span>
                 {results.length !== currentPageRows.length && (
                   <span className="text-slate-500">
-                    (filtered from {results.length.toLocaleString()} total)
+                    {t.dashFilteredFromTotal.replace('{count}', results.length.toLocaleString())}
                   </span>
                 )}
               </div>
               <div className="text-[11px] text-emerald-700 font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                Full Result View
+                {t.dashFullResultView}
               </div>
             </div>
           ) : (
@@ -1712,10 +1710,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 <strong className="text-slate-800 font-mono tabular-nums">
                   {filteredRows.length.toLocaleString()}
                 </strong>{' '}
-                rows
+                {t.dashRowsUnit}
                 {searchTerm.trim() && (
                   <span className="text-slate-500 ml-2">
-                    (filtered from {results.length.toLocaleString()} total)
+                    {t.dashFilteredFromTotal.replace('{count}', results.length.toLocaleString())}
                   </span>
                 )}
               </div>

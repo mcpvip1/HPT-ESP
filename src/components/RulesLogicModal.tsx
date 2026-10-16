@@ -86,15 +86,15 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
             <div>
               <div className="flex items-center gap-2.5">
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                  Rules & Logic Setting
+                  {t.rulesModalTitle}
                 </h2>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
                   <Check className="w-3 h-3" />
-                  Saved Once
+                  {t.rulesSavedOnce}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5 hidden sm:block">
-                Configure your key matching and evaluation logic once. Applied automatically whenever a file is imported.
+                {t.rulesModalDesc}
               </p>
             </div>
           </div>
@@ -111,12 +111,12 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
               {justSaved ? (
                 <>
                   <Check className="w-3.5 h-3.5" />
-                  <span>Saved!</span>
+                  <span>{t.rulesSavedShort}</span>
                 </>
               ) : (
                 <>
                   <Save className="w-3.5 h-3.5" />
-                  <span>Save Settings</span>
+                  <span>{t.rulesSaveSettings}</span>
                 </>
               )}
             </button>
@@ -124,7 +124,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
             <button
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-              aria-label="Close"
+              aria-label={t.close}
             >
               <X className="w-5 h-5" />
             </button>
@@ -143,7 +143,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
               }`}
             >
               <Link2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>1. Column Mapping & Normalization</span>
+              <span>{t.rulesTabMapping}</span>
               <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
                 {mappings.length}
               </span>
@@ -158,7 +158,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
               }`}
             >
               <Layers className="w-3.5 h-3.5 text-amber-600" />
-              <span>2. Decision Layers & Rules</span>
+              <span>{t.rulesTabDecision}</span>
               <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-50 text-amber-700 font-bold border border-amber-200">
                 {layers.length}
               </span>
@@ -166,7 +166,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
           </div>
 
           <div className="text-[11px] text-slate-400 hidden md:block">
-            Permanent Browser Storage (IndexedDB)
+            {t.rulesStorageNote}
           </div>
         </div>
 
@@ -204,7 +204,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
         <div className="px-6 py-3.5 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
           <div className="text-xs text-slate-500 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-            <span>Saved settings persist across refreshes and apply automatically on file import.</span>
+            <span>{t.rulesPersistNote}</span>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
@@ -212,7 +212,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
               onClick={onClose}
               className="px-4 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors"
             >
-              Close
+              {t.close}
             </button>
 
             <button
@@ -220,7 +220,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
               className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 transition-colors shadow-xs"
             >
               <Save className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Save Settings</span>
+              <span>{t.rulesSaveSettings}</span>
             </button>
 
             {referenceWb && comparisonWb && (
@@ -229,7 +229,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
                 disabled={isProcessing}
                 className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-all hover:translate-x-0.5"
               >
-                <span>{isProcessing ? 'Evaluating...' : 'Save & Show Results'}</span>
+                <span>{isProcessing ? t.rulesEvaluating : t.rulesSaveShowResults}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             )}

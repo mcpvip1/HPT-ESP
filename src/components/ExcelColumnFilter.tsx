@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { Language } from '../types';
+import { translations } from '../translations';
 import {
   Filter,
   ArrowUp,
@@ -26,6 +28,7 @@ interface ExcelColumnFilterProps {
   onSort: (direction: 'asc' | 'desc') => void;
   isOpen: boolean;
   onClose: () => void;
+  language?: Language;
 }
 
 export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
@@ -38,7 +41,9 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
   onSort,
   isOpen,
   onClose,
+  language = 'en',
 }) => {
+  const t = translations[language];
   const popoverRef = useRef<HTMLDivElement>(null);
   const [filterSearch, setFilterSearch] = useState('');
   
@@ -193,13 +198,13 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
       <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900 truncate max-w-[200px]">
           <Filter className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-          <span className="truncate font-bold">Filter: {columnLabel.replace('[Ref] ', '')}</span>
+          <span className="truncate font-bold">{t.filterHeaderPrefix} {columnLabel.replace('[Ref] ', '')}</span>
         </div>
         <button
           type="button"
           onClick={onClose}
           className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 transition-colors"
-          title="Close filter menu"
+          title={t.filterCloseMenu}
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -216,7 +221,7 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 text-[11px] font-semibold bg-white hover:bg-slate-100 hover:text-slate-900 rounded-md border border-slate-200 text-slate-700 shadow-xs transition-colors"
         >
           <ArrowUp className="w-3 h-3 text-emerald-600" />
-          <span>Sort A → Z</span>
+          <span>{t.filterSortAsc}</span>
         </button>
         <button
           type="button"
@@ -227,7 +232,7 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 text-[11px] font-semibold bg-white hover:bg-slate-100 hover:text-slate-900 rounded-md border border-slate-200 text-slate-700 shadow-xs transition-colors"
         >
           <ArrowDown className="w-3 h-3 text-emerald-600" />
-          <span>Sort Z → A</span>
+          <span>{t.filterSortDesc}</span>
         </button>
       </div>
 
@@ -239,7 +244,7 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
             type="text"
             value={filterSearch}
             onChange={(e) => setFilterSearch(e.target.value)}
-            placeholder="Search values..."
+            placeholder={t.filterSearchValues}
             className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-emerald-500 font-mono shadow-xs"
             autoFocus
           />
@@ -267,7 +272,7 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
               className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
             />
             <span className="font-semibold text-slate-800 font-sans text-xs">
-              (Select All)
+              {t.filterSelectAll}
             </span>
           </div>
           <span className="text-[10px] text-slate-500 font-sans font-semibold">
@@ -277,7 +282,7 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
 
         {filteredItems.length === 0 ? (
           <div className="py-4 text-center text-slate-400 text-xs font-sans">
-            No matching values found
+            {t.filterNoMatchingValues}
           </div>
         ) : (
           filteredItems.map((item) => {
@@ -296,7 +301,7 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
                   />
                   <span
                     className={`truncate text-xs ${
-                      item.value === '(Blanks)' || item.value === '(Empty)'
+                      item.value === t.dashValueBlanks || item.value === t.dashValueEmpty
                         ? 'text-slate-400 italic'
                         : isChecked
                         ? 'text-slate-900 font-semibold'
@@ -328,7 +333,7 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
           className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-rose-600 disabled:opacity-30 disabled:pointer-events-none transition-colors font-medium"
         >
           <RotateCcw className="w-3 h-3" />
-          <span>Clear Filter</span>
+          <span>{t.filterClearFilter}</span>
         </button>
 
         <div className="flex items-center gap-1.5">
@@ -337,7 +342,7 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
             onClick={onClose}
             className="px-2.5 py-1 text-xs text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-200/60 transition-colors"
           >
-            Cancel
+            {t.cancel}
           </button>
           <button
             type="button"
@@ -345,7 +350,7 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
             className="flex items-center gap-1 px-3 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
           >
             <Check className="w-3 h-3" />
-            <span>Apply</span>
+            <span>{t.filterApply}</span>
           </button>
         </div>
       </div>
