@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   WorkbookData,
   ColumnMapping,
@@ -36,6 +36,16 @@ import {
   copyPreviewLinkToClipboard,
   SharedPreviewPayload,
 } from './utils/previewSharing';
+import { onAuthStateChanged } from 'firebase/auth';
+import type { User } from 'firebase/auth';
+import { auth, signInWithGoogle, signOutGoogle } from './lib/firebase';
+import {
+  publishRulesState,
+  fetchRulesState,
+  subscribePreviewSnapshot,
+  fetchPreviewSnapshot,
+  debounce,
+} from './lib/cloudSync';
 import {
   FileSpreadsheet,
   CheckCircle2,
@@ -83,6 +93,13 @@ export default function App() {
     defaultNormalizationRules
   );
   const [layers, setLayers] = useState<DecisionLayer[]>(defaultDecisionLayers);
+
+  // Cloud sync (Firebase): one shared workspace across every device
+  const [cloudUser, setCloudUser] = useState<User | null>(null);
+  const rulesStateRef = useRef({ normalization, layers, mappings });
+  rulesStateRef.current = { normalization, layers, mappings };
+  const lastRulesPublishRef = useRef<string>('');
+  const lastCloudPreviewAtRef = useRef<number>(0);
 
   // Matching Results
   const [results, setResults] = useState<MatchedRow[]>([]);
@@ -141,6 +158,97 @@ export default function App() {
     }
     return false;
   }, []);
+
+  // ---- Cloud sync: auth, shared rules, live preview -----------------------
+  // Sign in: pull the shared rule settings so this device matches the others.
+  // First sign-in on the account seeds the cloud with this device's settings.
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setCloudUser(u);
+      if (!u) return;
+      try {
+        const cloud = await fetchRulesState(u.uid);
+        if (cloud && cloud.updatedAt) {
+          if (cloud.normalization) {
+            setNormalization(cloud.normalization);
+            await saveToIDB(StorageKeys.NORMALIZATION_RULES, cloud.normalization);
+          }
+          if (cloud.layers && cloud.layers.length > 0) {
+            setLayers(cloud.layers);
+            await saveToIDB(StorageKeys.DECISION_LAYERS, cloud.layers);
+          }
+          if (cloud.mappings) {
+            setMappings(cloud.mappings);
+            await saveToIDB(StorageKeys.COLUMN_MAPPINGS, cloud.mappings);
+          }
+          lastRulesPublishRef.current = JSON.stringify({
+            n: cloud.normalization,
+            l: cloud.layers,
+            m: cloud.mappings,
+          });
+          showToast('Cloud workspace synced — rules & mappings match your other devices.', 'success');
+        } else {
+          const cur = rulesStateRef.current;
+          await publishRulesState(u.uid, cur);
+          lastRulesPublishRef.current = JSON.stringify({
+            n: cur.normalization,
+            l: cur.layers,
+            m: cur.mappings,
+          });
+        }
+      } catch (e) {
+        console.warn('Cloud rules sync failed', e);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // Publish rule settings to the cloud whenever they change (debounced).
+  const debouncedPublishRules = useRef(
+    debounce((uid: string, st: { normalization: NormalizationRules; layers: DecisionLayer[]; mappings: ColumnMapping[] }) => {
+      const key = JSON.stringify({ n: st.normalization, l: st.layers, m: st.mappings });
+      if (key === lastRulesPublishRef.current) return;
+      lastRulesPublishRef.current = key;
+      publishRulesState(uid, st);
+    }, 1500)
+  ).current;
+
+  useEffect(() => {
+    if (!cloudUser || isPreviewMode) return;
+    debouncedPublishRules(cloudUser.uid, rulesStateRef.current);
+  }, [cloudUser, isPreviewMode, normalization, layers, mappings, debouncedPublishRules]);
+
+  // Live cloud preview: while signed in, the preview page follows the latest
+  // snapshot published by the studio — on any device, no refresh needed.
+  useEffect(() => {
+    if (!cloudUser || !isPreviewMode) return;
+    const unsub = subscribePreviewSnapshot(cloudUser.uid, async (meta) => {
+      if (!meta || !meta.updatedAt || meta.updatedAt <= lastCloudPreviewAtRef.current) return;
+      lastCloudPreviewAtRef.current = meta.updatedAt;
+      const pData = await fetchPreviewSnapshot(cloudUser.uid);
+      if (pData && checkAndApplyPreview(pData)) {
+        showToast('Preview synced with the latest changes.', 'success');
+      }
+    });
+    return () => unsub();
+  }, [cloudUser, isPreviewMode, checkAndApplyPreview, showToast]);
+
+  const handleCloudSignIn = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (e: any) {
+      showToast(e?.message || 'Google sign-in failed.', 'error');
+    }
+  };
+
+  const handleCloudSignOut = async () => {
+    try {
+      await signOutGoogle();
+      showToast('Signed out of cloud sync.', 'info');
+    } catch (e) {
+      console.warn('Sign-out failed', e);
+    }
+  };
 
   // Initial Load from Persistent Storage & Live Preview Link Handling
   useEffect(() => {
@@ -521,6 +629,9 @@ export default function App() {
       <Header
         language={language}
         onLanguageChange={handleLanguageChange}
+        cloudUser={cloudUser}
+        onCloudSignIn={handleCloudSignIn}
+        onCloudSignOut={handleCloudSignOut}
         onOpenRulesSetting={() => setIsRulesModalOpen(true)}
         hasRefFile={!!referenceWb}
         hasCompFile={!!comparisonWb}
@@ -598,6 +709,7 @@ export default function App() {
                   onShowToast={showToast}
                   isPreviewMode={false}
                   initialColumnConfigs={previewColumnConfigs}
+                  cloudUser={cloudUser}
                 />
               </div>
             )}
