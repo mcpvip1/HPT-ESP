@@ -1290,11 +1290,20 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     else handleSort(col.id);
                   };
 
+                  // Freeze the row-number column on the left so rows stay identifiable
+                  // while scrolling horizontally on small screens.
+                  const isRowIndexCol = col.id === 'rowIndex';
                   return (
                     <th
                       key={col.id}
-                      className={`py-3.5 px-3 border-r border-slate-200 whitespace-nowrap group/th transition-colors relative ${
-                        col.category === 'reference' ? 'text-blue-800 bg-blue-50/60' : 'text-slate-700'
+                      className={`py-3.5 px-3 border-r border-slate-200 whitespace-nowrap group/th transition-colors ${
+                        isRowIndexCol
+                          ? 'sticky left-0 z-20 bg-slate-100 text-slate-700'
+                          : `relative ${
+                              col.category === 'reference'
+                                ? 'text-blue-800 bg-blue-50/60'
+                                : 'text-slate-700'
+                            }`
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -1422,8 +1431,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   );
                 })}
 
-                {/* Actions column */}
-                <th className="py-3 px-3 text-center w-16 text-slate-500 whitespace-nowrap">
+                {/* Actions column — frozen on the right so Inspect stays reachable on mobile */}
+                <th className="py-3 px-3 text-center w-16 text-slate-500 whitespace-nowrap sticky right-0 z-20 bg-slate-100 border-l border-slate-200">
                   {t.viewDetails}
                 </th>
               </tr>
@@ -1463,6 +1472,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   const isGreen = row.decisionColor === 'green';
                   const isYellow = row.decisionColor === 'yellow';
                   const isRed = row.decisionColor === 'red';
+                  // Opaque background for the frozen columns (must cover scrolled content)
+                  const frozenBg = isGreen
+                    ? 'bg-emerald-50'
+                    : isYellow
+                    ? 'bg-amber-50'
+                    : isRed
+                    ? 'bg-rose-50'
+                    : 'bg-white';
 
                   return (
                     <tr
@@ -1482,7 +1499,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           return (
                             <td
                               key={col.id}
-                              className="py-2.5 px-3 border-r border-slate-200 text-center text-slate-500 font-mono tabular-nums text-[11px] font-bold"
+                              className={`py-2.5 px-3 border-r border-slate-200 text-center text-slate-500 font-mono tabular-nums text-[11px] font-bold sticky left-0 z-[5] ${frozenBg}`}
                             >
                               {highlightText(row.rowIndex, searchTerm)}
                             </td>
@@ -1612,8 +1629,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         );
                       })}
 
-                      {/* Row Inspect Button */}
-                      <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                      {/* Row Inspect Button — frozen on the right for mobile reachability */}
+                      <td className={`py-2.5 px-3 text-center whitespace-nowrap sticky right-0 z-[5] border-l border-slate-200 ${frozenBg}`}>
                         <button
                           onClick={() => setSelectedRow(row)}
                           className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
