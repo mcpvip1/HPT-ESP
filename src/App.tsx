@@ -157,6 +157,8 @@ export default function App() {
   });
 
   const t = translations[language];
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const showToast = useCallback(
     (text: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -400,7 +402,10 @@ export default function App() {
       const key = JSON.stringify({ n: st.normalization, l: st.layers, m: st.mappings, hc: st.holdColumn, h: st.holdValues, hr: st.holdReason, rr: st.releasedRowIds });
       if (key === lastRulesPublishRef.current) return;
       lastRulesPublishRef.current = key;
-      publishRulesState(uid, st);
+      publishRulesState(uid, st).then((ok) => {
+        if (ok) showToast(tRef.current.toastCloudSettingsUploaded, 'success');
+        else showToast(tRef.current.toastCloudSettingsSyncFailed, 'error');
+      });
     }, 1500)
   ).current;
 
@@ -419,7 +424,8 @@ export default function App() {
     debounce((uid: string, state: { results: MatchedRow[]; stats: MatchingStats; filters: ResultFilters }, gen: number) => {
       if (gen !== resultsPublishGenRef.current) return;
       publishResultsState(uid, state).then((ok) => {
-        if (!ok) console.warn('Cloud sync: results publish failed');
+        if (ok) showToast(tRef.current.toastCloudResultsUploaded, 'success');
+        else showToast(tRef.current.toastCloudResultsSyncFailed, 'error');
       });
       // Keep the local instant-paint cache in step
       saveToIDB(StorageKeys.RESULTS_STATE, state).catch(() => {});
@@ -454,7 +460,8 @@ export default function App() {
   const debouncedPublishWorkbooks = useRef(
     debounce((uid: string, wbs: { reference: WorkbookData | null; comparison: WorkbookData | null }) => {
       publishWorkbooksWithRetry(uid, wbs).then((ok) => {
-        if (!ok) showToast(t.toastCloudFilesSyncFailed, 'error');
+        if (ok) showToast(tRef.current.toastCloudFilesUploaded, 'success');
+        else showToast(tRef.current.toastCloudFilesSyncFailed, 'error');
       });
     }, 2000)
   ).current;
