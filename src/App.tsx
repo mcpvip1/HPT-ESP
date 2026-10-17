@@ -43,6 +43,7 @@ import {
 import { onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { auth, signInWithGoogle, signOutGoogle } from './lib/firebase';
+import { LOGO_DATA_URL } from './assets/logo';
 import {
   publishRulesState,
   fetchRulesState,
@@ -1303,7 +1304,7 @@ export default function App() {
       <div className="min-h-screen bg-[#F2F2F2] text-slate-900 flex flex-col items-center justify-center p-6 font-sans selection:bg-brand-500 selection:text-white">
         <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-10 w-full max-w-md shadow-sm text-center space-y-5">
           <img
-            src={`${import.meta.env.BASE_URL}excellent-logo-web.jpg`}
+            src={LOGO_DATA_URL}
             alt="Excellent Medical Technology"
             className="h-20 w-auto mx-auto"
           />

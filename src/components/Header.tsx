@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Globe, SlidersHorizontal, Cloud, CloudUpload, LogOut } from 'lucide-react';
+import { LOGO_DATA_URL } from '../assets/logo';
 import { ProgressRing } from './ProgressRing';
 import type { ActiveUpload } from '../types';
 import type { User } from 'firebase/auth';
@@ -75,7 +76,7 @@ export const Header: React.FC<HeaderProps> = ({
               title="Excellent Medical Technology ESP"
             >
               <img
-                src={`${import.meta.env.BASE_URL}excellent-logo-web.jpg`}
+                src={LOGO_DATA_URL}
                 alt="Excellent Medical Technology"
                 className="h-9 sm:h-10 w-auto shrink-0"
               />
