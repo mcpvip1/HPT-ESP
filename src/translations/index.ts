@@ -345,6 +345,9 @@ export interface TranslationDict {
   dashFixedPreviewLink: string;
   dashFixedPreviewLinkDesc: string;
   dashCopyShareLink: string;
+  dashPublishPreview: string;
+  dashPreviewPublished: string;
+  dashPreviewPublishFailed: string;
   dashLongShareLink: string;
   dashCopied: string;
   dashCopy: string;
