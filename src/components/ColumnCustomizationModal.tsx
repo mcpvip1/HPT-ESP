@@ -228,7 +228,7 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
 
           {/* Category Tag */}
           {col.category === 'system' && (
-            <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 font-bold">
+            <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-brand-50 text-brand-700 border border-brand-200 shrink-0 font-bold">
               {t.colAudit}
             </span>
           )}
@@ -250,12 +250,12 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
             onClick={() => handleToggleTable(col.id)}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
               col.showInTable
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-xs'
+                ? 'bg-brand-50 text-brand-700 border border-brand-200 shadow-xs'
                 : 'bg-slate-100 text-slate-400 border border-slate-200 hover:text-slate-700'
             }`}
           >
             {col.showInTable ? (
-              <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
+              <CheckSquare className="w-3.5 h-3.5 text-brand-600" />
             ) : (
               <Square className="w-3.5 h-3.5 text-slate-400" />
             )}
@@ -291,13 +291,13 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
         {/* Modal Header */}
         <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 shadow-xs">
+            <div className="p-2 rounded-xl bg-brand-50 border border-brand-200 text-brand-700 shadow-xs">
               <SlidersHorizontal className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
                 <span>{t.colTitle}</span>
-                <span className="text-[11px] font-semibold font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="text-[11px] font-semibold font-mono px-2 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200">
                   {t.colBadge}
                 </span>
               </h2>
@@ -326,7 +326,7 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
                 value={modalSearch}
                 onChange={(e) => setModalSearch(e.target.value)}
                 placeholder={t.colSearchPh}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-emerald-500 font-mono shadow-xs"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-brand-500 font-mono shadow-xs"
               />
               {modalSearch && (
                 <button
@@ -345,7 +345,7 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
                 type="checkbox"
                 checked={syncExportWithTable}
                 onChange={(e) => onToggleSync(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
               />
               <span className="text-xs text-slate-700 font-semibold">
                 {t.colSyncExport}
@@ -391,10 +391,10 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
               </button>
               <button
                 onClick={handleSelectDecisionOnly}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition-colors"
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-brand-700 hover:text-brand-800 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-md transition-colors"
                 title={t.colKeepDecision}
               >
-                <Sparkles className="w-3 h-3 text-emerald-600" />
+                <Sparkles className="w-3 h-3 text-brand-600" />
                 {t.colKeyOnly}
               </button>
               <button
@@ -416,11 +416,11 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
             <span>{t.colOrderName} ({filteredConfigs.length})</span>
           </div>
           <div className="col-span-3 sm:col-span-2 text-center flex items-center justify-center gap-1">
-            <Table className="w-3.5 h-3.5 text-emerald-600" />
+            <Table className="w-3.5 h-3.5 text-brand-600" />
             <span>{t.colTable}</span>
             <button
               onClick={() => handleSetAllTable(tableVisibleCount < safeConfigs.length)}
-              className="ml-1 text-[10px] text-emerald-700 hover:underline font-bold"
+              className="ml-1 text-[10px] text-brand-700 hover:underline font-bold"
               title={t.colToggleAllTable}
             >
               {tableVisibleCount < safeConfigs.length ? t.colAll : t.colNone}
@@ -454,7 +454,7 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
                 {modalSearch && (
                   <button
                     onClick={() => setModalSearch('')}
-                    className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
+                    className="px-3 py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors"
                   >
                     {t.colClearFilter}
                   </button>
@@ -484,7 +484,7 @@ export const ColumnCustomizationModal: React.FC<ColumnCustomizationModalProps> =
             </button>
             <button
               onClick={handleSaveAndClose}
-              className="flex items-center justify-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-lg shadow-sm transition-all"
+              className="flex items-center justify-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 active:bg-brand-800 rounded-lg shadow-sm transition-all"
             >
               <Save className="w-3.5 h-3.5" />
               <span>{t.colSaveSync}</span>
