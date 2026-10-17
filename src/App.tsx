@@ -1300,19 +1300,24 @@ export default function App() {
   // results sync from the cloud. Public share-preview links stay open.
   if (!isPreviewMode && authResolved && !cloudUser) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-6 font-sans selection:bg-emerald-500 selection:text-white">
+      <div className="min-h-screen bg-[#F2F2F2] text-slate-900 flex flex-col items-center justify-center p-6 font-sans selection:bg-brand-500 selection:text-white">
         <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-10 w-full max-w-md shadow-sm text-center space-y-5">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto">
-            <FileSpreadsheet className="w-7 h-7 text-emerald-600" />
-          </div>
+          <img
+            src={`${import.meta.env.BASE_URL}excellent-logo-transparent.png`}
+            alt="Excellent Medical Technology"
+            className="h-20 w-auto mx-auto"
+          />
           <div className="space-y-2">
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t.appName}</h1>
+            <p className="text-[11px] font-medium text-slate-400">
+              Created by <span className="font-bold text-accent-600">DO2-HPT</span>
+            </p>
             <p className="text-sm font-semibold text-slate-700">{t.gateTitle}</p>
             <p className="text-xs text-slate-500 leading-relaxed">{t.gateDesc}</p>
           </div>
           <button
             onClick={handleCloudSignIn}
-            className="w-full flex items-center justify-center gap-2.5 px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl shadow-sm transition-all"
+            className="w-full flex items-center justify-center gap-2.5 px-4 py-3 text-sm font-bold text-white bg-brand-600 hover:bg-brand-500 active:bg-brand-700 rounded-xl shadow-sm transition-all"
           >
             <Cloud className="w-4 h-4" />
             {t.gateSignIn}
@@ -1346,7 +1351,7 @@ export default function App() {
   const cloudPullOverlay = isCloudPulling && !isPreviewMode && (
     <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl px-7 py-6 shadow-xl flex items-center gap-4 max-w-sm w-full">
-        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin shrink-0" />
+        <Loader2 className="w-8 h-8 text-brand-600 animate-spin shrink-0" />
         <div className="min-w-0">
           <p className="text-sm font-bold text-slate-900">{t.cloudDownloading}</p>
           <p className="text-xs text-slate-500 mt-0.5">{t.cloudDownloadingSub}</p>
@@ -1356,7 +1361,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-[#F2F2F2] text-slate-900 flex flex-col font-sans selection:bg-brand-500 selection:text-white">
       {cloudPullOverlay}
       {/* 1. Header (Adapts cleanly to Studio or Preview mode) */}
       <Header
@@ -1382,7 +1387,7 @@ export default function App() {
           <div className="space-y-4">
             {previewLoading ? (
               <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-4 shadow-sm">
-                <div className="w-12 h-12 mx-auto rounded-full border-4 border-slate-200 border-t-emerald-600 animate-spin" />
+                <div className="w-12 h-12 mx-auto rounded-full border-4 border-slate-200 border-t-brand-600 animate-spin" />
                 <h3 className="text-base font-semibold text-slate-900">
                   {t.previewDownloading}
                 </h3>
@@ -1430,7 +1435,7 @@ export default function App() {
             ) : (
               <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-4 shadow-sm">
                 <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 mx-auto">
-                  <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
+                  <FileSpreadsheet className="w-6 h-6 text-brand-600" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-900">
                   {shareId === FIXED_PREVIEW_SHARE_ID ? t.previewFixedEmptyTitle : t.previewNoResultsTitle}
