@@ -1,5 +1,5 @@
 import LZString from 'lz-string';
-import { MatchedRow, MatchingStats, ColumnConfigItem, ResultColor } from '../types';
+import { MatchedRow, MatchingStats, ColumnConfigItem, ResultColor, UnmatchedInfo } from '../types';
 
 export interface SharedPreviewPayload {
   version: 1 | 2;
@@ -20,6 +20,22 @@ export interface SharedPreviewPayload {
  * Minimizes URL length by up to 90% by stripping repetitive object keys,
  * storing headers once, and encoding rows as compact tuples.
  */
+/**
+ * Compact encoding of UnmatchedInfo for preview payloads:
+ * [keyDisplay, primaryIdentifier, reason, matchTypeCode, fieldDiffs, closestRef]
+ * matchTypeCode: 0 = completely_missing, 1 = partial_mismatch, 2 = no_key
+ * fieldDiffs: [comparisonCol, mainCol, compValue, refValue, isMatchCode][]
+ * closestRef: [keys[], values[]] | null
+ */
+type CompactUnmatchedInfo = [
+  string,
+  string,
+  string,
+  number,
+  [string, string, any, any, number][],
+  [string[], any[]] | null
+];
+
 interface CompactPreviewPayload {
   v: 2;
   t: number;
@@ -33,7 +49,7 @@ interface CompactPreviewPayload {
   cols?: ColumnConfigItem[];
   ch: string[]; // comparison headers
   rh: string[]; // reference headers
-  r: [number, number, number, string, any[], any[]][];
+  r: [number, number, number, string, any[], any[], CompactUnmatchedInfo | null][];
 }
 
 const COLOR_MAP: Record<ResultColor | 'none', number> = {
@@ -74,15 +90,40 @@ export function packCompact(payload: SharedPreviewPayload): CompactPreviewPayloa
   const ch = Array.from(chSet);
   const rh = Array.from(rhSet);
 
-  const r: [number, number, number, string, any[], any[]][] = payload.results.map((row) => {
-    const compVals = ch.map((k) => row.comparisonRow[k] ?? '');
-    const refVals = rh.length > 0 && row.matchedMainRow ? rh.map((k) => row.matchedMainRow![k] ?? '') : [];
-    const colorCode = COLOR_MAP[row.decisionColor] ?? 3;
-    const isMatchedCode = row.isMatched ? 1 : 0;
-    const reason = row.decisionReason || '';
+  const r: [number, number, number, string, any[], any[], CompactUnmatchedInfo | null][] =
+    payload.results.map((row) => {
+      const compVals = ch.map((k) => row.comparisonRow[k] ?? '');
+      const refVals =
+        rh.length > 0 && row.matchedMainRow ? rh.map((k) => row.matchedMainRow![k] ?? '') : [];
+      const colorCode = COLOR_MAP[row.decisionColor] ?? 3;
+      const isMatchedCode = row.isMatched ? 1 : 0;
+      const reason = row.decisionReason || '';
 
-    return [row.rowIndex, colorCode, isMatchedCode, reason, compVals, refVals];
-  });
+      // Preserve the unmatched root-cause analysis so the preview's detail
+      // modal can show field diffs + closest candidate, just like the studio.
+      let unmatched: CompactUnmatchedInfo | null = null;
+      const ui = row.unmatchedInfo;
+      if (!row.isMatched && ui) {
+        unmatched = [
+          ui.unmatchedKeyDisplay || '',
+          ui.primaryIdentifier || '',
+          ui.reason || '',
+          ui.matchType === 'partial_mismatch' ? 1 : ui.matchType === 'no_key' ? 2 : 0,
+          (ui.fieldDiffs || []).map((d) => [
+            d.comparisonCol,
+            d.mainCol,
+            d.compValue ?? '',
+            d.refValue ?? '',
+            d.isMatch ? 1 : 0,
+          ]),
+          ui.closestReferenceRow
+            ? [Object.keys(ui.closestReferenceRow), Object.values(ui.closestReferenceRow)]
+            : null,
+        ];
+      }
+
+      return [row.rowIndex, colorCode, isMatchedCode, reason, compVals, refVals, unmatched];
+    });
 
   return {
     v: 2,
@@ -116,9 +157,31 @@ export function unpackCompact(compact: CompactPreviewPayload): SharedPreviewPayl
   const rh = compact.rh || [];
 
   const results: MatchedRow[] = (compact.r || []).map((tup, idx) => {
-    const [rowIndex, colorCode, isMatchedCode, reason, compVals, refVals] = tup;
+    const [rowIndex, colorCode, isMatchedCode, reason, compVals, refVals, unmatchedRaw] = tup;
     const decisionColor = COLOR_REVERSE_MAP[colorCode] || 'none';
     const isMatched = isMatchedCode === 1;
+
+    let unmatchedInfo: UnmatchedInfo | undefined;
+    if (!isMatched && unmatchedRaw) {
+      const [keyDisplay, primaryId, uiReason, matchTypeCode, diffsRaw, closestRaw] = unmatchedRaw;
+      unmatchedInfo = {
+        unmatchedKeyDisplay: keyDisplay || '',
+        primaryIdentifier: primaryId || '',
+        reason: uiReason || '',
+        matchType:
+          matchTypeCode === 1 ? 'partial_mismatch' : matchTypeCode === 2 ? 'no_key' : 'completely_missing',
+        fieldDiffs: (diffsRaw || []).map(([cc, mc, cv, rv, im]) => ({
+          comparisonCol: cc,
+          mainCol: mc,
+          compValue: cv,
+          refValue: rv,
+          isMatch: im === 1,
+        })),
+        closestReferenceRow: closestRaw
+          ? Object.fromEntries(closestRaw[0].map((k, i) => [k, closestRaw[1][i]]))
+          : undefined,
+      };
+    }
 
     const comparisonRow: Record<string, any> = {};
     ch.forEach((colName, cIdx) => {
@@ -145,6 +208,7 @@ export function unpackCompact(compact: CompactPreviewPayload): SharedPreviewPayl
       rowIndex: rowIndex || idx + 1,
       matchKey: ch.length > 0 ? String(comparisonRow[ch[0]] ?? '') : '',
       isMatched,
+      unmatchedInfo,
       decisionColor,
       decisionReason: reason || '',
       comparisonRow,
