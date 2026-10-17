@@ -44,7 +44,7 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
             <span
               className={`w-3.5 h-3.5 rounded-full shrink-0 shadow-sm ${
                 row.decisionColor === 'green'
-                  ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]'
+                  ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.7)]'
                   : row.decisionColor === 'yellow'
                   ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.7)]'
                   : row.decisionColor === 'red'
@@ -60,7 +60,7 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
               </h3>
               <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                 <span>{t.modalMatchKey}</span>
-                <span className="font-mono text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                <span className="font-mono text-brand-700 font-semibold bg-brand-50 px-1.5 py-0.5 rounded border border-brand-200">
                   {row.matchKey || t.modalNotAvailable}
                 </span>
               </p>
@@ -126,14 +126,14 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
                       key={i}
                       className={`p-2 rounded-lg border text-xs font-mono flex flex-col justify-between ${
                         diff.isMatch
-                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                          ? 'bg-green-50 border-green-200 text-green-800'
                           : 'bg-rose-50 border-rose-200 text-rose-800'
                       }`}
                     >
                       <div className="flex items-center justify-between text-[11px] text-slate-500 font-sans mb-1 font-semibold">
                         <span>{diff.comparisonCol}</span>
                         {diff.isMatch ? (
-                          <span className="text-emerald-700 flex items-center gap-0.5 font-bold">
+                          <span className="text-green-700 flex items-center gap-0.5 font-bold">
                             <CheckCircle2 className="w-3 h-3" /> {t.modalMatch}
                           </span>
                         ) : (
@@ -160,8 +160,8 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
           </div>
         ) : (
           <div className="space-y-3 mx-5 sm:mx-6 mt-4 shrink-0">
-            <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2 text-emerald-700 font-semibold">
+            <div className="p-3.5 rounded-xl bg-green-50 border border-green-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 text-green-700 font-semibold">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span>{t.modalMatchedSuccess}</span>
               </div>
@@ -188,7 +188,7 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
                   </div>
                 </div>
                 {row.reconciledPostponeInfo?.source && (
-                  <span className="self-start sm:self-auto px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-white text-emerald-800 border border-emerald-200 shadow-xs whitespace-nowrap">
+                  <span className="self-start sm:self-auto px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-white text-brand-800 border border-brand-200 shadow-xs whitespace-nowrap">
                     {t.modalOverridingSource} {row.reconciledPostponeInfo.source}
                   </span>
                 )}
@@ -238,7 +238,7 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
 
           {/* Reference File Row / Closest Candidate */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col">
-            <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-3 flex items-center justify-between">
+            <h4 className="text-xs font-bold text-brand-700 uppercase tracking-wider mb-3 flex items-center justify-between">
               <span>
                 {row.matchedMainRow
                   ? t.modalMatchedRefRecord
@@ -286,7 +286,7 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
                       key={k}
                       className={`flex items-start justify-between py-1.5 gap-4 ${
                         isMatchingCol
-                          ? 'bg-emerald-50 px-2 rounded'
+                          ? 'bg-brand-50 px-2 rounded'
                           : isDifferingCol
                           ? 'bg-rose-50 px-2 rounded'
                           : ''
@@ -295,7 +295,7 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="text-slate-500 font-mono text-[11px] font-medium">{k}</span>
                         {isMatchingCol && (
-                          <span className="text-[10px] px-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 font-sans">
+                          <span className="text-[10px] px-1 rounded bg-brand-100 text-brand-800 border border-brand-200 font-sans">
                             {t.modalMatchedBadge}
                           </span>
                         )}
@@ -329,7 +329,7 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
           <div className="text-xs text-slate-600 font-mono">
-            {t.modalStatus} <span className="text-slate-900 font-bold">{row.isMatched ? t.modalMatched : t.modalUnmatchedNew}</span> · {t.modalLayer} <span className="text-emerald-700 font-bold">{row.decisionLayerName || 'Inspection'}</span>
+            {t.modalStatus} <span className="text-slate-900 font-bold">{row.isMatched ? t.modalMatched : t.modalUnmatchedNew}</span> · {t.modalLayer} <span className="text-brand-700 font-bold">{row.decisionLayerName || 'Inspection'}</span>
           </div>
           <button
             onClick={onClose}
