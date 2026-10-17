@@ -137,7 +137,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
         {/* Modal Top Header */}
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-4 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-xs">
+            <div className="w-10 h-10 rounded-xl bg-brand-50 border border-brand-200 flex items-center justify-center text-brand-600 shadow-xs">
               <SlidersHorizontal className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
@@ -145,7 +145,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                   {t.rulesModalTitle}
                 </h2>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-brand-50 text-brand-700 border border-brand-200 font-mono">
                   <Check className="w-3 h-3" />
                   {t.rulesSavedOnce}
                 </span>
@@ -161,8 +161,8 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
               onClick={handleSave}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg border transition-all shadow-xs ${
                 justSaved
-                  ? 'bg-emerald-600 text-white border-emerald-600'
-                  : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-600 shadow-xs'
+                  ? 'bg-brand-600 text-white border-brand-600'
+                  : 'bg-brand-600 hover:bg-brand-500 text-white border-brand-600 shadow-xs'
               }`}
             >
               {justSaved ? (
@@ -199,9 +199,9 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Link2 className="w-3.5 h-3.5 text-emerald-600" />
+              <Link2 className="w-3.5 h-3.5 text-brand-600" />
               <span>{t.rulesTabMapping}</span>
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-brand-50 text-brand-700 font-bold border border-brand-200">
                 {mappings.length}
               </span>
             </button>
@@ -396,7 +396,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
         {/* Modal Bottom Action Bar */}
         <div className="px-6 py-3.5 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
           <div className="text-xs text-slate-500 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+            <span className="w-2 h-2 rounded-full bg-brand-500 inline-block" />
             <span>{t.rulesPersistNote}</span>
           </div>
 
@@ -412,7 +412,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
               onClick={handleSave}
               className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 transition-colors shadow-xs"
             >
-              <Save className="w-3.5 h-3.5 text-emerald-600" />
+              <Save className="w-3.5 h-3.5 text-brand-600" />
               <span>{t.rulesSaveSettings}</span>
             </button>
 
@@ -420,7 +420,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
               <button
                 onClick={handleSaveAndApply}
                 disabled={isProcessing}
-                className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-all hover:translate-x-0.5"
+                className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 rounded-lg shadow-sm transition-all hover:translate-x-0.5"
               >
                 <span>{isProcessing ? t.rulesEvaluating : t.rulesSaveShowResults}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
