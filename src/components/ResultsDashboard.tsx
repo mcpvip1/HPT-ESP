@@ -149,6 +149,19 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [quickCopied, setQuickCopied] = useState(false);
   // Public live-share: anyone with the link sees the latest snapshot, no sign-in
+  // Fixed short preview link (/preview): independent of live share, on by
+  // default so other devices always see the latest results. The user can
+  // revoke it with the toggle below or via "Stop sharing".
+  const [fixedLinkEnabled, setFixedLinkEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('emp_fixed_preview_enabled') !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const fixedLinkEnabledRef = useRef(fixedLinkEnabled);
+  fixedLinkEnabledRef.current = fixedLinkEnabled;
+
   const [liveShareId, setLiveShareId] = useState<string | null>(() => {
     try {
       return localStorage.getItem('emp_live_share_id');
@@ -505,7 +518,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       publishPreviewSnapshot(uid, payload);
       if (shareId) {
         publishSharedSnapshot(shareId, uid, payload);
-        // Fixed short link (/preview) always mirrors the live share
+      }
+      // Fixed short link (/preview) always mirrors the latest studio results,
+      // independent of live share, so other browsers/devices stay fresh.
+      if (fixedLinkEnabledRef.current) {
         publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, uid, payload);
       }
     }, 2000)
@@ -610,10 +626,17 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       onShowToast(t.dashSignInForShare, 'info');
       return;
     }
-    if (liveShareId) {
-      setShowLiveSharePanel((v) => !v);
+    // Open the share panel; the fixed link is managed there independently,
+    // and a live share link is created explicitly from the panel.
+    setShowLiveSharePanel((v) => !v);
+  };
+
+  const handleCreateLiveShare = async () => {
+    if (!cloudUser) {
+      onShowToast(t.dashSignInForShare, 'info');
       return;
     }
+    if (liveShareId) return;
     const sid = generateShareId();
     const okShare = await setActiveShare(cloudUser.uid, sid);
     let okPublish = false;
@@ -640,6 +663,25 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     onShowToast(t.dashShareCreated, 'success');
   };
 
+  const handleToggleFixedLink = async () => {
+    if (!cloudUser) {
+      onShowToast(t.dashSignInForShare, 'info');
+      return;
+    }
+    const next = !fixedLinkEnabled;
+    setFixedLinkEnabled(next);
+    try {
+      localStorage.setItem('emp_fixed_preview_enabled', next ? '1' : '0');
+    } catch { /* ignore */ }
+    if (!next) {
+      // Revoke: take the fixed short link down immediately
+      try { await unpublishSharedSnapshot(FIXED_PREVIEW_SHARE_ID); } catch { /* ignore */ }
+    } else if (results.length > 0 && stats) {
+      // Publish the current results right away
+      await publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, cloudUser.uid, buildSharePayload());
+    }
+  };
+
   const handleStopLiveShare = async () => {
     if (!liveShareId) return;
     const ok = await unpublishSharedSnapshot(liveShareId);
@@ -647,8 +689,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       onShowToast(t.dashShareRevokeFailed, 'error');
       return;
     }
-    // Best-effort: take the fixed short link down too
+    // Revoke the fixed short link too and switch its toggle off
     try { await unpublishSharedSnapshot(FIXED_PREVIEW_SHARE_ID); } catch { /* ignore */ }
+    setFixedLinkEnabled(false);
+    try { localStorage.setItem('emp_fixed_preview_enabled', '0'); } catch { /* ignore */ }
     if (cloudUser) await setActiveShare(cloudUser.uid, null);
     try {
       localStorage.removeItem('emp_live_share_id');
@@ -1146,7 +1190,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     <span>{liveShareId ? t.dashSharingLive : t.dashLiveShare}</span>
                   </button>
 
-                  {showLiveSharePanel && liveShareId && (
+                  {showLiveSharePanel && (
                     <div className="absolute right-0 mt-2 w-80 rounded-xl bg-white border border-slate-200 shadow-xl p-3 z-50 space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-slate-900">{t.dashPublicLiveShareLink}</span>
@@ -1161,13 +1205,34 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       <p className="text-[11px] text-slate-500 leading-snug">
                         {t.dashLiveShareDesc}
                       </p>
-                      <div className="text-[11px] font-bold text-slate-700">
-                        {t.dashFixedPreviewLink}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[11px] font-bold text-slate-700">
+                          {t.dashFixedPreviewLink}
+                        </div>
+                        <button
+                          onClick={handleToggleFixedLink}
+                          className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
+                            fixedLinkEnabled ? 'bg-emerald-500' : 'bg-slate-300'
+                          }`}
+                          title={t.dashFixedPreviewLink}
+                          aria-label={t.dashFixedPreviewLink}
+                        >
+                          <span
+                            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${
+                              fixedLinkEnabled ? 'left-[18px]' : 'left-0.5'
+                            }`}
+                          />
+                        </button>
                       </div>
                       <button
                         onClick={handleCopyFixedLink}
                         title={t.dashCopy}
-                        className="flex items-center gap-2 w-full px-2.5 py-2 text-[11px] font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-lg hover:border-emerald-300 hover:bg-emerald-50/60 active:scale-[0.99] transition-all text-left"
+                        disabled={!fixedLinkEnabled}
+                        className={`flex items-center gap-2 w-full px-2.5 py-2 text-[11px] font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-lg transition-all text-left ${
+                          fixedLinkEnabled
+                            ? 'hover:border-emerald-300 hover:bg-emerald-50/60 active:scale-[0.99]'
+                            : 'opacity-50 cursor-not-allowed'
+                        }`}
                       >
                         <span className="flex-1 min-w-0 truncate">{getFixedPreviewUrl()}</span>
                         {fixedLinkCopied ? (
@@ -1177,31 +1242,42 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         )}
                       </button>
                       <p className="text-[10px] text-slate-400 leading-snug">
-                        {t.dashFixedPreviewLinkDesc}
+                        {fixedLinkEnabled ? t.dashFixedPreviewLinkDesc : t.dashFixedLinkOffHint}
                       </p>
-                      <details className="rounded-lg bg-slate-50 border border-slate-200 px-2 py-1.5">
-                        <summary className="text-[11px] text-slate-500 cursor-pointer select-none">
-                          {t.dashLongShareLink}
-                        </summary>
+                      {liveShareId ? (
+                        <>
+                          <details className="rounded-lg bg-slate-50 border border-slate-200 px-2 py-1.5">
+                            <summary className="text-[11px] text-slate-500 cursor-pointer select-none">
+                              {t.dashLongShareLink}
+                            </summary>
+                            <button
+                              onClick={handleCopyLiveShareLink}
+                              title={t.dashCopy}
+                              className="mt-1.5 flex items-center gap-2 w-full px-2 py-1.5 text-[11px] font-mono text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-emerald-300 active:scale-[0.99] transition-all text-left"
+                            >
+                              <span className="flex-1 min-w-0 truncate">{getSharePreviewUrl(liveShareId)}</span>
+                              {liveShareCopied ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              )}
+                            </button>
+                          </details>
+                          <button
+                            onClick={handleStopLiveShare}
+                            className="w-full px-2.5 py-1.5 text-[11px] font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg"
+                          >
+                            {t.dashStopSharing}
+                          </button>
+                        </>
+                      ) : (
                         <button
-                          onClick={handleCopyLiveShareLink}
-                          title={t.dashCopy}
-                          className="mt-1.5 flex items-center gap-2 w-full px-2 py-1.5 text-[11px] font-mono text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-emerald-300 active:scale-[0.99] transition-all text-left"
+                          onClick={handleCreateLiveShare}
+                          className="w-full px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg"
                         >
-                          <span className="flex-1 min-w-0 truncate">{getSharePreviewUrl(liveShareId)}</span>
-                          {liveShareCopied ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          )}
+                          {t.dashLiveShare}
                         </button>
-                      </details>
-                      <button
-                        onClick={handleStopLiveShare}
-                        className="w-full px-2.5 py-1.5 text-[11px] font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg"
-                      >
-                        {t.dashStopSharing}
-                      </button>
+                      )}
                     </div>
                   )}
                 </div>
