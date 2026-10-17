@@ -81,7 +81,6 @@ import {
 export default function App() {
   const [isStorageLoading, setIsStorageLoading] = useState(true);
   const [language, setLanguage] = useState<Language>('en');
-  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
 
   // Live Preview Mode State (activated via /preview route, #preview, ?preview, or ?share=)
@@ -156,6 +155,7 @@ export default function App() {
   rulesStateRef.current = { normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds };
   const lastRulesPublishRef = useRef<string>('');
   const lastCloudPreviewAtRef = useRef<number>(0);
+  const publicPreviewAppliedRef = useRef<boolean>(false);
 
   // Matching Results
   const [results, setResults] = useState<MatchedRow[]>([]);
@@ -650,8 +650,10 @@ export default function App() {
 
   // Live cloud preview: while signed in, the preview page follows the latest
   // snapshot published by the studio — on any device, no refresh needed.
+  // Skip if the public shares/latest slot already provided data (it's the source of truth).
   useEffect(() => {
     if (!cloudUser || !isPreviewMode) return;
+    if (publicPreviewAppliedRef.current) return;
     const unsub = subscribePreviewSnapshot(cloudUser.uid, async (meta) => {
       if (!meta || !meta.updatedAt || meta.updatedAt <= lastCloudPreviewAtRef.current) return;
       lastCloudPreviewAtRef.current = meta.updatedAt;
@@ -790,6 +792,7 @@ export default function App() {
             ]);
             if (fixed && isMounted) {
               lastCloudPreviewAtRef.current = fixed.createdAt || 0;
+              publicPreviewAppliedRef.current = true;
               checkAndApplyPreview(fixed);
             } else if (isMounted) {
               // Fetch failed/timed out or returned nothing: show the empty
