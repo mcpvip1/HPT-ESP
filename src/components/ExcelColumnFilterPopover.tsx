@@ -171,7 +171,7 @@ export const ExcelColumnFilterPopover: React.FC<ExcelColumnFilterPopoverProps> =
       {/* Popover Header */}
       <div className="p-3 border-b border-slate-800 bg-slate-950 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-5 h-5 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+          <div className="w-5 h-5 rounded bg-brand-500/20 text-brand-400 flex items-center justify-center shrink-0">
             <Filter className="w-3 h-3" />
           </div>
           <span className="font-semibold text-white truncate font-mono text-[11px]" title={columnLabel}>
@@ -196,7 +196,7 @@ export const ExcelColumnFilterPopover: React.FC<ExcelColumnFilterPopoverProps> =
           }}
           className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors text-left"
         >
-          <ArrowUpAZ className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <ArrowUpAZ className="w-3.5 h-3.5 text-brand-400 shrink-0" />
           <span>Sort A to Z (Ascending)</span>
         </button>
         <button
@@ -206,7 +206,7 @@ export const ExcelColumnFilterPopover: React.FC<ExcelColumnFilterPopoverProps> =
           }}
           className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors text-left"
         >
-          <ArrowDownZA className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <ArrowDownZA className="w-3.5 h-3.5 text-brand-400 shrink-0" />
           <span>Sort Z to A (Descending)</span>
         </button>
       </div>
@@ -220,7 +220,7 @@ export const ExcelColumnFilterPopover: React.FC<ExcelColumnFilterPopoverProps> =
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search values in column..."
-            className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-8 pr-7 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-all font-mono"
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-8 pr-7 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition-all font-mono"
             autoFocus
           />
           {searchQuery && (
@@ -243,14 +243,14 @@ export const ExcelColumnFilterPopover: React.FC<ExcelColumnFilterPopoverProps> =
           <div
             className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${
               allFilteredSelected
-                ? 'bg-emerald-600 border-emerald-500 text-white'
+                ? 'bg-brand-600 border-brand-500 text-white'
                 : someFilteredSelected
-                ? 'bg-emerald-950 border-emerald-600 text-emerald-400'
+                ? 'bg-brand-950 border-brand-600 text-brand-400'
                 : 'border-slate-700 bg-slate-950 text-transparent'
             }`}
           >
             {allFilteredSelected && <Check className="w-3 h-3 stroke-[3]" />}
-            {someFilteredSelected && <div className="w-2 h-0.5 bg-emerald-400 rounded-sm" />}
+            {someFilteredSelected && <div className="w-2 h-0.5 bg-brand-400 rounded-sm" />}
           </div>
           <span>(Select All)</span>
         </label>
@@ -278,7 +278,7 @@ export const ExcelColumnFilterPopover: React.FC<ExcelColumnFilterPopoverProps> =
                   <div
                     className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-colors shrink-0 ${
                       isChecked
-                        ? 'bg-emerald-600 border-emerald-500 text-white'
+                        ? 'bg-brand-600 border-brand-500 text-white'
                         : 'border-slate-700 bg-slate-950 text-transparent'
                     }`}
                   >
@@ -327,7 +327,7 @@ export const ExcelColumnFilterPopover: React.FC<ExcelColumnFilterPopoverProps> =
           </button>
           <button
             onClick={handleApply}
-            className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-colors"
+            className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-brand-600 hover:bg-brand-500 shadow-sm transition-colors"
           >
             Apply
           </button>
