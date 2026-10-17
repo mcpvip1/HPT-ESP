@@ -20,9 +20,9 @@ const styles: Record<
   { bar: string; iconWrap: string; progress: string; Icon: React.ComponentType<{ className?: string }> }
 > = {
   success: {
-    bar: 'bg-brand-500',
-    iconWrap: 'bg-brand-100 text-brand-600',
-    progress: 'bg-brand-500',
+    bar: 'bg-emerald-500',
+    iconWrap: 'bg-emerald-100 text-emerald-600',
+    progress: 'bg-emerald-500',
     Icon: CheckCircle2,
   },
   error: {
