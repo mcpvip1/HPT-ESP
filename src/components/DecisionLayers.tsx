@@ -435,7 +435,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors select-none shadow-xs"
               title={t.layerSaveRulesBtnTitle}
             >
-              <Save className="w-3.5 h-3.5 text-brand-600" />
+              <Save className="w-3.5 h-3.5 text-emerald-600" />
               <span>{t.layerSaveRules}</span>
             </button>
           )}
@@ -451,10 +451,10 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
       </div>
 
       {/* Quick Inspection Decision Preset Card */}
-      <div className="bg-gradient-to-r from-brand-50 via-white to-amber-50 border border-brand-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+      <div className="bg-gradient-to-r from-emerald-50 via-white to-amber-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs font-bold text-brand-700">
-            <span className="w-2 h-2 rounded-full bg-brand-500 animate-pulse" />
+          <div className="flex items-center gap-2 text-xs font-bold text-emerald-700">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             {t.layerActiveRuleTitle}
           </div>
           <p className="text-[11px] text-slate-600">
@@ -466,7 +466,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleApplyInspectionPreset}
-            className="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-lg shrink-0 transition-colors shadow-xs"
+            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg shrink-0 transition-colors shadow-xs"
           >
             {t.layerResetStandardRule}
           </button>
@@ -542,7 +542,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                     onChange={(e) =>
                       handleUpdateLayer(layer.id, { primaryColumn: e.target.value })
                     }
-                    className={`w-full bg-white border rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-brand-500 font-mono shadow-xs ${
+                    className={`w-full bg-white border rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 font-mono shadow-xs ${
                       !isPrimaryReady ? 'border-amber-500 text-amber-800' : 'border-slate-200'
                     }`}
                   >
@@ -566,7 +566,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                         secondaryColumn: e.target.value || undefined,
                       })
                     }
-                    className={`w-full bg-white border rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-brand-500 font-mono shadow-xs ${
+                    className={`w-full bg-white border rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 font-mono shadow-xs ${
                       !isSecondaryReady ? 'border-amber-500 text-amber-800' : 'border-slate-200'
                     }`}
                   >
@@ -592,7 +592,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                       })
                     }
                     disabled={!layer.secondaryColumn}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-brand-500 disabled:opacity-40 font-mono shadow-xs"
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 disabled:opacity-40 font-mono shadow-xs"
                   >
                     <option value="or">{t.layerLogicOr}</option>
                     <option value="and">{t.layerLogicAnd}</option>
@@ -608,7 +608,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                   </span>
                   <button
                     onClick={() => handleAddRule(layer.id)}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-brand-700 hover:text-brand-800 bg-brand-50 px-2.5 py-1 rounded-md border border-brand-200 shadow-xs"
+                    className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 shadow-xs"
                   >
                     <Plus className="w-3 h-3" />
                     <span>{t.addRule}</span>
@@ -669,7 +669,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                         })
                       }
                       placeholder={t.layerValuePlaceholder}
-                      className="flex-1 bg-white border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand-500 font-mono shadow-xs"
+                      className="flex-1 bg-white border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-mono shadow-xs"
                     />
 
                     {/* Color Output */}
@@ -683,13 +683,13 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                         }
                         className={`border rounded px-2.5 py-1 text-xs font-bold focus:outline-none shadow-xs ${
                           rule.color === 'green'
-                            ? 'bg-brand-600 text-white border-brand-600'
+                            ? 'bg-emerald-600 text-white border-emerald-600'
                             : rule.color === 'yellow'
                             ? 'bg-amber-500 text-white border-amber-500'
                             : 'bg-rose-600 text-white border-rose-600'
                         }`}
                       >
-                        <option value="green" className="bg-white text-brand-700">{t.layerColorGreen}</option>
+                        <option value="green" className="bg-white text-emerald-700">{t.layerColorGreen}</option>
                         <option value="yellow" className="bg-white text-amber-700">{t.layerColorYellow}</option>
                         <option value="red" className="bg-white text-rose-700">{t.layerColorRed}</option>
                       </select>
@@ -719,7 +719,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                         fallbackToOriginalFill: e.target.checked,
                       })
                     }
-                    className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                    className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                   />
                   <label htmlFor={`fallback_${layer.id}`} className="cursor-pointer text-slate-700 font-medium">
                     {t.layerUseOriginalFill}
@@ -759,7 +759,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
         <button
           onClick={onExecuteMatching}
           disabled={isProcessing || !referenceWb || !comparisonWb}
-          className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg shadow-sm transition-all hover:scale-[1.01]"
+          className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg shadow-sm transition-all hover:scale-[1.01]"
         >
           <Play className="w-4 h-4 fill-white" />
           <span>{isProcessing ? t.matchingInProgress : t.runMatching}</span>
@@ -873,7 +873,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                 onClick={() => setPresetTab('templates')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                   presetTab === 'templates'
-                    ? 'bg-brand-50 text-brand-800 border border-brand-200'
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
@@ -991,7 +991,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
                       className="p-3.5 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
                     >
                       <div className="space-y-1 min-w-0">
-                        <div className="text-xs font-bold text-brand-800">{template.name}</div>
+                        <div className="text-xs font-bold text-emerald-800">{template.name}</div>
                         <div className="text-[11px] text-slate-600">{template.desc}</div>
                         <div className="text-[10px] text-slate-500 font-mono">
                           {t.layerTemplateMeta.replace('{layers}', String(template.layers.length)).replace('{rules}', String(template.layers[0]?.rules.length ?? 0))}
@@ -1000,7 +1000,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
 
                       <button
                         onClick={() => handleApplyPreset(template.layers)}
-                        className="px-3 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 rounded-lg shadow-xs transition-colors shrink-0 self-end sm:self-auto"
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-xs transition-colors shrink-0 self-end sm:self-auto"
                       >
                         {t.layerApplyRule}
                       </button>
