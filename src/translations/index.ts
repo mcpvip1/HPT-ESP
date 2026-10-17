@@ -250,6 +250,7 @@ export interface TranslationDict {
   toastEvaluatedSummary: string;
   toastMatchingError: string;
   toastPreviewRefreshed: string;
+  toastPreviewRefreshFailed: string;
   previewNoResultsTitle: string;
   previewNoResultsDesc: string;
   previewDownloading: string;
@@ -839,6 +840,7 @@ export const translations: Record<Language, TranslationDict> = {
     toastEvaluatedSummary: "Evaluated {total} rows: {green} passed, {yellow} review, {red} rejected.",
     toastMatchingError: "Error occurred during matching.",
     toastPreviewRefreshed: "Preview results refreshed",
+    toastPreviewRefreshFailed: "Could not refresh from cloud",
     previewNoResultsTitle: "No Matching Results Yet",
     previewNoResultsDesc: "The shared result preview link does not contain results data, or the link expired.",
     previewDownloading: "Downloading information\u2026",
@@ -1138,6 +1140,7 @@ export const translations: Record<Language, TranslationDict> = {
     toastEvaluatedSummary: "အတန်း {total} ကို အကဲဖြတ်ပြီးပြီ — {green} အောင်မြင်၊ {yellow} ပြန်လည်သုံးသပ်ရန်၊ {red} ပယ်ချထားသည်။",
     toastMatchingError: "ကိုက်ညီမှု တွက်ချက်စဉ် အမှားတစ်ခု ဖြစ်ပွားခဲ့သည်။",
     toastPreviewRefreshed: "အစမ်းကြည့်ရလဒ်များကို ပြန်လည်ရယူပြီးပြီ",
+    toastPreviewRefreshFailed: "Cloud မှ ပြန်လည်ရယူ၍ မရပါ",
     previewNoResultsTitle: "ကိုက်ညီသော ရလဒ်များ မရှိသေးပါ",
     previewDownloading: "အချက်အလက် ဒေါင်းလုဒ်ဆွဲနေပါသည်\u2026",
     previewPleaseWait: "ခဏစောင့်ဆိုင်းပါ",
@@ -1437,6 +1440,7 @@ export const translations: Record<Language, TranslationDict> = {
     toastEvaluatedSummary: "ประเมิน {total} แถว: ผ่าน {green} ตรวจสอบ {yellow} ปฏิเสธ {red}",
     toastMatchingError: "เกิดข้อผิดพลาดระหว่างการจับคู่",
     toastPreviewRefreshed: "รีเฟรชผลลัพธ์ตัวอย่างแล้ว",
+    toastPreviewRefreshFailed: "ไม่สามารถรีเฟรชจากคลาวด์ได้",
     previewNoResultsTitle: "ยังไม่มีผลลัพธ์ที่ตรงกัน",
     previewDownloading: "กำลังดาวน์โหลดข้อมูล\u2026",
     previewPleaseWait: "โปรดรอสักครู่",
@@ -1736,6 +1740,7 @@ export const translations: Record<Language, TranslationDict> = {
     toastEvaluatedSummary: "已评估 {total} 行：{green} 通过，{yellow} 待复核，{red} 被拒绝。",
     toastMatchingError: "匹配过程中发生错误。",
     toastPreviewRefreshed: "预览结果已刷新",
+    toastPreviewRefreshFailed: "无法从云端刷新",
     previewNoResultsTitle: "暂无匹配结果",
     previewDownloading: "正在下载信息\u2026",
     previewPleaseWait: "请稍候",
