@@ -1,5 +1,31 @@
 @import "tailwindcss";
 
+@theme {
+  /* Excellent Medical Technology brand palette (from logo) */
+  --color-brand-50: #eef6fd;
+  --color-brand-100: #d9ebfa;
+  --color-brand-200: #b3d7f5;
+  --color-brand-300: #94c6f2;
+  --color-brand-400: #5aa9e6;
+  --color-brand-500: #2b88d9;
+  --color-brand-600: #1f6fb5;
+  --color-brand-700: #1a5a92;
+  --color-brand-800: #174a76;
+  --color-brand-900: #143d61;
+  --color-brand-950: #0e2a45;
+
+  --color-accent-50: #fef6ec;
+  --color-accent-100: #fdebd3;
+  --color-accent-200: #fad5a5;
+  --color-accent-300: #f2b263;
+  --color-accent-400: #f7a94d;
+  --color-accent-500: #f2911b;
+  --color-accent-600: #d97a0e;
+  --color-accent-700: #b5630c;
+  --color-accent-800: #91500e;
+  --color-accent-900: #77420f;
+}
+
 @keyframes toast-slide-in {
   from {
     opacity: 0;
