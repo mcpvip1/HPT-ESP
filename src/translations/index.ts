@@ -256,6 +256,7 @@ export interface TranslationDict {
   previewPleaseWait: string;
   previewFixedEmptyTitle: string;
   previewFixedEmptyDesc: string;
+  previewRetry: string;
   headerResultPreview: string;
   headerLiveTable: string;
   headerSignedInTitle: string;
@@ -841,6 +842,7 @@ export const translations: Record<Language, TranslationDict> = {
     previewPleaseWait: "Please wait",
     previewFixedEmptyTitle: "No preview published yet",
     previewFixedEmptyDesc: "The owner hasn't published results to this link yet. New results will appear here automatically once published.",
+    previewRetry: "Retry",
     headerResultPreview: "Result Preview",
     headerLiveTable: "· Live Interactive Table",
     headerSignedInTitle: "Signed in as {email} — click to sign out of cloud sync",
@@ -1138,6 +1140,7 @@ export const translations: Record<Language, TranslationDict> = {
     previewPleaseWait: "ခဏစောင့်ဆိုင်းပါ",
     previewFixedEmptyTitle: "အကြိုကြည့်ရှုမှု ထုတ်ဝေထားခြင်း မရှိသေးပါ",
     previewFixedEmptyDesc: "ပိုင်ရှင်က ဤလင့်ခ်သို့ ရလဒ်များ မထုတ်ဝေရသေးပါ။ ထုတ်ဝေပြီးပါက ရလဒ်အသစ်များ ဤနေရာတွင် အလိုအလျောက် ပေါ်လာပါမည်။",
+    previewRetry: "ထပ်ကြိုးစားမည်",
     previewNoResultsDesc: "မျှဝေထားသော ရလဒ် အစမ်းကြည့်လင့်ခ်တွင် ရလဒ်ဒေတာ မပါဝင်ပါ သို့မဟုတ် လင့်ခ် သက်တမ်းကုန်သွားပြီ။",
     headerResultPreview: "ရလဒ် အစမ်းကြည့်မှု",
     headerLiveTable: "· တိုက်ရိုက် အပြန်အလှန် ဇယား",
@@ -1436,6 +1439,7 @@ export const translations: Record<Language, TranslationDict> = {
     previewPleaseWait: "โปรดรอสักครู่",
     previewFixedEmptyTitle: "ยังไม่มีการเผยแพร่ตัวอย่าง",
     previewFixedEmptyDesc: "เจ้าของยังไม่ได้เผยแพร่ผลลัพธ์ไปยังลิงก์นี้ ผลลัพธ์ใหม่จะปรากฏที่นี่โดยอัตโนมัติเมื่อมีการเผยแพร่",
+    previewRetry: "ลองอีกครั้ง",
     previewNoResultsDesc: "ลิงก์ตัวอย่างผลลัพธ์ที่แชร์ไม่มีข้อมูลผลลัพธ์ หรือลิงก์หมดอายุ",
     headerResultPreview: "ตัวอย่างผลลัพธ์",
     headerLiveTable: "· ตารางโต้ตอบสด",
@@ -1734,6 +1738,7 @@ export const translations: Record<Language, TranslationDict> = {
     previewPleaseWait: "请稍候",
     previewFixedEmptyTitle: "尚未发布预览",
     previewFixedEmptyDesc: "所有者尚未向此链接发布结果。发布后，最新结果将自动显示在这里。",
+    previewRetry: "重试",
     previewNoResultsDesc: "共享的结果预览链接不包含结果数据，或链接已过期。",
     headerResultPreview: "结果预览",
     headerLiveTable: "· 实时交互表",
