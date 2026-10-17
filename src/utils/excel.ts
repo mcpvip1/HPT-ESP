@@ -966,6 +966,9 @@ export function processMatching(
         }
 
         // Replace any postpone status in comparisonRow and mergedRow with Accept
+        // Clone first: r.comparisonRow references the source workbook row;
+        // mutating it would corrupt the user's uploaded data in memory/IDB/cloud.
+        r.comparisonRow = { ...r.comparisonRow };
         for (const [colName, val] of Object.entries(r.comparisonRow)) {
           const s = String(val ?? '').toLowerCase();
           if (s.includes('postpone')) {
@@ -1008,6 +1011,7 @@ export function processMatching(
                 }
               }
             }
+            r.comparisonRow = { ...r.comparisonRow };
             for (const [colName, val] of Object.entries(r.comparisonRow)) {
               const s = String(val ?? '').toLowerCase();
               if (s.includes('postpone') || s.includes('pending') || s.includes('hold')) {
