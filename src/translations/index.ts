@@ -585,7 +585,7 @@ export const translations: Record<Language, TranslationDict> = {
   en: {
     ...batchB.en,
     ...batchC.en,
-    appName: "ExcelMatch Pro",
+    appName: "Excellent Medical Technology ESP",
     appSubtitle: "Intelligent Auto-Sorting, Matching & Decision Engine",
     step1: "1. Files",
     step2: "2. Results & Export",
@@ -883,7 +883,7 @@ export const translations: Record<Language, TranslationDict> = {
   my: {
     ...batchB.my,
     ...batchC.my,
-    appName: "ExcelMatch Pro",
+    appName: "Excellent Medical Technology ESP",
     appSubtitle: "အလိုအလျောက် Excel အချက်အလက်နှိုင်းယှဉ်စစ်ဆေးရေး အင်ဂျင်",
     step1: "၁. ဖိုင်များ",
     step2: "၂. ရလဒ်နှင့် ထုတ်ယူမှု",
@@ -1181,7 +1181,7 @@ export const translations: Record<Language, TranslationDict> = {
   th: {
     ...batchB.th,
     ...batchC.th,
-    appName: "ExcelMatch Pro",
+    appName: "Excellent Medical Technology ESP",
     appSubtitle: "ระบบเปรียบเทียบข้อมูล จัดเรียง และประเมินผลอัตโนมัติสำหรับ Excel",
     step1: "1. ไฟล์ข้อมูล",
     step2: "2. ผลลัพธ์และส่งออก",
@@ -1479,7 +1479,7 @@ export const translations: Record<Language, TranslationDict> = {
   zh: {
     ...batchB.zh,
     ...batchC.zh,
-    appName: "ExcelMatch Pro",
+    appName: "Excellent Medical Technology ESP",
     appSubtitle: "企业级智能 Excel 自动比对、多列匹配与决策引擎",
     step1: "1. 数据文件",
     step2: "2. 结果与导出",
