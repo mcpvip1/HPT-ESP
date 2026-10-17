@@ -472,14 +472,14 @@ export function exportStandalonePreviewHtml(payload: SharedPreviewPayload): void
         <h1 class="text-xl font-bold text-white">${title}</h1>
         <p class="text-xs text-slate-400 mt-1">Generated snapshot · ${new Date(payload.createdAt).toLocaleString()}</p>
       </div>
-      <div class="text-xs text-brand-400 font-mono bg-brand-950/80 border border-brand-800 px-3 py-1 rounded-lg">
+      <div class="text-xs text-emerald-400 font-mono bg-emerald-950/80 border border-emerald-800 px-3 py-1 rounded-lg">
         ${payload.results.length} Total Rows
       </div>
     </div>
 
     <!-- Search Input -->
     <div class="flex items-center gap-2">
-      <input id="searchInput" type="text" placeholder="Filter rows in real-time..." class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white w-full max-w-md focus:outline-none focus:border-brand-500 font-mono">
+      <input id="searchInput" type="text" placeholder="Filter rows in real-time..." class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white w-full max-w-md focus:outline-none focus:border-emerald-500 font-mono">
     </div>
 
     <!-- Table -->
