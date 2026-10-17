@@ -49,7 +49,7 @@ interface CompactPreviewPayload {
   cols?: ColumnConfigItem[];
   ch: string[]; // comparison headers
   rh: string[]; // reference headers
-  r: [number, number, number, string, any[], any[], CompactUnmatchedInfo | null][];
+  r: [number, number, number, string, any[], any[], CompactUnmatchedInfo | null, string][];
 }
 
 const COLOR_MAP: Record<ResultColor | 'none', number> = {
@@ -90,7 +90,7 @@ export function packCompact(payload: SharedPreviewPayload): CompactPreviewPayloa
   const ch = Array.from(chSet);
   const rh = Array.from(rhSet);
 
-  const r: [number, number, number, string, any[], any[], CompactUnmatchedInfo | null][] =
+  const r: [number, number, number, string, any[], any[], CompactUnmatchedInfo | null, string][] =
     payload.results.map((row) => {
       const compVals = ch.map((k) => row.comparisonRow[k] ?? '');
       const refVals =
@@ -122,7 +122,7 @@ export function packCompact(payload: SharedPreviewPayload): CompactPreviewPayloa
         ];
       }
 
-      return [row.rowIndex, colorCode, isMatchedCode, reason, compVals, refVals, unmatched];
+      return [row.rowIndex, colorCode, isMatchedCode, reason, compVals, refVals, unmatched, row.matchKey || ''];
     });
 
   return {
@@ -157,7 +157,7 @@ export function unpackCompact(compact: CompactPreviewPayload): SharedPreviewPayl
   const rh = compact.rh || [];
 
   const results: MatchedRow[] = (compact.r || []).map((tup, idx) => {
-    const [rowIndex, colorCode, isMatchedCode, reason, compVals, refVals, unmatchedRaw] = tup;
+    const [rowIndex, colorCode, isMatchedCode, reason, compVals, refVals, unmatchedRaw, packedMatchKey] = tup;
     const decisionColor = COLOR_REVERSE_MAP[colorCode] || 'none';
     const isMatched = isMatchedCode === 1;
 
@@ -206,7 +206,7 @@ export function unpackCompact(compact: CompactPreviewPayload): SharedPreviewPayl
     return {
       id: `row_${idx + 1}`,
       rowIndex: rowIndex || idx + 1,
-      matchKey: ch.length > 0 ? String(comparisonRow[ch[0]] ?? '') : '',
+      matchKey: typeof packedMatchKey === 'string' && packedMatchKey ? packedMatchKey : (ch.length > 0 ? String(comparisonRow[ch[0]] ?? '') : ''),
       isMatched,
       unmatchedInfo,
       decisionColor,
