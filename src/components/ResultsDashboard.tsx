@@ -28,6 +28,7 @@ import {
   FileText,
   Clock,
   Link2,
+  Cloud,
 } from 'lucide-react';
 import {
   MatchedRow,
@@ -588,6 +589,33 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     await copyTextToClipboard(getFixedPreviewUrl(), setShareLinkCopied);
   };
 
+  // Manual publish to the fixed public preview slot (/preview).
+  // The auto-publish is debounced; this lets the user force the latest
+  // results to the preview link immediately (e.g. after swapping files).
+  const handlePublishPreview = async () => {
+    if (!cloudUser || !results || results.length === 0 || !stats) return;
+    try {
+      const payload: SharedPreviewPayload = {
+        version: 1,
+        createdAt: Date.now(),
+        comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+        comparisonWbUploadedAt: comparisonWb?.uploadedAt,
+        stats,
+        results,
+        filter: activeFilter,
+        onlyAccept: hideSupersededPostpone,
+        searchTerm,
+        searchColumn,
+        columnConfigs,
+      };
+      await publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, cloudUser.uid, payload);
+      onShowToast(t.dashPreviewPublished || 'Preview updated with latest results', 'success');
+    } catch (e) {
+      console.warn('Manual preview publish failed', e);
+      onShowToast(t.dashPreviewPublishFailed || 'Failed to update preview', 'error');
+    }
+  };
+
   // Helper to retrieve cell string value for any column (System, Ref, Comp)
   const getRowColValue = (row: MatchedRow, colId: string): string => {
     if (colId === 'rowIndex') return String(row.rowIndex);
@@ -989,6 +1017,17 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   )}
                   <span>{shareLinkCopied ? t.dashCopied : t.dashCopyShareLink}</span>
                 </button>
+                {/* Publish to Preview: force the current results to the public /preview link immediately */}
+                {!isPreviewMode && (
+                  <button
+                    onClick={handlePublishPreview}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none"
+                    title={t.dashPublishPreview || 'Update the public preview link with these results'}
+                  >
+                    <Cloud className="w-3.5 h-3.5 shrink-0" />
+                    <span>{t.dashPublishPreview || 'Update preview'}</span>
+                  </button>
+                )}
 
               </div>
               <div className="h-6 w-px bg-slate-200 hidden md:block" />
