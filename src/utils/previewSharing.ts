@@ -5,6 +5,7 @@ export interface SharedPreviewPayload {
   version: 1 | 2;
   createdAt: number;
   comparisonWbName: string;
+  comparisonWbUploadedAt?: number;
   stats: MatchingStats;
   results: MatchedRow[];
   filter?: 'all' | 'green' | 'yellow' | 'red' | 'blue' | 'unmatched';
@@ -23,6 +24,7 @@ interface CompactPreviewPayload {
   v: 2;
   t: number;
   n: string;
+  u?: number; // comparison file uploadedAt (absent = unknown)
   f?: string;
   oa?: number; // 1 = Only Accept on, 0 = off (absent = default on)
   s?: string;
@@ -86,6 +88,7 @@ export function packCompact(payload: SharedPreviewPayload): CompactPreviewPayloa
     v: 2,
     t: payload.createdAt || Date.now(),
     n: payload.comparisonWbName || 'Evaluation_Results',
+    u: payload.comparisonWbUploadedAt || undefined,
     f: payload.filter !== 'all' ? payload.filter : undefined,
     oa: payload.onlyAccept ? 1 : 0,
     s: payload.searchTerm ? payload.searchTerm : undefined,
@@ -163,6 +166,7 @@ export function unpackCompact(compact: CompactPreviewPayload): SharedPreviewPayl
     version: 2,
     createdAt: compact.t || Date.now(),
     comparisonWbName: compact.n || 'Evaluation_Results',
+    comparisonWbUploadedAt: compact.u || undefined,
     filter: (compact.f as any) || 'all',
     onlyAccept: compact.oa !== 0,
     searchTerm: compact.s || '',
