@@ -1071,14 +1071,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           <div className="flex flex-1 items-center gap-2 max-w-2xl">
             {/* Search Scope Dropdown */}
             {!isPreviewMode && (
-              <div className="relative shrink-0">
+              <div className="relative shrink-0 max-w-[45vw]">
                 <select
                   value={searchColumn}
                   onChange={(e) => {
                     setSearchColumn(e.target.value);
                     setPage(1);
                   }}
-                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 hover:text-slate-900 focus:outline-none focus:border-emerald-500 transition-colors shadow-xs"
+                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 hover:text-slate-900 focus:outline-none focus:border-emerald-500 transition-colors shadow-xs max-w-full truncate"
                   title={t.dashSearchScopeTitle}
                 >
                   <option value="all">{t.dashSearchScopeAll}</option>
@@ -1107,7 +1107,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             )}
 
             {/* Real-time Search Input Field */}
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
@@ -1145,7 +1145,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
           {/* Currently viewed file + last replaced time */}
           {comparisonWb && (
-            <div className="flex items-center gap-2 shrink-0 self-end md:self-auto ml-auto">
+            <div className="flex flex-wrap items-center gap-2 max-w-full self-end md:self-auto ml-auto">
               <span
                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px]"
                 title={comparisonWb.name}
@@ -1239,7 +1239,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       {/* 4. Main Data Table with Dynamic Column Visibility & Real-Time Search Match Highlighting */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-[11px] sm:text-xs border-collapse">
             <thead className="sticky top-0 z-10 bg-slate-100/90 backdrop-blur-sm border-b border-slate-200 text-slate-700 font-bold select-none shadow-xs">
               <tr>
                 {visibleTableColumns.map((col, idx) => {
@@ -1264,7 +1264,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   return (
                     <th
                       key={col.id}
-                      className={`py-3.5 px-3 border-r border-slate-200 whitespace-nowrap group/th transition-colors ${
+                      className={`py-2 px-2 sm:py-3.5 sm:px-3 border-r border-slate-200 whitespace-nowrap group/th transition-colors ${
                         isRowIndexCol
                           ? 'sticky left-0 z-20 bg-slate-100 text-slate-700'
                           : `relative ${
@@ -1482,7 +1482,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
                         if (col.id === 'decisionStatus') {
                           return (
-                            <td key={col.id} className="py-2.5 px-4 border-r border-slate-200 whitespace-nowrap">
+                            <td key={col.id} className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap">
                               {getSolidBadge(row.decisionColor)}
                             </td>
                           );
@@ -1490,7 +1490,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
                         if (col.id === 'matchStatus') {
                           return (
-                            <td key={col.id} className="py-2.5 px-4 border-r border-slate-200 whitespace-nowrap">
+                            <td key={col.id} className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap">
                               {row.isMatched ? (
                                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 px-2.5 py-1 rounded-md shadow-xs">
                                   <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
@@ -1532,7 +1532,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
                         if (col.id === 'decisionReason') {
                           return (
-                            <td key={col.id} className="py-2.5 px-4 border-r border-slate-200 text-xs text-slate-700 font-medium truncate max-w-xs">
+                            <td key={col.id} className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 text-xs text-slate-700 font-medium truncate max-w-xs">
                               <span title={row.decisionReason}>
                                 {highlightText(row.decisionReason, searchTerm)}
                               </span>
@@ -1579,7 +1579,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           return (
                             <td
                               key={col.id}
-                              className="py-2.5 px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800 bg-blue-50/20"
+                              className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800 bg-blue-50/20"
                             >
                               {isInspectionCol ? renderFilledInspectionCell(valStr) : highlightText(valStr, searchTerm)}
                             </td>
@@ -1596,7 +1596,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         return (
                           <td
                             key={col.id}
-                            className="py-2.5 px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800"
+                            className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800"
                           >
                             {isInspectionCol ? renderFilledInspectionCell(valStr) : highlightText(valStr, searchTerm)}
                           </td>
