@@ -754,10 +754,84 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     return val !== undefined && val !== null && String(val).trim() !== '' ? String(val) : '(Blanks)';
   };
 
-  // Helper to calculate distinct values and occurrences for Excel-style filter
+  // Shared row predicate: status tab + Only Accept + column checklists + search.
+  // `excludeColId` skips one column's own checklist so that column's dropdown
+  // keeps showing all values available in the current view (Excel behavior).
+  // In particular the status tab always applies, so e.g. under the green
+  // filter a column dropdown never offers values that have no green rows.
+  const passesRowFilters = (item: MatchedRow, excludeColId?: string): boolean => {
+    // 1. Status Filter Tab
+    if (activeFilter === 'green' && item.decisionColor !== 'green') return false;
+    if (activeFilter === 'yellow' && item.decisionColor !== 'yellow') return false;
+    if (activeFilter === 'red' && item.decisionColor !== 'red') return false;
+    if (activeFilter === 'blue' && item.decisionColor !== 'blue') return false;
+    if (activeFilter === 'unmatched' && item.isMatched) return false;
+
+    // Deduplication: "only take accept" - optionally hide rows that were superseded by an Accept record
+    if (hideSupersededPostpone && item.supersededByAccept) return false;
+
+    // 2. Excel-Style Column Filters (Multi-Column Checklists)
+    for (const [filterColId, allowedVals] of Object.entries(columnFilters)) {
+      if (filterColId === excludeColId) continue;
+      if (allowedVals && Array.isArray(allowedVals)) {
+        const rowVal = getRowColValue(item, filterColId);
+        if (!allowedVals.includes(rowVal)) {
+          return false;
+        }
+      }
+    }
+
+    // 3. Real-Time Content Search Field
+    const query = searchTerm.trim().toLowerCase();
+    if (query) {
+      if (searchColumn === 'all') {
+        const inKey = item.matchKey.toLowerCase().includes(query);
+        const inReason = item.decisionReason.toLowerCase().includes(query);
+        const inOutcome = (item.decisionColor === 'green' ? 'passed accept' : item.decisionColor === 'yellow' ? 'review postpone' : item.decisionColor === 'red' ? 'rejected fail' : item.decisionColor === 'blue' ? 'hold blue' : '').includes(query);
+        const inMatchStatus = (item.isMatched ? 'matched' : 'unmatched new').includes(query);
+        const inRowIdx = String(item.rowIndex).includes(query);
+        const inUnmatched = item.unmatchedInfo
+          ? (item.unmatchedInfo.primaryIdentifier + ' ' + item.unmatchedInfo.reason + ' ' + item.unmatchedInfo.unmatchedKeyDisplay).toLowerCase().includes(query)
+          : false;
+        const inComp = Object.values(item.comparisonRow).some((v) =>
+          String(v ?? '').toLowerCase().includes(query)
+        );
+        const inRef = item.matchedMainRow
+          ? Object.values(item.matchedMainRow).some((v) =>
+              String(v ?? '').toLowerCase().includes(query)
+            )
+          : false;
+
+        return inKey || inReason || inOutcome || inMatchStatus || inRowIdx || inUnmatched || inComp || inRef;
+      } else if (searchColumn === 'reason') {
+        return item.decisionReason.toLowerCase().includes(query);
+      } else if (searchColumn === 'unmatched') {
+        return (item.unmatchedInfo?.primaryIdentifier + ' ' + item.unmatchedInfo?.reason + ' ' + item.unmatchedInfo?.unmatchedKeyDisplay).toLowerCase().includes(query);
+      } else if (searchColumn === 'matchKey') {
+        return item.matchKey.toLowerCase().includes(query);
+      } else if (searchColumn === 'outcome') {
+        const outcomeStr = item.decisionColor === 'green' ? 'passed accept' : item.decisionColor === 'yellow' ? 'review postpone' : item.decisionColor === 'red' ? 'rejected fail' : item.decisionColor === 'blue' ? 'hold blue' : '';
+        return outcomeStr.includes(query);
+      } else if (searchColumn.startsWith('[Ref] ')) {
+        const rawKey = searchColumn.replace('[Ref] ', '');
+        const val = item.matchedMainRow?.[rawKey];
+        return String(val ?? '').toLowerCase().includes(query);
+      } else {
+        const val = item.comparisonRow[searchColumn] ?? item.matchedMainRow?.[searchColumn];
+        return String(val ?? '').toLowerCase().includes(query);
+      }
+    }
+
+    return true;
+  };
+
+  // Helper to calculate distinct values and occurrences for Excel-style filter.
+  // Counts only rows visible under the current status tab / search / other
+  // column filters, so the dropdown never offers dead-end options.
   const getColumnUniqueValues = (colId: string): UniqueValueItem[] => {
     const counts = new Map<string, number>();
     for (const r of results) {
+      if (!passesRowFilters(r, colId)) continue;
       const val = getRowColValue(r, colId);
       counts.set(val, (counts.get(val) || 0) + 1);
     }
@@ -770,75 +844,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       });
   };
 
-  // Real-Time Filter & Search Logic
+  // Real-Time Filter & Search Logic (shared predicate above)
   const filteredRows = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-
-    return results.filter((item) => {
-      // 1. Status Filter Tab
-      if (activeFilter === 'green' && item.decisionColor !== 'green') return false;
-      if (activeFilter === 'yellow' && item.decisionColor !== 'yellow') return false;
-      if (activeFilter === 'red' && item.decisionColor !== 'red') return false;
-      if (activeFilter === 'blue' && item.decisionColor !== 'blue') return false;
-      if (activeFilter === 'unmatched' && item.isMatched) return false;
-
-      // Deduplication: "only take accept" - optionally hide rows that were superseded by an Accept record
-      if (hideSupersededPostpone && item.supersededByAccept) return false;
-
-      // 2. Excel-Style Column Filters (Multi-Column Checklists)
-      for (const [filterColId, allowedVals] of Object.entries(columnFilters)) {
-        if (allowedVals && Array.isArray(allowedVals)) {
-          const rowVal = getRowColValue(item, filterColId);
-          if (!allowedVals.includes(rowVal)) {
-            return false;
-          }
-        }
-      }
-
-      // 3. Real-Time Content Search Field
-      if (query) {
-        if (searchColumn === 'all') {
-          // Search across all comparison fields, reference fields, key, and evaluation reason
-          const inKey = item.matchKey.toLowerCase().includes(query);
-          const inReason = item.decisionReason.toLowerCase().includes(query);
-          const inOutcome = (item.decisionColor === 'green' ? 'passed accept' : item.decisionColor === 'yellow' ? 'review postpone' : item.decisionColor === 'red' ? 'rejected fail' : item.decisionColor === 'blue' ? 'hold blue' : '').includes(query);
-          const inMatchStatus = (item.isMatched ? 'matched' : 'unmatched new').includes(query);
-          const inRowIdx = String(item.rowIndex).includes(query);
-          const inUnmatched = item.unmatchedInfo
-            ? (item.unmatchedInfo.primaryIdentifier + ' ' + item.unmatchedInfo.reason + ' ' + item.unmatchedInfo.unmatchedKeyDisplay).toLowerCase().includes(query)
-            : false;
-          const inComp = Object.values(item.comparisonRow).some((v) =>
-            String(v ?? '').toLowerCase().includes(query)
-          );
-          const inRef = item.matchedMainRow
-            ? Object.values(item.matchedMainRow).some((v) =>
-                String(v ?? '').toLowerCase().includes(query)
-              )
-            : false;
-
-          return inKey || inReason || inOutcome || inMatchStatus || inRowIdx || inUnmatched || inComp || inRef;
-        } else if (searchColumn === 'reason') {
-          return item.decisionReason.toLowerCase().includes(query);
-        } else if (searchColumn === 'unmatched') {
-          return (item.unmatchedInfo?.primaryIdentifier + ' ' + item.unmatchedInfo?.reason + ' ' + item.unmatchedInfo?.unmatchedKeyDisplay).toLowerCase().includes(query);
-        } else if (searchColumn === 'matchKey') {
-          return item.matchKey.toLowerCase().includes(query);
-        } else if (searchColumn === 'outcome') {
-          const outcomeStr = item.decisionColor === 'green' ? 'passed accept' : item.decisionColor === 'yellow' ? 'review postpone' : item.decisionColor === 'red' ? 'rejected fail' : item.decisionColor === 'blue' ? 'hold blue' : '';
-          return outcomeStr.includes(query);
-        } else if (searchColumn.startsWith('[Ref] ')) {
-          const rawKey = searchColumn.replace('[Ref] ', '');
-          const val = item.matchedMainRow?.[rawKey];
-          return String(val ?? '').toLowerCase().includes(query);
-        } else {
-          // Specific selected column
-          const val = item.comparisonRow[searchColumn] ?? item.matchedMainRow?.[searchColumn];
-          return String(val ?? '').toLowerCase().includes(query);
-        }
-      }
-
-      return true;
-    });
+    return results.filter((item) => passesRowFilters(item));
   }, [results, activeFilter, columnFilters, searchTerm, searchColumn, hideSupersededPostpone]);
 
   // Sorting Logic
