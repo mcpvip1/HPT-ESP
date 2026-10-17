@@ -75,6 +75,7 @@ import {
   SlidersHorizontal,
   Cloud,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
 
 export default function App() {
@@ -772,13 +773,23 @@ export default function App() {
           setShareId(FIXED_PREVIEW_SHARE_ID);
           setPreviewLoading(true);
           try {
-            const fixed = await fetchSharedSnapshot(FIXED_PREVIEW_SHARE_ID);
+            // Timeout after 15s so a hanging network can't stick the UI on
+            // "Downloading..." forever; the refresh button retries.
+            const fixed = await Promise.race([
+              fetchSharedSnapshot(FIXED_PREVIEW_SHARE_ID),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
+            ]);
             if (fixed && isMounted) {
               lastCloudPreviewAtRef.current = fixed.createdAt || 0;
               checkAndApplyPreview(fixed);
+            } else if (isMounted) {
+              // Fetch failed/timed out or returned nothing: show the empty
+              // state (with retry) instead of hanging on the spinner.
+              setPreviewLoading(false);
             }
           } catch (e) {
             console.warn('Failed to load fixed preview', e);
+            if (isMounted) setPreviewLoading(false);
           }
           if (isMounted) {
             setPreviewLoading(false);
@@ -1444,6 +1455,13 @@ export default function App() {
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
                   {shareId === FIXED_PREVIEW_SHARE_ID ? t.previewFixedEmptyDesc : t.previewNoResultsDesc}
                 </p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  {t.previewRetry || 'Retry'}
+                </button>
               </div>
             )}
           </div>
