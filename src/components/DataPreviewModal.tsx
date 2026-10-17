@@ -69,13 +69,13 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs">
+            <div className="p-2 rounded-xl bg-brand-50 text-brand-600 border border-brand-200 shadow-xs">
               <FileSpreadsheet className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">{title}</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                {workbook.name} · {t.dpSheet} <strong className="text-emerald-700 font-bold">{currentSheetName}</strong> ·{' '}
+                {workbook.name} · {t.dpSheet} <strong className="text-brand-700 font-bold">{currentSheetName}</strong> ·{' '}
                 <span className="font-mono tabular-nums text-slate-700 font-semibold">{currentSheetData.rows.length.toLocaleString()}</span> {t.dpRows} ·{' '}
                 <span className="font-mono tabular-nums text-slate-700 font-semibold">{currentSheetData.headers.length}</span> {t.dpColumns}
               </p>
@@ -108,7 +108,7 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
                   onClick={() => handleSheetChange(sName)}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shadow-xs cursor-pointer ${
                     isSelected
-                      ? 'bg-emerald-600 text-white font-bold ring-2 ring-emerald-600/30'
+                      ? 'bg-brand-600 text-white font-bold ring-2 ring-brand-600/30'
                       : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
                   }`}
                 >
@@ -116,7 +116,7 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
                   <span
                     className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ${
                       isSelected
-                        ? 'bg-emerald-700 text-white'
+                        ? 'bg-brand-700 text-white'
                         : 'bg-slate-100 text-slate-500'
                     }`}
                   >
@@ -140,7 +140,7 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
                 setPage(1);
               }}
               placeholder={t.searchDataCells}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-xs"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand-500 focus:bg-white transition-all shadow-xs"
             />
           </div>
           <div className="text-xs text-slate-500">
