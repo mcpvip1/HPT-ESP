@@ -1132,21 +1132,18 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       <div className="text-[11px] font-bold text-slate-700">
                         {t.dashFixedPreviewLink}
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          readOnly
-                          value={getFixedPreviewUrl()}
-                          onFocus={(e) => e.target.select()}
-                          className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
-                        />
-                        <button
-                          onClick={handleCopyFixedLink}
-                          className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shrink-0"
-                        >
-                          {fixedLinkCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{fixedLinkCopied ? t.dashCopied : t.dashCopy}</span>
-                        </button>
-                      </div>
+                      <button
+                        onClick={handleCopyFixedLink}
+                        title={t.dashCopy}
+                        className="flex items-center gap-2 w-full px-2.5 py-2 text-[11px] font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-lg hover:border-emerald-300 hover:bg-emerald-50/60 active:scale-[0.99] transition-all text-left"
+                      >
+                        <span className="flex-1 min-w-0 truncate">{getFixedPreviewUrl()}</span>
+                        {fixedLinkCopied ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        )}
+                      </button>
                       <p className="text-[10px] text-slate-400 leading-snug">
                         {t.dashFixedPreviewLinkDesc}
                       </p>
@@ -1154,21 +1151,18 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         <summary className="text-[11px] text-slate-500 cursor-pointer select-none">
                           {t.dashLongShareLink}
                         </summary>
-                        <div className="flex items-center gap-1.5 mt-1.5">
-                          <input
-                            readOnly
-                            value={getSharePreviewUrl(liveShareId)}
-                            onFocus={(e) => e.target.select()}
-                            className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono text-slate-700 bg-white border border-slate-200 rounded-lg focus:outline-none"
-                          />
-                          <button
-                            onClick={handleCopyLiveShareLink}
-                            className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shrink-0"
-                          >
-                            {liveShareCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                            <span>{liveShareCopied ? t.dashCopied : t.dashCopy}</span>
-                          </button>
-                        </div>
+                        <button
+                          onClick={handleCopyLiveShareLink}
+                          title={t.dashCopy}
+                          className="mt-1.5 flex items-center gap-2 w-full px-2 py-1.5 text-[11px] font-mono text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-emerald-300 active:scale-[0.99] transition-all text-left"
+                        >
+                          <span className="flex-1 min-w-0 truncate">{getSharePreviewUrl(liveShareId)}</span>
+                          {liveShareCopied ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          )}
+                        </button>
                       </details>
                       <button
                         onClick={handleStopLiveShare}
