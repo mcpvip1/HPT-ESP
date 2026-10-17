@@ -3,7 +3,9 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
+  getDocsFromServer,
   onSnapshot,
   setDoc,
   writeBatch,
@@ -281,10 +283,13 @@ export async function isCloudDocUploading(uid: string, name: string): Promise<bo
 }
 
 async function fetchChunkedDoc(
-  metaRef: DocumentReference
+  metaRef: DocumentReference,
+  fromServer = false
 ): Promise<{ meta: Record<string, unknown>; json: string } | null> {
   try {
-    const metaSnap = await getDoc(metaRef);
+    // Public shares must bypass the local Firestore cache so a fresh open
+    // always shows the latest published data, not a stale cached copy.
+    const metaSnap = fromServer ? await getDocFromServer(metaRef) : await getDoc(metaRef);
     if (!metaSnap.exists()) return null;
     const meta = metaSnap.data() as Record<string, unknown>;
     // An upload in progress (or crashed mid-upload): never read partial data.
@@ -292,7 +297,9 @@ async function fetchChunkedDoc(
     const expected = (meta.chunkCount as number) || 0;
     if (expected === 0) return null;
     const metaUploadId = meta.uploadId as string | undefined;
-    const colSnap = await getDocs(collection(metaSnap.ref, 'chunks'));
+    const colSnap = fromServer
+      ? await getDocsFromServer(collection(metaSnap.ref, 'chunks'))
+      : await getDocs(collection(metaSnap.ref, 'chunks'));
     const parts: string[] = [];
     let consistent = true;
     colSnap.forEach((d) => {
@@ -348,8 +355,11 @@ async function publishSnapshotTo(
   );
 }
 
-async function fetchSnapshotFrom(metaRef: DocumentReference): Promise<SharedPreviewPayload | null> {
-  const res = await fetchChunkedDoc(metaRef);
+async function fetchSnapshotFrom(
+  metaRef: DocumentReference,
+  fromServer = false
+): Promise<SharedPreviewPayload | null> {
+  const res = await fetchChunkedDoc(metaRef, fromServer);
   if (!res) return null;
   try {
     return unpackCompact(JSON.parse(res.json));
@@ -452,7 +462,7 @@ export function subscribeSharedSnapshot(
 
 export async function fetchSharedSnapshot(shareId: string): Promise<SharedPreviewPayload | null> {
   try {
-    return await fetchSnapshotFrom(shareDoc(shareId));
+    return await fetchSnapshotFrom(shareDoc(shareId), true);
   } catch (e) {
     console.warn('Cloud sync: failed to fetch shared snapshot', e);
     return null;
