@@ -29,12 +29,17 @@ import type {
 export function debounce<Args extends unknown[]>(
   fn: (...args: Args) => void,
   ms: number
-): (...args: Args) => void {
+): ((...args: Args) => void) & { cancel: () => void } {
   let t: ReturnType<typeof setTimeout> | undefined;
-  return (...args: Args) => {
+  const debounced = (...args: Args) => {
     if (t) clearTimeout(t);
     t = setTimeout(() => fn(...args), ms);
   };
+  debounced.cancel = () => {
+    if (t) clearTimeout(t);
+    t = undefined;
+  };
+  return debounced;
 }
 
 /** Unguessable public share identifier. */
@@ -293,7 +298,11 @@ async function fetchChunkedDoc(
     if (!metaSnap.exists()) return null;
     const meta = metaSnap.data() as Record<string, unknown>;
     // An upload in progress (or crashed mid-upload): never read partial data.
-    if (meta.uploading) return null;
+    // If the marker is stale (>10 min), the tab likely crashed; proceed anyway.
+    if (meta.uploading) {
+      const started = (meta.uploadStartedAt as number) || 0;
+      if (Date.now() - started < 10 * 60 * 1000) return null;
+    }
     const expected = (meta.chunkCount as number) || 0;
     if (expected === 0) return null;
     const metaUploadId = meta.uploadId as string | undefined;
@@ -484,34 +493,55 @@ const FIRESTORE_WEB_KEY = 'AIzaSyA-GR1J6dgtg2rFEjsnAD1qSbPqnkUj5m8';
 
 async function fetchSharedSnapshotViaRest(shareId: string): Promise<SharedPreviewPayload | null> {
   const key = FIRESTORE_WEB_KEY;
+  // Abort after 15s so a stalled network can't hang forever (BUG-6).
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
+  const sig = ctrl.signal;
+  try {
   // 1. Meta doc
   const metaRes = await fetch(
-    `${FIRESTORE_REST_BASE}/shares/${encodeURIComponent(shareId)}?key=${key}`
+    `${FIRESTORE_REST_BASE}/shares/${encodeURIComponent(shareId)}?key=${key}`,
+    { signal: sig }
   );
   if (!metaRes.ok) return null;
   const metaDoc = await metaRes.json();
   const fields = metaDoc.fields || {};
   const chunkCount = parseInt(fields.chunkCount?.integerValue || '0', 10);
   if (!chunkCount || chunkCount <= 0) return null;
-  if (fields.uploading?.booleanValue) return null; // upload in progress
-  // 2. Chunks (numeric doc ids)
-  const parts: string[] = [];
-  for (let i = 0; i < chunkCount; i++) {
-    const cRes = await fetch(
-      `${FIRESTORE_REST_BASE}/shares/${encodeURIComponent(shareId)}/chunks/${i}?key=${key}`
-    );
-    if (!cRes.ok) return null;
-    const cDoc = await cRes.json();
-    const data = cDoc.fields?.data?.stringValue;
-    if (typeof data !== 'string') return null;
-    parts.push(data);
+  if (fields.uploading?.booleanValue) {
+    // Stale marker check (same TTL as SDK path)
+    const started = parseInt(fields.uploadStartedAt?.integerValue || '0', 10);
+    if (Date.now() - started < 10 * 60 * 1000) return null;
   }
+  const metaUploadId = fields.uploadId?.stringValue;
+  // 2. Chunks (numeric doc ids) — fetched in parallel
+  const chunkPromises = Array.from({ length: chunkCount }, async (_, i) => {
+    const cRes = await fetch(
+      `${FIRESTORE_REST_BASE}/shares/${encodeURIComponent(shareId)}/chunks/${i}?key=${key}`,
+      { signal: sig }
+    );
+    if (!cRes.ok) throw new Error(`chunk ${i} failed`);
+    const cDoc = await cRes.json();
+    const cFields = cDoc.fields || {};
+    // UploadId consistency: don't mix chunks from overlapping uploads
+    const chunkUploadId = cFields.uploadId?.stringValue;
+    if (metaUploadId && chunkUploadId && chunkUploadId !== metaUploadId) {
+      throw new Error(`chunk ${i} uploadId mismatch`);
+    }
+    const data = cFields.data?.stringValue;
+    if (typeof data !== 'string') throw new Error(`chunk ${i} bad data`);
+    return data;
+  });
+  const parts = await Promise.all(chunkPromises);
   const json = parts.join('');
   try {
     return unpackCompact(JSON.parse(json));
   } catch (e) {
     console.warn('Cloud sync: REST unpack failed', e);
     return null;
+  }
+  } finally {
+    clearTimeout(timer);
   }
 }
 
