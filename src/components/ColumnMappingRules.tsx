@@ -496,6 +496,35 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
               {normalization.ignoreLeadingZeros && <Check className="w-3.5 h-3.5" />}
             </div>
           </div>
+
+          {/* Toggle 5: Trim edge punctuation */}
+          <div
+            onClick={() =>
+              onUpdateNormalization({
+                ...normalization,
+                trimPunctuation: !(normalization.trimPunctuation !== false),
+              })
+            }
+            className={`flex items-start justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
+              normalization.trimPunctuation !== false
+                ? 'bg-emerald-50/60 border-emerald-300 shadow-xs'
+                : 'bg-slate-50/60 border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            <div className="pr-3">
+              <div className="text-xs font-bold text-slate-800">{t.trimPunctuation}</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">{t.trimPunctuationDesc}</div>
+            </div>
+            <div
+              className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition-colors ${
+                normalization.trimPunctuation !== false
+                  ? 'bg-emerald-600 text-white'
+                  : 'border border-slate-300 bg-white'
+              }`}
+            >
+              {normalization.trimPunctuation !== false && <Check className="w-3.5 h-3.5" />}
+            </div>
+          </div>
         </div>
       </div>
 
