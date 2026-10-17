@@ -1473,7 +1473,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           return (
                             <td
                               key={col.id}
-                              className={`py-2.5 px-2 sm:px-3 border-r border-slate-200 text-center text-slate-500 font-mono tabular-nums text-[11px] font-bold sticky left-0 z-[5] ${frozenBg}`}
+                              className={`py-1.5 px-2 sm:py-2.5 sm:px-3 border-r border-slate-200 text-center text-slate-500 font-mono tabular-nums text-[11px] font-bold sticky left-0 z-[5] ${frozenBg}`}
                             >
                               {highlightText(row.rowIndex, searchTerm)}
                             </td>
@@ -1604,7 +1604,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       })}
 
                       {/* Row Inspect Button — frozen on the right for mobile reachability */}
-                      <td className={`py-2.5 px-3 text-center whitespace-nowrap sticky right-0 z-[5] border-l border-slate-200 ${frozenBg}`}>
+                      <td className={`py-1.5 px-2 sm:py-2.5 sm:px-3 text-center whitespace-nowrap sticky right-0 z-[5] border-l border-slate-200 ${frozenBg}`}>
                         <div className="flex items-center justify-center gap-1.5">
                           {!isPreviewMode && row.isHold && row.holdKey && onReleaseHoldKey && (
                             <button
