@@ -71,6 +71,9 @@ export interface BatchBKeys {
   dashFixedPreviewLink: string;
   dashFixedPreviewLinkDesc: string;
   dashCopyShareLink: string;
+  dashPublishPreview: string;
+  dashPreviewPublished: string;
+  dashPreviewPublishFailed: string;
   dashLongShareLink: string;
   dashCopied: string;
   dashCopy: string;
@@ -206,6 +209,9 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashFixedPreviewLink: "Fixed preview link",
     dashFixedPreviewLinkDesc: "Short link — always shows your latest published results and active filter.",
     dashCopyShareLink: "Copy share link",
+    dashPublishPreview: "Update preview",
+    dashPreviewPublished: "Preview updated with latest results",
+    dashPreviewPublishFailed: "Failed to update preview",
     dashLongShareLink: "Long share link (legacy)",
     dashCopied: "Copied",
     dashCopy: "Copy",
@@ -339,6 +345,9 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashFixedPreviewLink: "ပုံသေ အကြိုကြည့်လင့်ခ်",
     dashFixedPreviewLinkDesc: "လင့်ခ်အတို — နောက်ဆုံးထုတ်ဝေထားသော ရလဒ်များနှင့် စစ်ထုတ်မှုကို အမြဲပြသသည်။",
     dashCopyShareLink: "မျှဝေလင့်ခ် ကူးယူရန်",
+    dashPublishPreview: "အစမ်းကြည့်ရန် အပ်ဒိတ်လုပ်မည်",
+    dashPreviewPublished: "အစမ်းကြည့်လင့်ခ်အား နောက်ဆုံးရလဒ်များဖြင့် အပ်ဒိတ်လုပ်ပြီးပါပြီ",
+    dashPreviewPublishFailed: "အစမ်းကြည့်ရန် အပ်ဒိတ်လုပ်ခြင်း မအောင်မြင်ပါ",
     dashLongShareLink: "လင့်ခ်အရှည် (ဟောင်း)",
     dashCopied: "ကူးယူပြီးပြီ",
     dashCopy: "ကူးယူရန်",
@@ -472,6 +481,9 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashFixedPreviewLink: "ลิงก์ตัวอย่างแบบคงที่",
     dashFixedPreviewLinkDesc: "ลิงก์สั้น — แสดงผลลัพธ์และตัวกรองที่เผยแพร่ล่าสุดของคุณเสมอ",
     dashCopyShareLink: "คัดลอกลิงก์แชร์",
+    dashPublishPreview: "อัปเดตตัวอย่าง",
+    dashPreviewPublished: "อัปเดตตัวอย่างด้วยผลลัพธ์ล่าสุดแล้ว",
+    dashPreviewPublishFailed: "อัปเดตตัวอย่างไม่สำเร็จ",
     dashLongShareLink: "ลิงก์แชร์แบบยาว (เดิม)",
     dashCopied: "คัดลอกแล้ว",
     dashCopy: "คัดลอก",
@@ -605,6 +617,9 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashFixedPreviewLink: "固定预览链接",
     dashFixedPreviewLinkDesc: "短链接 — 始终显示您最新发布的结果和筛选器。",
     dashCopyShareLink: "复制分享链接",
+    dashPublishPreview: "更新预览",
+    dashPreviewPublished: "预览已更新为最新结果",
+    dashPreviewPublishFailed: "更新预览失败",
     dashLongShareLink: "长分享链接（旧版）",
     dashCopied: "已复制",
     dashCopy: "复制",
