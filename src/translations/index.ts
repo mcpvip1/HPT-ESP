@@ -250,6 +250,10 @@ export interface TranslationDict {
   toastPreviewRefreshed: string;
   previewNoResultsTitle: string;
   previewNoResultsDesc: string;
+  previewDownloading: string;
+  previewPleaseWait: string;
+  previewFixedEmptyTitle: string;
+  previewFixedEmptyDesc: string;
   headerResultPreview: string;
   headerLiveTable: string;
   headerSignedInTitle: string;
@@ -335,6 +339,9 @@ export interface TranslationDict {
   dashLiveShare: string;
   dashPublicLiveShareLink: string;
   dashLiveShareDesc: string;
+  dashFixedPreviewLink: string;
+  dashFixedPreviewLinkDesc: string;
+  dashLongShareLink: string;
   dashCopied: string;
   dashCopy: string;
   dashStopSharing: string;
@@ -825,6 +832,10 @@ export const translations: Record<Language, TranslationDict> = {
     toastPreviewRefreshed: "Preview results refreshed",
     previewNoResultsTitle: "No Matching Results Yet",
     previewNoResultsDesc: "The shared result preview link does not contain results data, or the link expired.",
+    previewDownloading: "Downloading information\u2026",
+    previewPleaseWait: "Please wait",
+    previewFixedEmptyTitle: "No preview published yet",
+    previewFixedEmptyDesc: "The owner hasn't published results to this link yet. New results will appear here automatically once published.",
     headerResultPreview: "Result Preview",
     headerLiveTable: "· Live Interactive Table",
     headerSignedInTitle: "Signed in as {email} — click to sign out of cloud sync",
@@ -1116,6 +1127,10 @@ export const translations: Record<Language, TranslationDict> = {
     toastMatchingError: "ကိုက်ညီမှု တွက်ချက်စဉ် အမှားတစ်ခု ဖြစ်ပွားခဲ့သည်။",
     toastPreviewRefreshed: "အစမ်းကြည့်ရလဒ်များကို ပြန်လည်ရယူပြီးပြီ",
     previewNoResultsTitle: "ကိုက်ညီသော ရလဒ်များ မရှိသေးပါ",
+    previewDownloading: "အချက်အလက် ဒေါင်းလုဒ်ဆွဲနေပါသည်\u2026",
+    previewPleaseWait: "ခဏစောင့်ဆိုင်းပါ",
+    previewFixedEmptyTitle: "အကြိုကြည့်ရှုမှု ထုတ်ဝေထားခြင်း မရှိသေးပါ",
+    previewFixedEmptyDesc: "ပိုင်ရှင်က ဤလင့်ခ်သို့ ရလဒ်များ မထုတ်ဝေရသေးပါ။ ထုတ်ဝေပြီးပါက ရလဒ်အသစ်များ ဤနေရာတွင် အလိုအလျောက် ပေါ်လာပါမည်။",
     previewNoResultsDesc: "မျှဝေထားသော ရလဒ် အစမ်းကြည့်လင့်ခ်တွင် ရလဒ်ဒေတာ မပါဝင်ပါ သို့မဟုတ် လင့်ခ် သက်တမ်းကုန်သွားပြီ။",
     headerResultPreview: "ရလဒ် အစမ်းကြည့်မှု",
     headerLiveTable: "· တိုက်ရိုက် အပြန်အလှန် ဇယား",
@@ -1408,6 +1423,10 @@ export const translations: Record<Language, TranslationDict> = {
     toastMatchingError: "เกิดข้อผิดพลาดระหว่างการจับคู่",
     toastPreviewRefreshed: "รีเฟรชผลลัพธ์ตัวอย่างแล้ว",
     previewNoResultsTitle: "ยังไม่มีผลลัพธ์ที่ตรงกัน",
+    previewDownloading: "กำลังดาวน์โหลดข้อมูล\u2026",
+    previewPleaseWait: "โปรดรอสักครู่",
+    previewFixedEmptyTitle: "ยังไม่มีการเผยแพร่ตัวอย่าง",
+    previewFixedEmptyDesc: "เจ้าของยังไม่ได้เผยแพร่ผลลัพธ์ไปยังลิงก์นี้ ผลลัพธ์ใหม่จะปรากฏที่นี่โดยอัตโนมัติเมื่อมีการเผยแพร่",
     previewNoResultsDesc: "ลิงก์ตัวอย่างผลลัพธ์ที่แชร์ไม่มีข้อมูลผลลัพธ์ หรือลิงก์หมดอายุ",
     headerResultPreview: "ตัวอย่างผลลัพธ์",
     headerLiveTable: "· ตารางโต้ตอบสด",
@@ -1700,6 +1719,10 @@ export const translations: Record<Language, TranslationDict> = {
     toastMatchingError: "匹配过程中发生错误。",
     toastPreviewRefreshed: "预览结果已刷新",
     previewNoResultsTitle: "暂无匹配结果",
+    previewDownloading: "正在下载信息\u2026",
+    previewPleaseWait: "请稍候",
+    previewFixedEmptyTitle: "尚未发布预览",
+    previewFixedEmptyDesc: "所有者尚未向此链接发布结果。发布后，最新结果将自动显示在这里。",
     previewNoResultsDesc: "共享的结果预览链接不包含结果数据，或链接已过期。",
     headerResultPreview: "结果预览",
     headerLiveTable: "· 实时交互表",
