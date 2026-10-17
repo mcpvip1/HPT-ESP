@@ -835,7 +835,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     switch (color) {
       case 'green':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-bold text-white bg-green-600 shadow-xs tracking-wider">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-bold text-white bg-emerald-600 shadow-xs tracking-wider">
             <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
             {t.badgePassed}
           </span>
@@ -880,7 +880,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     active: string;
   }[] = [
     { key: 'all', label: t.filterAll, count: totalResults, dot: 'bg-slate-400', active: 'border-slate-300 bg-slate-50 ring-2 ring-slate-300' },
-    { key: 'green', label: t.filterGreen, count: stats.greenCount ?? 0, dot: 'bg-green-500', active: 'border-green-300 bg-green-50 ring-2 ring-green-300' },
+    { key: 'green', label: t.filterGreen, count: stats.greenCount ?? 0, dot: 'bg-emerald-500', active: 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-300' },
     { key: 'yellow', label: t.filterYellow, count: stats.yellowCount ?? 0, dot: 'bg-amber-500', active: 'border-amber-300 bg-amber-50 ring-2 ring-amber-300' },
     { key: 'red', label: t.filterRed, count: stats.redCount ?? 0, dot: 'bg-rose-500', active: 'border-rose-300 bg-rose-50 ring-2 ring-rose-300' },
     { key: 'blue', label: t.filterBlue, count: stats.blueCount ?? 0, dot: 'bg-blue-600', active: 'border-blue-300 bg-blue-50 ring-2 ring-blue-300' },
@@ -938,7 +938,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           >
             <span
               className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                hideSupersededPostpone ? 'bg-brand-600' : 'bg-slate-300'
+                hideSupersededPostpone ? 'bg-emerald-600' : 'bg-slate-300'
               }`}
             >
               <span
@@ -963,7 +963,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 group"
               title={t.dashRefreshTitle}
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-brand-600 group-hover:rotate-180 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 group-hover:rotate-180 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
               <span>{t.dashRefresh}</span>
             </button>
 
@@ -974,12 +974,12 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 onClick={() => handleSaveColumnConfigs(columnConfigs)}
                 className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none ${
                   hasUnsavedColumnChanges
-                    ? 'bg-brand-600 hover:bg-brand-500 text-white shadow-brand-200 shadow-md ring-1 ring-brand-400 animate-pulse'
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-200 shadow-md ring-1 ring-emerald-400 animate-pulse'
                     : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
                 }`}
                 title={t.dashSaveViewTitle}
               >
-                <Save className={`w-3.5 h-3.5 ${hasUnsavedColumnChanges ? 'text-white' : 'text-brand-600'}`} />
+                <Save className={`w-3.5 h-3.5 ${hasUnsavedColumnChanges ? 'text-white' : 'text-emerald-600'}`} />
                 <span>{hasUnsavedColumnChanges ? t.dashSaveSyncView : t.dashSaveView}</span>
               </button>
             )}
@@ -990,9 +990,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
               title={t.dashColumnsTitle}
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-brand-600 group-hover:scale-110 transition-transform" />
+              <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
               <span>{t.dashColumns}</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-brand-700 border border-brand-200 font-bold">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-emerald-700 border border-emerald-200 font-bold">
                 {tableVisibleCount}
               </span>
             </button>
@@ -1011,9 +1011,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   title={t.dashCopyShareLink}
                 >
                   {shareLinkCopied ? (
-                    <Check className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   ) : (
-                    <Link2 className="w-3.5 h-3.5 text-brand-600 group-hover:scale-110 transition-transform shrink-0" />
+                    <Link2 className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
                   )}
                   <span>{shareLinkCopied ? t.dashCopied : t.dashCopyShareLink}</span>
                 </button>
@@ -1021,7 +1021,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 {!isPreviewMode && (
                   <button
                     onClick={handlePublishPreview}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none"
                     title={t.dashPublishPreview || 'Update the public preview link with these results'}
                   >
                     <Cloud className="w-3.5 h-3.5 shrink-0" />
@@ -1035,10 +1035,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={handleExportExcel}
-                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0"
+                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0"
                   title={t.dashExportExcelTitle}
                 >
-                  <FileSpreadsheet className="w-4 h-4 text-brand-100" />
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
                   <span>{t.exportExcel}</span>
                 </button>
 
@@ -1068,7 +1068,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     setSearchColumn(e.target.value);
                     setPage(1);
                   }}
-                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 hover:text-slate-900 focus:outline-none focus:border-brand-500 transition-colors shadow-xs"
+                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 hover:text-slate-900 focus:outline-none focus:border-emerald-500 transition-colors shadow-xs"
                   title={t.dashSearchScopeTitle}
                 >
                   <option value="all">{t.dashSearchScopeAll}</option>
@@ -1107,7 +1107,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   setPage(1);
                 }}
                 placeholder={t.dashSearchPlaceholder}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand-500 focus:bg-white focus:ring-1 focus:ring-brand-500 transition-all font-mono shadow-xs"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all font-mono shadow-xs"
               />
               {searchTerm && (
                 <button
@@ -1126,7 +1126,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
             {/* Match Counter Badge */}
             {searchTerm.trim() && (
-              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-brand-50 text-brand-700 border border-brand-200 shrink-0 font-mono">
+              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 font-mono">
                 <Filter className="w-3 h-3" />
                 {t.dashRowsFound.replace('{count}', filteredRows.length.toLocaleString())}
               </span>
@@ -1140,14 +1140,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px]"
                 title={comparisonWb.name}
               >
-                <FileText className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+                <FileText className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 <span className="font-semibold text-slate-700 max-w-[160px] truncate">
                   {comparisonWb.name}
                 </span>
               </span>
               {comparisonWb.uploadedAt ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px]">
-                  <Clock className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+                  <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   <span className="font-mono text-slate-600 whitespace-nowrap">
                     {formatFileDateTime(comparisonWb.uploadedAt, language)}
                   </span>
@@ -1166,7 +1166,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   setPageSize(Number(e.target.value));
                   setPage(1);
                 }}
-                className="bg-white border border-slate-200 rounded-md px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-brand-500 font-mono shadow-xs"
+                className="bg-white border border-slate-200 rounded-md px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-emerald-500 font-mono shadow-xs"
               >
                 <option value={25}>25</option>
                 <option value={50}>50</option>
@@ -1180,7 +1180,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         {/* Active Excel Column Filters Pill Bar */}
         {Object.keys(columnFilters).length > 0 && (
           <div className="pt-2.5 border-t border-slate-200 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-brand-700 font-semibold flex items-center gap-1.5 shrink-0">
+            <span className="text-emerald-700 font-semibold flex items-center gap-1.5 shrink-0">
               <Filter className="w-3.5 h-3.5" />
               <span>{t.dashActiveColumnFilters}</span>
             </span>
@@ -1190,10 +1190,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               return (
                 <span
                   key={colId}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-brand-50 text-brand-800 border border-brand-200 shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-xs"
                 >
                   <span className="font-sans font-medium text-slate-700">{label}:</span>
-                  <span className="font-bold text-brand-700">{t.dashValsSelected.replace('{count}', String(vals.length))}</span>
+                  <span className="font-bold text-emerald-700">{t.dashValsSelected.replace('{count}', String(vals.length))}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -1204,7 +1204,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       });
                       setPage(1);
                     }}
-                    className="p-0.5 hover:text-slate-900 rounded hover:bg-brand-100 transition-colors ml-0.5 text-brand-700"
+                    className="p-0.5 hover:text-slate-900 rounded hover:bg-emerald-100 transition-colors ml-0.5 text-emerald-700"
                     title={t.dashClearFilterOn.replace('{label}', label)}
                   >
                     <X className="w-3 h-3" />
@@ -1268,7 +1268,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         {/* Sortable Header Label */}
                         <div
                           onClick={handleColSort}
-                          className="flex items-center gap-1.5 cursor-pointer font-mono select-none hover:text-brand-700 transition-colors"
+                          className="flex items-center gap-1.5 cursor-pointer font-mono select-none hover:text-emerald-700 transition-colors"
                           title={t.dashClickToSortBy.replace('{label}', col.label)}
                         >
                           {col.category === 'reference' && (
@@ -1279,9 +1279,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           <span>{col.label.replace('[Ref] ', '')}</span>
                           {isSorted ? (
                             sortDirection === 'asc' ? (
-                              <ArrowUp className="w-3 h-3 text-brand-600 shrink-0" />
+                              <ArrowUp className="w-3 h-3 text-emerald-600 shrink-0" />
                             ) : (
-                              <ArrowDown className="w-3 h-3 text-brand-600 shrink-0" />
+                              <ArrowDown className="w-3 h-3 text-emerald-600 shrink-0" />
                             )
                           ) : (
                             <ArrowUpDown className="w-3 h-3 text-slate-400 shrink-0 opacity-0 group-hover/th:opacity-100 transition-opacity" />
@@ -1302,7 +1302,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                               }}
                               className={`p-1.5 rounded transition-colors ${
                                 isColFiltered
-                                  ? 'text-brand-700 bg-brand-100 border border-brand-300 shadow-xs'
+                                  ? 'text-emerald-700 bg-emerald-100 border border-emerald-300 shadow-xs'
                                   : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
                               }`}
                               title={t.dashFilterLikeExcelTitle.replace('{label}', col.label)}
@@ -1402,7 +1402,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 <tr>
                   <td colSpan={100} className="py-16 text-center text-slate-500 bg-slate-50/60">
                     <div className="max-w-md mx-auto space-y-3 px-4">
-                      <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-brand-600 mx-auto">
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-emerald-600 mx-auto">
                         <SlidersHorizontal className="w-6 h-6" />
                       </div>
                       <h4 className="text-sm font-bold text-slate-900">{t.dashAllColumnsHidden}</h4>
@@ -1412,7 +1412,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       <div className="flex justify-center gap-2.5 pt-2">
                         <button
                           onClick={handleResetDefaultColumns}
-                          className="px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-colors"
+                          className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
                         >
                           {t.dashRestoreAllColumns}
                         </button>
@@ -1434,7 +1434,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   const isBlue = row.decisionColor === 'blue';
                   // Opaque background for the frozen columns (must cover scrolled content)
                   const frozenBg = isGreen
-                    ? 'bg-brand-50'
+                    ? 'bg-emerald-50'
                     : isYellow
                     ? 'bg-amber-50'
                     : isRed
@@ -1448,7 +1448,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       key={row.id}
                       className={`transition-colors border-b border-slate-100 ${
                         isGreen
-                          ? 'bg-brand-50/30 hover:bg-brand-50/70 border-l-[4px] border-l-brand-500'
+                          ? 'bg-emerald-50/30 hover:bg-emerald-50/70 border-l-[4px] border-l-emerald-500'
                           : isYellow
                           ? 'bg-amber-50/30 hover:bg-amber-50/70 border-l-[4px] border-l-amber-500'
                           : isRed
@@ -1603,7 +1603,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                 setReleaseTarget({ key: row.holdKey as string, count });
                                 setSupervisorConfirmed(false);
                               }}
-                              className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-300 rounded-md transition-colors"
+                              className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-md transition-colors"
                               title={t.dashRemoveFromHoldTitle}
                             >
                               <Check className="w-3 h-3 stroke-[3]" />
@@ -1632,7 +1632,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     {searchTerm && (
                       <button
                         onClick={() => setSearchTerm('')}
-                        className="text-xs text-brand-600 hover:underline inline-block mt-1 font-semibold"
+                        className="text-xs text-emerald-600 hover:underline inline-block mt-1 font-semibold"
                       >
                         {t.dashClearSearchFilter.replace('{term}', searchTerm)}
                       </button>
@@ -1658,7 +1658,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-brand-700 font-mono font-bold bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
+              <div className="text-[11px] text-emerald-700 font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                 {t.dashFullResultView}
               </div>
             </div>
@@ -1717,7 +1717,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           <div className="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-brand-600" />
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
                 <h4 className="text-sm font-bold text-slate-900">{t.dashRemoveFromHold}</h4>
               </div>
               <button
@@ -1733,7 +1733,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 type="checkbox"
                 checked={supervisorConfirmed}
                 onChange={(e) => setSupervisorConfirmed(e.target.checked)}
-                className="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
               />
               <span className="text-xs text-slate-800 font-bold">{t.dashReleaseSupervisor}</span>
             </label>
@@ -1774,7 +1774,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     setReleaseTarget(null);
                   }
                 }}
-                className="px-4 py-1.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-lg shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {t.dashRemoveFromHold}
               </button>
