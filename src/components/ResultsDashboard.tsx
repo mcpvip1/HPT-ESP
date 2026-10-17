@@ -901,7 +901,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* 1. Results overview: clickable KPI stat cards (filter the table) */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5">
+        <div className="grid grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-2.5">
           {kpiDefs.map((k) => {
             const pct = totalResults > 0 ? Math.round((k.count / totalResults) * 100) : 0;
             const isActive = activeFilter === k.key;
@@ -912,7 +912,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   setActiveFilter(k.key);
                   setPage(1);
                 }}
-                className={`rounded-xl border p-3 text-left transition-all ${
+                className={`rounded-xl border p-2 sm:p-3 text-left transition-all ${
                   isActive ? k.active : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
                 }`}
               >
@@ -923,7 +923,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   </span>
                 </div>
                 <div className="mt-1.5 flex items-baseline gap-1.5">
-                  <span className="text-2xl font-extrabold tabular-nums text-slate-900">
+                  <span className="text-xl sm:text-2xl font-extrabold tabular-nums text-slate-900">
                     {k.count.toLocaleString()}
                   </span>
                   {k.key !== 'all' && (
@@ -1310,7 +1310,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                 setFilterAnchorRect(rect);
                                 setOpenFilterColId((prev) => (prev === col.id ? null : col.id));
                               }}
-                              className={`p-1.5 rounded transition-colors ${
+                              className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded transition-colors ${
                                 isColFiltered
                                   ? 'text-emerald-700 bg-emerald-100 border border-emerald-300 shadow-xs'
                                   : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
@@ -1401,7 +1401,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 })}
 
                 {/* Actions column — frozen on the right so Inspect stays reachable on mobile */}
-                <th className="py-3 px-3 text-center w-16 text-slate-500 whitespace-nowrap sticky right-0 z-20 bg-slate-100 border-l border-slate-200">
+                <th className="py-3 px-2 sm:px-3 text-center w-12 sm:w-16 text-slate-500 whitespace-nowrap sticky right-0 z-20 bg-slate-100 border-l border-slate-200">
                   {t.viewDetails}
                 </th>
               </tr>
@@ -1473,7 +1473,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           return (
                             <td
                               key={col.id}
-                              className={`py-2.5 px-3 border-r border-slate-200 text-center text-slate-500 font-mono tabular-nums text-[11px] font-bold sticky left-0 z-[5] ${frozenBg}`}
+                              className={`py-2.5 px-2 sm:px-3 border-r border-slate-200 text-center text-slate-500 font-mono tabular-nums text-[11px] font-bold sticky left-0 z-[5] ${frozenBg}`}
                             >
                               {highlightText(row.rowIndex, searchTerm)}
                             </td>
@@ -1622,7 +1622,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           )}
                           <button
                             onClick={() => setSelectedRow(row)}
-                            className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
                             title={t.dashInspectRowTitle}
                           >
                             <Eye className="w-4 h-4" />
