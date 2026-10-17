@@ -70,6 +70,7 @@ export interface BatchBKeys {
   dashLiveShareDesc: string;
   dashFixedPreviewLink: string;
   dashFixedPreviewLinkDesc: string;
+  dashFixedLinkOffHint: string;
   dashLongShareLink: string;
   dashCopied: string;
   dashCopy: string;
@@ -204,6 +205,7 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashLiveShareDesc: "Anyone with this link sees your latest results and active filter — no sign-in needed. Updates automatically as you work.",
     dashFixedPreviewLink: "Fixed preview link",
     dashFixedPreviewLinkDesc: "Short link — always shows your latest published results and active filter.",
+    dashFixedLinkOffHint: "Fixed link is off — turn it on to share your latest results at the short link.",
     dashLongShareLink: "Long share link (legacy)",
     dashCopied: "Copied",
     dashCopy: "Copy",
@@ -336,6 +338,7 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashLiveShareDesc: "လင့်ခ်ရှိသူတိုင်း သင့်နောက်ဆုံးရလဒ်များနှင့် လက်ရှိ စစ်ထုတ်မှုကို မြင်ရမည် — ဝင်ရောက်ရန် မလိုအပ်ပါ။ သင်လုပ်ဆောင်သည်နှင့်အမျှ အလိုအလျောက် အပ်ဒိတ်ဖြစ်မည်။",
     dashFixedPreviewLink: "ပုံသေ အကြိုကြည့်လင့်ခ်",
     dashFixedPreviewLinkDesc: "လင့်ခ်အတို — နောက်ဆုံးထုတ်ဝေထားသော ရလဒ်များနှင့် စစ်ထုတ်မှုကို အမြဲပြသသည်။",
+    dashFixedLinkOffHint: "ပုံသေလင့်ခ်ပိတ်ထားသည် — နောက်ဆုံးရလဒ်များကို လင့်ခ်အတိုဖြင့် မျှဝေရန် ဖွင့်ပါ။",
     dashLongShareLink: "လင့်ခ်အရှည် (ဟောင်း)",
     dashCopied: "ကူးယူပြီးပြီ",
     dashCopy: "ကူးယူရန်",
@@ -468,6 +471,7 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashLiveShareDesc: "ทุกคนที่มีลิงก์นี้จะเห็นผลลัพธ์ล่าสุดและตัวกรองที่ใช้งานของคุณ — ไม่ต้องลงชื่อเข้าใช้ อัปเดตอัตโนมัติขณะที่คุณทำงาน",
     dashFixedPreviewLink: "ลิงก์ตัวอย่างแบบคงที่",
     dashFixedPreviewLinkDesc: "ลิงก์สั้น — แสดงผลลัพธ์และตัวกรองที่เผยแพร่ล่าสุดของคุณเสมอ",
+    dashFixedLinkOffHint: "ลิงก์ถาวรปิดอยู่ — เปิดเพื่อแชร์ผลลัพธ์ล่าสุดผ่านลิงก์สั้น",
     dashLongShareLink: "ลิงก์แชร์แบบยาว (เดิม)",
     dashCopied: "คัดลอกแล้ว",
     dashCopy: "คัดลอก",
@@ -600,6 +604,7 @@ export const batchB: Record<Language, BatchBKeys> = {
     dashLiveShareDesc: "拥有此链接的任何人都可以看到您的最新结果和当前筛选器 — 无需登录。您工作时会自动更新。",
     dashFixedPreviewLink: "固定预览链接",
     dashFixedPreviewLinkDesc: "短链接 — 始终显示您最新发布的结果和筛选器。",
+    dashFixedLinkOffHint: "固定链接已关闭 — 打开以通过短链接分享您的最新结果。",
     dashLongShareLink: "长分享链接（旧版）",
     dashCopied: "已复制",
     dashCopy: "复制",
