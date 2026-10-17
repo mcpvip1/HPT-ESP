@@ -19,7 +19,6 @@ import {
   Filter,
   SlidersHorizontal,
   Table as TableIcon,
-  Share2,
   EyeOff,
   Copy,
   Check,
@@ -28,6 +27,7 @@ import {
   Save,
   FileText,
   Clock,
+  Link2,
 } from 'lucide-react';
 import {
   MatchedRow,
@@ -45,16 +45,11 @@ import type { User } from 'firebase/auth';
 import {
   publishPreviewSnapshot,
   publishSharedSnapshot,
-  unpublishSharedSnapshot,
-  getActiveShare,
-  setActiveShare,
-  generateShareId,
   debounce,
   FIXED_PREVIEW_SHARE_ID,
 } from '../lib/cloudSync';
 import { RowDetailModal } from './RowDetailModal';
 import { ColumnCustomizationModal } from './ColumnCustomizationModal';
-import { SharePreviewModal } from './SharePreviewModal';
 import { ExcelColumnFilter, UniqueValueItem } from './ExcelColumnFilter';
 
 interface ResultsDashboardProps {
@@ -146,32 +141,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [activeFilter, setActiveFilter] = useState<FilterType>(initialFilter || 'all');
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm || '');
   const [searchColumn, setSearchColumn] = useState<string>(initialSearchColumn || 'all');
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [quickCopied, setQuickCopied] = useState(false);
   // Public live-share: anyone with the link sees the latest snapshot, no sign-in
-  // Fixed short preview link (/preview): independent of live share, on by
-  // default so other devices always see the latest results. The user can
-  // revoke it with the toggle below or via "Stop sharing".
-  const [fixedLinkEnabled, setFixedLinkEnabled] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('emp_fixed_preview_enabled') !== '0';
-    } catch {
-      return true;
-    }
-  });
-  const fixedLinkEnabledRef = useRef(fixedLinkEnabled);
-  fixedLinkEnabledRef.current = fixedLinkEnabled;
-
-  const [liveShareId, setLiveShareId] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem('emp_live_share_id');
-    } catch {
-      return null;
-    }
-  });
-  const [showLiveSharePanel, setShowLiveSharePanel] = useState(false);
-  const [liveShareCopied, setLiveShareCopied] = useState(false);
-  const [fixedLinkCopied, setFixedLinkCopied] = useState(false);
+  const [shareLinkCopied, setShareLinkCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -510,43 +481,33 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const tableVisibleCount = columnConfigs.filter((c) => c.showInTable).length;
   const exportVisibleCount = columnConfigs.filter((c) => c.showInExport).length;
 
-  // Cloud live preview: in the studio, publish the latest results + active
-  // filter/search/columns to the shared workspace (debounced) so the preview
-  // page on any signed-in device follows along automatically.
+  // Publish the latest results + active filter/search/columns to the cloud
+  // (debounced): the private workspace snapshot for the owner's devices, and
+  // the fixed public preview slot (/preview) so anyone with the share link
+  // always fetches the latest on open or refresh.
   const debouncedPublishPreview = useRef(
-    debounce((uid: string, payload: SharedPreviewPayload, shareId: string | null) => {
+    debounce((uid: string, payload: SharedPreviewPayload) => {
       publishPreviewSnapshot(uid, payload);
-      if (shareId) {
-        publishSharedSnapshot(shareId, uid, payload);
-      }
-      // Fixed short link (/preview) always mirrors the latest studio results,
-      // independent of live share, so other browsers/devices stay fresh.
-      if (fixedLinkEnabledRef.current) {
-        publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, uid, payload);
-      }
+      publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, uid, payload);
     }, 2000)
   ).current;
 
   useEffect(() => {
     if (isPreviewMode || !cloudUser) return;
     if (!results || results.length === 0 || !stats) return;
-    debouncedPublishPreview(
-      cloudUser.uid,
-      {
-        version: 1,
-        createdAt: Date.now(),
-        comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
-        comparisonWbUploadedAt: comparisonWb?.uploadedAt,
-        stats,
-        results,
-        filter: activeFilter,
-        onlyAccept: hideSupersededPostpone,
-        searchTerm,
-        searchColumn,
-        columnConfigs,
-      },
-      liveShareId
-    );
+    debouncedPublishPreview(cloudUser.uid, {
+      version: 1,
+      createdAt: Date.now(),
+      comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+      comparisonWbUploadedAt: comparisonWb?.uploadedAt,
+      stats,
+      results,
+      filter: activeFilter,
+      onlyAccept: hideSupersededPostpone,
+      searchTerm,
+      searchColumn,
+      columnConfigs,
+    });
   }, [
     isPreviewMode,
     cloudUser,
@@ -558,28 +519,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     searchColumn,
     columnConfigs,
     comparisonWb,
-    liveShareId,
     debouncedPublishPreview,
   ]);
-
-  // Adopt the active public share published from another signed-in device
-  useEffect(() => {
-    if (isPreviewMode || !cloudUser) return;
-    let cancelled = false;
-    getActiveShare(cloudUser.uid).then((sid) => {
-      if (!cancelled && sid) {
-        setLiveShareId(sid);
-        try {
-          localStorage.setItem('emp_live_share_id', sid);
-        } catch {
-          // ignore storage failures
-        }
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [isPreviewMode, cloudUser]);
 
   // Keep URL hash updated seamlessly when in preview mode as filters or columns change
   useEffect(() => {
@@ -621,89 +562,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     columnConfigs,
   });
 
-  const handleToggleLiveShare = async () => {
-    if (!cloudUser) {
-      onShowToast(t.dashSignInForShare, 'info');
-      return;
-    }
-    // Open the share panel; the fixed link is managed there independently,
-    // and a live share link is created explicitly from the panel.
-    setShowLiveSharePanel((v) => !v);
-  };
-
-  const handleCreateLiveShare = async () => {
-    if (!cloudUser) {
-      onShowToast(t.dashSignInForShare, 'info');
-      return;
-    }
-    if (liveShareId) return;
-    const sid = generateShareId();
-    const okShare = await setActiveShare(cloudUser.uid, sid);
-    let okPublish = false;
-    if (okShare && results.length > 0 && stats) {
-      okPublish = await publishSharedSnapshot(sid, cloudUser.uid, buildSharePayload());
-      if (okPublish) {
-        // Best-effort: the fixed short link mirrors the live share
-        await publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, cloudUser.uid, buildSharePayload());
-      }
-    }
-    if (!okShare || !okPublish) {
-      // Don't leave behind a link that points at nothing
-      await setActiveShare(cloudUser.uid, null);
-      onShowToast(t.dashSharePublishFailed, 'error');
-      return;
-    }
-    try {
-      localStorage.setItem('emp_live_share_id', sid);
-    } catch {
-      // ignore storage failures
-    }
-    setLiveShareId(sid);
-    setShowLiveSharePanel(true);
-    onShowToast(t.dashShareCreated, 'success');
-  };
-
-  const handleToggleFixedLink = async () => {
-    if (!cloudUser) {
-      onShowToast(t.dashSignInForShare, 'info');
-      return;
-    }
-    const next = !fixedLinkEnabled;
-    setFixedLinkEnabled(next);
-    try {
-      localStorage.setItem('emp_fixed_preview_enabled', next ? '1' : '0');
-    } catch { /* ignore */ }
-    if (!next) {
-      // Revoke: take the fixed short link down immediately
-      try { await unpublishSharedSnapshot(FIXED_PREVIEW_SHARE_ID); } catch { /* ignore */ }
-    } else if (results.length > 0 && stats) {
-      // Publish the current results right away
-      await publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, cloudUser.uid, buildSharePayload());
-    }
-  };
-
-  const handleStopLiveShare = async () => {
-    if (!liveShareId) return;
-    const ok = await unpublishSharedSnapshot(liveShareId);
-    if (!ok) {
-      onShowToast(t.dashShareRevokeFailed, 'error');
-      return;
-    }
-    // Revoke the fixed short link too and switch its toggle off
-    try { await unpublishSharedSnapshot(FIXED_PREVIEW_SHARE_ID); } catch { /* ignore */ }
-    setFixedLinkEnabled(false);
-    try { localStorage.setItem('emp_fixed_preview_enabled', '0'); } catch { /* ignore */ }
-    if (cloudUser) await setActiveShare(cloudUser.uid, null);
-    try {
-      localStorage.removeItem('emp_live_share_id');
-    } catch {
-      // ignore storage failures
-    }
-    setLiveShareId(null);
-    setShowLiveSharePanel(false);
-    onShowToast(t.dashShareStopped, 'info');
-  };
-
   const copyTextToClipboard = async (text: string, setCopied: (v: boolean) => void) => {
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -725,45 +583,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     }
   };
 
-  const handleCopyLiveShareLink = async () => {
-    if (!liveShareId) return;
-    await copyTextToClipboard(getSharePreviewUrl(liveShareId), setLiveShareCopied);
-  };
-
-  const handleCopyFixedLink = async () => {
-    await copyTextToClipboard(getFixedPreviewUrl(), setFixedLinkCopied);
-  };
-
-  const handleQuickCopyPreviewLink = async () => {
-    try {
-      const res = await copyPreviewLinkToClipboard({
-        version: 1,
-        createdAt: Date.now(),
-        comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
-        comparisonWbUploadedAt: comparisonWb?.uploadedAt,
-        stats,
-        results,
-        filter: activeFilter,
-        onlyAccept: hideSupersededPostpone,
-        searchTerm,
-        searchColumn,
-        columnConfigs,
-      });
-      if (res.success) {
-        setQuickCopied(true);
-        const filterName = activeFilter === 'all' ? t.dashFilterNameAll
-          : activeFilter === 'green' ? t.filterGreen
-          : activeFilter === 'yellow' ? t.filterYellow
-          : activeFilter === 'red' ? t.filterRed
-          : activeFilter === 'blue' ? t.filterBlue : t.filterUnmatched;
-        onShowToast(t.dashPreviewLinkCopied.replace('{filter}', filterName), 'success');
-        setTimeout(() => setQuickCopied(false), 2500);
-      } else {
-        setShowShareModal(true);
-      }
-    } catch {
-      setShowShareModal(true);
-    }
+  const handleCopyShareLink = async () => {
+    await copyTextToClipboard(getFixedPreviewUrl(), setShareLinkCopied);
   };
 
   // Helper to retrieve cell string value for any column (System, Ref, Comp)
@@ -1153,143 +974,19 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               <div className="h-6 w-px bg-slate-200 hidden md:block" />
               {/* Share group */}
               <div className="flex flex-wrap items-center gap-2">
-                {/* Quick 1-Click Copy Preview Link */}
+                {/* Copy Share Link Button: copies the fixed public preview link (/preview).
+                    Anyone opening it fetches the latest results from the cloud — no sign-in. */}
                 <button
-                  onClick={handleQuickCopyPreviewLink}
+                  onClick={handleCopyShareLink}
                   className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
-                  title={t.dashQuickCopyTitle}
+                  title={t.dashCopyShareLink}
                 >
-                  {quickCopied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
-                      <span className="text-emerald-600 font-bold">{t.dashLinkCopied}</span>
-                    </>
+                  {shareLinkCopied ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5 text-slate-500 group-hover:scale-110 transition-transform" />
-                      <span>{t.dashCopyLink}</span>
-                    </>
+                    <Link2 className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
                   )}
-                </button>
-
-                {/* Live Share Link Button (public, no sign-in needed for viewers) */}
-                <div className="relative shrink-0">
-                  <button
-                    onClick={handleToggleLiveShare}
-                    className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg shadow-xs transition-all whitespace-nowrap select-none group border ${
-                      liveShareId
-                        ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-300'
-                        : 'text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border-slate-200'
-                    }`}
-                    title={
-                      liveShareId ? t.dashLiveShareOnTitle : t.dashLiveShareOffTitle
-                    }
-                  >
-                    {liveShareId && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}
-                    <Share2 className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
-                    <span>{liveShareId ? t.dashSharingLive : t.dashLiveShare}</span>
-                  </button>
-
-                  {showLiveSharePanel && (
-                    <div className="absolute right-0 mt-2 w-80 rounded-xl bg-white border border-slate-200 shadow-xl p-3 z-50 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900">{t.dashPublicLiveShareLink}</span>
-                        <button
-                          onClick={() => setShowLiveSharePanel(false)}
-                          className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
-                          aria-label={t.close}
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-snug">
-                        {t.dashLiveShareDesc}
-                      </p>
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-[11px] font-bold text-slate-700">
-                          {t.dashFixedPreviewLink}
-                        </div>
-                        <button
-                          onClick={handleToggleFixedLink}
-                          className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
-                            fixedLinkEnabled ? 'bg-emerald-500' : 'bg-slate-300'
-                          }`}
-                          title={t.dashFixedPreviewLink}
-                          aria-label={t.dashFixedPreviewLink}
-                        >
-                          <span
-                            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${
-                              fixedLinkEnabled ? 'left-[18px]' : 'left-0.5'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      <button
-                        onClick={handleCopyFixedLink}
-                        title={t.dashCopy}
-                        disabled={!fixedLinkEnabled}
-                        className={`flex items-center gap-2 w-full px-2.5 py-2 text-[11px] font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-lg transition-all text-left ${
-                          fixedLinkEnabled
-                            ? 'hover:border-emerald-300 hover:bg-emerald-50/60 active:scale-[0.99]'
-                            : 'opacity-50 cursor-not-allowed'
-                        }`}
-                      >
-                        <span className="flex-1 min-w-0 truncate">{getFixedPreviewUrl()}</span>
-                        {fixedLinkCopied ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        )}
-                      </button>
-                      <p className="text-[10px] text-slate-400 leading-snug">
-                        {fixedLinkEnabled ? t.dashFixedPreviewLinkDesc : t.dashFixedLinkOffHint}
-                      </p>
-                      {liveShareId ? (
-                        <>
-                          <details className="rounded-lg bg-slate-50 border border-slate-200 px-2 py-1.5">
-                            <summary className="text-[11px] text-slate-500 cursor-pointer select-none">
-                              {t.dashLongShareLink}
-                            </summary>
-                            <button
-                              onClick={handleCopyLiveShareLink}
-                              title={t.dashCopy}
-                              className="mt-1.5 flex items-center gap-2 w-full px-2 py-1.5 text-[11px] font-mono text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-emerald-300 active:scale-[0.99] transition-all text-left"
-                            >
-                              <span className="flex-1 min-w-0 truncate">{getSharePreviewUrl(liveShareId)}</span>
-                              {liveShareCopied ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              )}
-                            </button>
-                          </details>
-                          <button
-                            onClick={handleStopLiveShare}
-                            className="w-full px-2.5 py-1.5 text-[11px] font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg"
-                          >
-                            {t.dashStopSharing}
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={handleCreateLiveShare}
-                          className="w-full px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg"
-                        >
-                          {t.dashLiveShare}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Share Preview Options Button */}
-                <button
-                  onClick={() => setShowShareModal(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
-                  title={t.dashSharePreviewTitle}
-                >
-                  <Share2 className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
-                  <span>{t.dashSharePreview}</span>
+                  <span>{shareLinkCopied ? t.dashCopied : t.dashCopyShareLink}</span>
                 </button>
 
               </div>
@@ -2067,21 +1764,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         language={language}
       />
 
-      {/* Share Result Preview Modal */}
-      <SharePreviewModal
-        isOpen={showShareModal}
-        onClose={() => setShowShareModal(false)}
-        results={results}
-        stats={stats}
-        comparisonWbName={comparisonWb?.name || 'Evaluation_Results'}
-        activeFilter={activeFilter}
-        searchTerm={searchTerm}
-        searchColumn={searchColumn}
-        columnConfigs={columnConfigs}
-        onShowToast={onShowToast}
-        language={language}
-        onlyAccept={hideSupersededPostpone}
-      />
     </div>
   );
 };
