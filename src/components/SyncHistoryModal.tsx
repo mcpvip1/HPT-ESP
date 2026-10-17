@@ -24,7 +24,7 @@ interface SyncHistoryModalProps {
 const kindIcon = (kind: SyncHistoryEntry['kind']) => {
   if (kind === 'file') return <FileUp className="w-4 h-4 text-sky-600 shrink-0" />;
   if (kind === 'settings') return <SlidersHorizontal className="w-4 h-4 text-violet-600 shrink-0" />;
-  return <Table2 className="w-4 h-4 text-brand-600 shrink-0" />;
+  return <Table2 className="w-4 h-4 text-emerald-600 shrink-0" />;
 };
 
 export const SyncHistoryModal: React.FC<SyncHistoryModalProps> = ({
@@ -105,7 +105,7 @@ export const SyncHistoryModal: React.FC<SyncHistoryModalProps> = ({
             </div>
           ) : (
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-6 h-6 text-brand-500 shrink-0" />
+              <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slate-900">{t.syncAllSynced}</p>
                 {lastSync && (
@@ -146,7 +146,7 @@ export const SyncHistoryModal: React.FC<SyncHistoryModalProps> = ({
                     </p>
                   </div>
                   {entry.status === 'done' ? (
-                    <CheckCircle2 className="w-4 h-4 text-brand-500 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                   ) : (
                     <X className="w-4 h-4 text-red-500 shrink-0" />
                   )}
