@@ -50,6 +50,7 @@ import {
   fetchPreviewSnapshot,
   subscribeSharedSnapshot,
   fetchSharedSnapshot,
+  unpublishSharedSnapshot,
   debounce,
   publishWorkbooks,
   fetchWorkbooks,
@@ -924,6 +925,8 @@ export default function App() {
     if (cloudUser) {
       try { await deleteResultsState(cloudUser.uid); } catch (e) { console.warn('Failed to delete cloud results', e); }
     }
+    // No results left: take the fixed public preview link down too
+    try { await unpublishSharedSnapshot(FIXED_PREVIEW_SHARE_ID); } catch { /* ignore */ }
   };
 
   // Replace the Reference Workbook (Main File) with a newly uploaded file.
