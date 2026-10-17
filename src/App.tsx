@@ -493,6 +493,7 @@ export default function App() {
     saveToIDB(StorageKeys.SYNC_HISTORY, next).catch(() => {});
     // Sync the log to the cloud so other devices see this upload too
     if (uidRef.current) debouncedPublishHistory(uidRef.current, next);
+    return () => debouncedPublishHistory.cancel();
   }, [pickActiveUpload, debouncedPublishHistory]);
 
   // Human-readable reason for a settings upload, by diffing rule sections
@@ -544,6 +545,7 @@ export default function App() {
       hc: cur.holdColumn, h: cur.holdValues, hr: cur.holdReason, rr: cur.releasedRowIds,
     });
     debouncedPublishRules(cloudUser.uid, cur, reason);
+    return () => debouncedPublishRules.cancel();
   }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds, debouncedPublishRules, describeRulesChange]);
 
   // Publish evaluated results (+ view filters) to the cloud whenever they
@@ -572,10 +574,14 @@ export default function App() {
     if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current) return;
     if (results.length === 0 || !stats) return;
     if (pulledResultsRef.current === results) {
-      pulledResultsRef.current = null; // pull echo accounted for — skip
+      // Pull echo: skip publish, but keep the ref until results actually change
+      // (don't null it, or a later filter change will spuriously re-publish)
       return;
     }
+    // Results are new (not from pull): clear the echo guard
+    pulledResultsRef.current = null;
     debouncedPublishResults.current(cloudUser.uid, { results, stats, filters: resultFilters }, resultsPublishGenRef.current);
+    return () => debouncedPublishResults.current.cancel();
   }, [cloudUser, isPreviewMode, localReady, results, stats, resultFilters, debouncedPublishResults]);
 
   const VALID_FILTERS = ['all', 'green', 'yellow', 'red', 'blue', 'unmatched'] as const;
