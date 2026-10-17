@@ -37,7 +37,7 @@ import {
 } from '../types';
 import { translations } from '../translations';
 import { exportStyledExcel, exportCsv } from '../utils/excel';
-import { generatePreviewLink, copyPreviewLinkToClipboard, getSharePreviewUrl } from '../utils/previewSharing';
+import { generatePreviewLink, copyPreviewLinkToClipboard, getSharePreviewUrl, getFixedPreviewUrl } from '../utils/previewSharing';
 import type { SharedPreviewPayload } from '../utils/previewSharing';
 import type { User } from 'firebase/auth';
 import {
@@ -48,6 +48,7 @@ import {
   setActiveShare,
   generateShareId,
   debounce,
+  FIXED_PREVIEW_SHARE_ID,
 } from '../lib/cloudSync';
 import { RowDetailModal } from './RowDetailModal';
 import { ColumnCustomizationModal } from './ColumnCustomizationModal';
@@ -138,6 +139,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   });
   const [showLiveSharePanel, setShowLiveSharePanel] = useState(false);
   const [liveShareCopied, setLiveShareCopied] = useState(false);
+  const [fixedLinkCopied, setFixedLinkCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -481,7 +483,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const debouncedPublishPreview = useRef(
     debounce((uid: string, payload: SharedPreviewPayload, shareId: string | null) => {
       publishPreviewSnapshot(uid, payload);
-      if (shareId) publishSharedSnapshot(shareId, uid, payload);
+      if (shareId) {
+        publishSharedSnapshot(shareId, uid, payload);
+        // Fixed short link (/preview) always mirrors the live share
+        publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, uid, payload);
+      }
     }, 2000)
   ).current;
 
@@ -590,6 +596,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     let okPublish = false;
     if (okShare && results.length > 0 && stats) {
       okPublish = await publishSharedSnapshot(sid, cloudUser.uid, buildSharePayload());
+      if (okPublish) {
+        // Best-effort: the fixed short link mirrors the live share
+        await publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, cloudUser.uid, buildSharePayload());
+      }
     }
     if (!okShare || !okPublish) {
       // Don't leave behind a link that points at nothing
@@ -614,6 +624,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       onShowToast(t.dashShareRevokeFailed, 'error');
       return;
     }
+    // Best-effort: take the fixed short link down too
+    try { await unpublishSharedSnapshot(FIXED_PREVIEW_SHARE_ID); } catch { /* ignore */ }
     if (cloudUser) await setActiveShare(cloudUser.uid, null);
     try {
       localStorage.removeItem('emp_live_share_id');
@@ -625,15 +637,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     onShowToast(t.dashShareStopped, 'info');
   };
 
-  const handleCopyLiveShareLink = async () => {
-    if (!liveShareId) return;
-    const url = getSharePreviewUrl(liveShareId);
+  const copyTextToClipboard = async (text: string, setCopied: (v: boolean) => void) => {
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(text);
       } else {
         const ta = document.createElement('textarea');
-        ta.value = url;
+        ta.value = text;
         ta.style.position = 'fixed';
         ta.style.opacity = '0';
         document.body.appendChild(ta);
@@ -641,11 +651,20 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         document.execCommand('copy');
         document.body.removeChild(ta);
       }
-      setLiveShareCopied(true);
-      setTimeout(() => setLiveShareCopied(false), 2000);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       onShowToast(t.dashCopyLinkFailed, 'error');
     }
+  };
+
+  const handleCopyLiveShareLink = async () => {
+    if (!liveShareId) return;
+    await copyTextToClipboard(getSharePreviewUrl(liveShareId), setLiveShareCopied);
+  };
+
+  const handleCopyFixedLink = async () => {
+    await copyTextToClipboard(getFixedPreviewUrl(), setFixedLinkCopied);
   };
 
   const handleQuickCopyPreviewLink = async () => {
@@ -1110,21 +1129,47 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       <p className="text-[11px] text-slate-500 leading-snug">
                         {t.dashLiveShareDesc}
                       </p>
+                      <div className="text-[11px] font-bold text-slate-700">
+                        {t.dashFixedPreviewLink}
+                      </div>
                       <div className="flex items-center gap-1.5">
                         <input
                           readOnly
-                          value={getSharePreviewUrl(liveShareId)}
+                          value={getFixedPreviewUrl()}
                           onFocus={(e) => e.target.select()}
                           className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
                         />
                         <button
-                          onClick={handleCopyLiveShareLink}
+                          onClick={handleCopyFixedLink}
                           className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shrink-0"
                         >
-                          {liveShareCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{liveShareCopied ? t.dashCopied : t.dashCopy}</span>
+                          {fixedLinkCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{fixedLinkCopied ? t.dashCopied : t.dashCopy}</span>
                         </button>
                       </div>
+                      <p className="text-[10px] text-slate-400 leading-snug">
+                        {t.dashFixedPreviewLinkDesc}
+                      </p>
+                      <details className="rounded-lg bg-slate-50 border border-slate-200 px-2 py-1.5">
+                        <summary className="text-[11px] text-slate-500 cursor-pointer select-none">
+                          {t.dashLongShareLink}
+                        </summary>
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          <input
+                            readOnly
+                            value={getSharePreviewUrl(liveShareId)}
+                            onFocus={(e) => e.target.select()}
+                            className="flex-1 min-w-0 px-2 py-1.5 text-[11px] font-mono text-slate-700 bg-white border border-slate-200 rounded-lg focus:outline-none"
+                          />
+                          <button
+                            onClick={handleCopyLiveShareLink}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shrink-0"
+                          >
+                            {liveShareCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{liveShareCopied ? t.dashCopied : t.dashCopy}</span>
+                          </button>
+                        </div>
+                      </details>
                       <button
                         onClick={handleStopLiveShare}
                         className="w-full px-2.5 py-1.5 text-[11px] font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg"
