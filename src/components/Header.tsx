@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Globe, SlidersHorizontal, FileSpreadsheet, Cloud, CloudUpload, LogOut } from 'lucide-react';
+import { Globe, SlidersHorizontal, Cloud, CloudUpload, LogOut } from 'lucide-react';
 import { ProgressRing } from './ProgressRing';
 import type { ActiveUpload } from '../types';
 import type { User } from 'firebase/auth';
@@ -65,25 +65,35 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-3 sm:gap-6 h-16">
-          {/* Brand Wordmark with Modern Clean Icon */}
+          {/* Brand: Excellent Medical Technology logo + name + creator */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200/90 flex items-center justify-center text-emerald-600 shadow-xs shrink-0">
-              <FileSpreadsheet className="w-4 h-4 stroke-[2.2]" />
-            </div>
             <button
               onClick={() => {
                 if (!isPreviewMode && onSelectStep) onSelectStep(1);
               }}
-              className="text-sm sm:text-base font-bold tracking-tight text-slate-900 hover:text-emerald-600 transition-colors truncate focus:outline-none"
+              className="flex items-center gap-2 sm:gap-2.5 min-w-0 focus:outline-none group"
+              title="Excellent Medical Technology ESP"
             >
-              ExcelMatch Pro
+              <img
+                src={`${import.meta.env.BASE_URL}excellent-logo-transparent.png`}
+                alt="Excellent Medical Technology"
+                className="h-9 sm:h-10 w-auto shrink-0"
+              />
+              <span className="hidden md:flex flex-col items-start leading-tight min-w-0">
+                <span className="text-[13px] font-bold tracking-tight text-slate-900 group-hover:text-brand-600 transition-colors truncate">
+                  Excellent Medical Technology <span className="text-brand-600">ESP</span>
+                </span>
+                <span className="text-[10px] font-medium text-slate-400 tracking-wide">
+                  Created by <span className="font-bold text-accent-600">DO2-HPT</span>
+                </span>
+              </span>
             </button>
           </div>
 
           {/* Mode Tag if in Preview */}
           {isPreviewMode && (
-            <div className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 min-w-0">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <div className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-lg bg-brand-50 border border-brand-200 text-xs font-semibold text-brand-700 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-brand-500 animate-pulse shrink-0" />
               <span className="hidden min-[420px]:inline truncate">{t.headerResultPreview}</span>
               <span className="hidden sm:inline text-slate-500 font-normal">
                 {t.headerLiveTable}
@@ -126,7 +136,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onCloudSignOut}
                 title={t.headerSignedInTitle.replace('{email}', cloudUser.email || t.headerGoogleUser)}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors whitespace-nowrap shrink-0 shadow-xs"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors whitespace-nowrap shrink-0 shadow-xs"
               >
                 <Cloud className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{t.headerSynced}</span>
@@ -165,7 +175,7 @@ export const Header: React.FC<HeaderProps> = ({
                       }}
                       className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors ${
                         language === langKey
-                          ? 'bg-emerald-50 text-emerald-700 font-semibold'
+                          ? 'bg-brand-50 text-brand-700 font-semibold'
                           : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
@@ -183,10 +193,10 @@ export const Header: React.FC<HeaderProps> = ({
             {!isPreviewMode && (
               <button
                 onClick={onOpenRulesSetting}
-                className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 active:bg-slate-950 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 group focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 active:bg-slate-950 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 group focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                 title={t.headerRulesTitle}
               >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-12 transition-transform" />
+                <SlidersHorizontal className="w-3.5 h-3.5 text-brand-400 group-hover:rotate-12 transition-transform" />
                 <span className="hidden sm:inline">{t.rulesLogicSetting}</span>
                 <span className="sm:hidden">{t.headerRulesShort}</span>
               </button>
