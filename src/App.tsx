@@ -736,7 +736,10 @@ export default function App() {
           setShareId(urlShareId);
           setIsPreviewMode(true);
           try {
-            const shared = await fetchSharedSnapshot(urlShareId);
+            const shared = await Promise.race([
+              fetchSharedSnapshot(urlShareId),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
+            ]);
             if (shared && isMounted) {
               lastCloudPreviewAtRef.current = shared.createdAt || 0;
               checkAndApplyPreview(shared);
@@ -1423,25 +1426,31 @@ export default function App() {
                 onExitPreview={handleExitPreview}
                 onRefresh={async () => {
                   // Fixed short link / live share link: pull the latest
-                  // published snapshot from the cloud.
+                  // published snapshot from the cloud (with timeout).
                   if (shareId) {
                     try {
-                      const latest = await fetchSharedSnapshot(shareId);
-                      if (latest) {
-                        checkAndApplyPreview(latest);
+                      const latest = await Promise.race([
+                        fetchSharedSnapshot(shareId),
+                        new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
+                      ]);
+                      if (latest && checkAndApplyPreview(latest)) {
                         showToast(t.toastPreviewRefreshed, 'success');
                         return;
                       }
                     } catch (e) {
                       console.warn('Preview refresh: cloud fetch failed', e);
                     }
+                    // Cloud fetch failed/timed out: tell the user honestly.
+                    showToast(t.toastPreviewRefreshFailed || 'Could not refresh from cloud', 'error');
+                    return;
                   }
                   // Fallback: URL-embedded snapshot (hash links)
                   const pData = parsePreviewFromUrl();
-                  if (pData) {
-                    checkAndApplyPreview(pData);
+                  if (pData && checkAndApplyPreview(pData)) {
+                    showToast(t.toastPreviewRefreshed, 'success');
+                  } else {
+                    showToast(t.toastPreviewRefreshFailed || 'Could not refresh from cloud', 'error');
                   }
-                  showToast(t.toastPreviewRefreshed, 'success');
                 }}
               />
             ) : (
