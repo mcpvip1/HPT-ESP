@@ -26,6 +26,8 @@ import {
   RotateCw,
   RefreshCw,
   Save,
+  FileText,
+  Clock,
 } from 'lucide-react';
 import {
   MatchedRow,
@@ -101,6 +103,23 @@ function highlightText(content: any, query: string): React.ReactNode {
       {highlightText(after, query)}
     </span>
   );
+}
+
+const localeForDate = (lang: string): string =>
+  lang === 'my' ? 'my-MM' : lang === 'th' ? 'th-TH' : lang === 'zh' ? 'zh-CN' : 'en-US';
+
+function formatFileDateTime(ts: number, lang: string): string {
+  try {
+    return new Date(ts).toLocaleString(localeForDate(lang), {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return new Date(ts).toLocaleString();
+  }
 }
 
 export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
@@ -411,6 +430,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           version: 1,
           createdAt: Date.now(),
           comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+        comparisonWbUploadedAt: comparisonWb?.uploadedAt,
           stats,
           results,
           filter: activeFilter,
@@ -500,6 +520,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         version: 1,
         createdAt: Date.now(),
         comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+        comparisonWbUploadedAt: comparisonWb?.uploadedAt,
         stats,
         results,
         filter: activeFilter,
@@ -552,6 +573,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         version: 1,
         createdAt: Date.now(),
         comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+        comparisonWbUploadedAt: comparisonWb?.uploadedAt,
         stats,
         results,
         filter: activeFilter,
@@ -573,6 +595,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     version: 1,
     createdAt: Date.now(),
     comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+    comparisonWbUploadedAt: comparisonWb?.uploadedAt,
     stats,
     results,
     filter: activeFilter,
@@ -673,6 +696,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         version: 1,
         createdAt: Date.now(),
         comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+        comparisonWbUploadedAt: comparisonWb?.uploadedAt,
         stats,
         results,
         filter: activeFilter,
@@ -1287,6 +1311,29 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               </span>
             )}
           </div>
+
+          {/* Currently viewed file + last replaced time */}
+          {comparisonWb && (
+            <div className="flex items-center gap-2 shrink-0 self-end md:self-auto ml-auto">
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px]"
+                title={comparisonWb.name}
+              >
+                <FileText className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="font-semibold text-slate-700 max-w-[160px] truncate">
+                  {comparisonWb.name}
+                </span>
+              </span>
+              {comparisonWb.uploadedAt ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px]">
+                  <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="font-mono text-slate-600 whitespace-nowrap">
+                    {formatFileDateTime(comparisonWb.uploadedAt, language)}
+                  </span>
+                </span>
+              ) : null}
+            </div>
+          )}
 
           {/* Rows Per Page Selector (Only in Studio mode since Preview mode shows all rows) */}
           {!isPreviewMode && (
