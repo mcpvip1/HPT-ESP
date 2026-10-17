@@ -343,7 +343,7 @@ export interface TranslationDict {
   dashLiveShareDesc: string;
   dashFixedPreviewLink: string;
   dashFixedPreviewLinkDesc: string;
-  dashFixedLinkOffHint: string;
+  dashCopyShareLink: string;
   dashLongShareLink: string;
   dashCopied: string;
   dashCopy: string;
