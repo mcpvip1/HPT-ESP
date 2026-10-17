@@ -176,7 +176,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [openFilterColId, setOpenFilterColId] = useState<string | null>(null);
   const [filterAnchorRect, setFilterAnchorRect] = useState<DOMRect | null>(null);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       // Re-sync latest saved column view settings from localStorage
@@ -190,7 +190,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           }
         } catch {}
       }
-      if (onRefresh) onRefresh();
+      if (onRefresh) await onRefresh();
       onShowToast(t.dashRefreshedLatest, 'success');
     } catch {
       onShowToast(t.dashRefreshCompleted, 'info');
@@ -490,7 +490,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const debouncedPublishPreview = useRef(
     debounce((uid: string, payload: SharedPreviewPayload) => {
       publishPreviewSnapshot(uid, payload);
-      publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, uid, payload);
+      // Surface failures so a broken public link doesn't go unnoticed (BUG-11)
+      publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, uid, payload).then((ok) => {
+        if (!ok) console.warn('Auto-publish to fixed preview slot failed');
+      });
     }, 2000)
   ).current;
 
@@ -510,6 +513,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       searchColumn,
       columnConfigs,
     });
+    // Cancel any pending debounced publish when deps change or unmount,
+    // so a stale timeout can't resurrect a deleted share (BUG-2).
+    return () => debouncedPublishPreview.cancel();
   }, [
     isPreviewMode,
     cloudUser,
@@ -608,7 +614,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         searchColumn,
         columnConfigs,
       };
-      await publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, cloudUser.uid, payload);
+      const ok = await publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, cloudUser.uid, payload);
+      if (!ok) {
+        onShowToast(t.dashPreviewPublishFailed || 'Failed to update preview', 'error');
+        return;
+      }
       onShowToast(t.dashPreviewPublished || 'Preview updated with latest results', 'success');
     } catch (e) {
       console.warn('Manual preview publish failed', e);
@@ -679,8 +689,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     const query = searchTerm.trim().toLowerCase();
     if (query) {
       if (searchColumn === 'all') {
-        const inKey = item.matchKey.toLowerCase().includes(query);
-        const inReason = item.decisionReason.toLowerCase().includes(query);
+        const inKey = (item.matchKey || '').toLowerCase().includes(query);
+        const inReason = (item.decisionReason || '').toLowerCase().includes(query);
         const inOutcome = (item.decisionColor === 'green' ? 'passed accept' : item.decisionColor === 'yellow' ? 'review postpone' : item.decisionColor === 'red' ? 'rejected fail' : item.decisionColor === 'blue' ? 'hold blue' : '').includes(query);
         const inMatchStatus = (item.isMatched ? 'matched' : 'unmatched new').includes(query);
         const inRowIdx = String(item.rowIndex).includes(query);
@@ -702,7 +712,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       } else if (searchColumn === 'unmatched') {
         return (item.unmatchedInfo?.primaryIdentifier + ' ' + item.unmatchedInfo?.reason + ' ' + item.unmatchedInfo?.unmatchedKeyDisplay).toLowerCase().includes(query);
       } else if (searchColumn === 'matchKey') {
-        return item.matchKey.toLowerCase().includes(query);
+        return (item.matchKey || '').toLowerCase().includes(query);
       } else if (searchColumn === 'outcome') {
         const outcomeStr = item.decisionColor === 'green' ? 'passed accept' : item.decisionColor === 'yellow' ? 'review postpone' : item.decisionColor === 'red' ? 'rejected fail' : item.decisionColor === 'blue' ? 'hold blue' : '';
         return outcomeStr.includes(query);
