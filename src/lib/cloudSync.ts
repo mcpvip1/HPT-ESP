@@ -462,9 +462,55 @@ export function subscribeSharedSnapshot(
 
 export async function fetchSharedSnapshot(shareId: string): Promise<SharedPreviewPayload | null> {
   try {
-    return await fetchSnapshotFrom(shareDoc(shareId), true);
+    const viaSdk = await fetchSnapshotFrom(shareDoc(shareId), true);
+    if (viaSdk) return viaSdk;
   } catch (e) {
-    console.warn('Cloud sync: failed to fetch shared snapshot', e);
+    console.warn('Cloud sync: SDK fetch failed, trying REST fallback', e);
+  }
+  // Fallback: direct Firestore REST API (no SDK, no persistent connection).
+  try {
+    return await fetchSharedSnapshotViaRest(shareId);
+  } catch (e) {
+    console.warn('Cloud sync: REST fallback failed', e);
+    return null;
+  }
+}
+
+// Direct Firestore REST fetch for the public share slot.
+// Uses the public web API key (same as the Firebase client config).
+const FIRESTORE_REST_BASE =
+  'https://firestore.googleapis.com/v1/projects/hpt-esp/databases/(default)/documents';
+const FIRESTORE_WEB_KEY = 'AIzaSyA-GR1J6dgtg2rFEjsnAD1qSbPqnkUj5m8';
+
+async function fetchSharedSnapshotViaRest(shareId: string): Promise<SharedPreviewPayload | null> {
+  const key = FIRESTORE_WEB_KEY;
+  // 1. Meta doc
+  const metaRes = await fetch(
+    `${FIRESTORE_REST_BASE}/shares/${encodeURIComponent(shareId)}?key=${key}`
+  );
+  if (!metaRes.ok) return null;
+  const metaDoc = await metaRes.json();
+  const fields = metaDoc.fields || {};
+  const chunkCount = parseInt(fields.chunkCount?.integerValue || '0', 10);
+  if (!chunkCount || chunkCount <= 0) return null;
+  if (fields.uploading?.booleanValue) return null; // upload in progress
+  // 2. Chunks (numeric doc ids)
+  const parts: string[] = [];
+  for (let i = 0; i < chunkCount; i++) {
+    const cRes = await fetch(
+      `${FIRESTORE_REST_BASE}/shares/${encodeURIComponent(shareId)}/chunks/${i}?key=${key}`
+    );
+    if (!cRes.ok) return null;
+    const cDoc = await cRes.json();
+    const data = cDoc.fields?.data?.stringValue;
+    if (typeof data !== 'string') return null;
+    parts.push(data);
+  }
+  const json = parts.join('');
+  try {
+    return unpackCompact(JSON.parse(json));
+  } catch (e) {
+    console.warn('Cloud sync: REST unpack failed', e);
     return null;
   }
 }
