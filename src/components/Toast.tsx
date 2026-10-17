@@ -15,44 +15,69 @@ interface ToastProps {
   language?: Language;
 }
 
+const styles: Record<
+  ToastMessage['type'],
+  { bar: string; iconWrap: string; progress: string; Icon: React.ComponentType<{ className?: string }> }
+> = {
+  success: {
+    bar: 'bg-emerald-500',
+    iconWrap: 'bg-emerald-100 text-emerald-600',
+    progress: 'bg-emerald-500',
+    Icon: CheckCircle2,
+  },
+  error: {
+    bar: 'bg-rose-500',
+    iconWrap: 'bg-rose-100 text-rose-600',
+    progress: 'bg-rose-500',
+    Icon: AlertCircle,
+  },
+  info: {
+    bar: 'bg-sky-500',
+    iconWrap: 'bg-sky-100 text-sky-600',
+    progress: 'bg-sky-500',
+    Icon: Info,
+  },
+};
+
 export const Toast: React.FC<ToastProps> = ({ toasts, onDismiss, language = 'en' }) => {
   const t = translations[language];
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-md w-full pointer-events-none px-4">
-      {toasts.map((toast) => (
-        <div
-          key={toast.id}
-          className={`pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-lg shadow-xl border text-sm transition-all duration-200 ${
-            toast.type === 'success'
-              ? 'bg-slate-900 border-emerald-600/60 text-white'
-              : toast.type === 'error'
-              ? 'bg-slate-900 border-rose-600/60 text-white'
-              : 'bg-slate-900 border-slate-700 text-white'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            {toast.type === 'success' && (
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-            )}
-            {toast.type === 'error' && (
-              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-            )}
-            {toast.type === 'info' && (
-              <Info className="w-5 h-5 text-sky-400 shrink-0" />
-            )}
-            <span className="font-medium text-slate-100">{toast.text}</span>
-          </div>
-          <button
-            onClick={() => onDismiss(toast.id)}
-            className="text-slate-400 hover:text-slate-200 transition-colors p-1"
-            aria-label={t.toastDismiss}
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-[calc(100%-2.5rem)] pointer-events-none">
+      {toasts.map((toast) => {
+        const s = styles[toast.type];
+        const Icon = s.Icon;
+        return (
+          <div
+            key={toast.id}
+            role="status"
+            className="pointer-events-auto relative overflow-hidden flex items-center gap-3 pl-4 pr-2.5 py-3 rounded-xl bg-white border border-slate-200/80 shadow-xl shadow-slate-900/[0.08] animate-[toast-slide-in_0.28s_cubic-bezier(0.21,1.02,0.73,1)]"
           >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      ))}
+            <span className={`absolute left-0 top-0 bottom-0 w-1 ${s.bar}`} aria-hidden="true" />
+            <span
+              className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${s.iconWrap}`}
+              aria-hidden="true"
+            >
+              <Icon className="w-4 h-4" />
+            </span>
+            <p className="flex-1 min-w-0 text-[13px] font-medium leading-snug text-slate-800">
+              {toast.text}
+            </p>
+            <button
+              onClick={() => onDismiss(toast.id)}
+              className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              aria-label={t.toastDismiss}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+            <span
+              className={`absolute bottom-0 left-0 h-[3px] ${s.progress} animate-[toast-progress_4.5s_linear_forwards]`}
+              aria-hidden="true"
+            />
+          </div>
+        );
+      })}
     </div>
   );
 };
