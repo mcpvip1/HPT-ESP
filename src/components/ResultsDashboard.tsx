@@ -103,7 +103,8 @@ function highlightText(content: any, query: string): React.ReactNode {
 const localeForDate = (lang: string): string =>
   lang === 'my' ? 'my-MM' : lang === 'th' ? 'th-TH' : lang === 'zh' ? 'zh-CN' : 'en-US';
 
-function formatFileDateTime(ts: number, lang: string): string {
+function formatFileDateTime(ts: number | undefined, lang: string): string {
+  if (ts === undefined || ts === null) return '—';
   try {
     return new Date(ts).toLocaleString(localeForDate(lang), {
       year: 'numeric',
@@ -851,11 +852,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     active: string;
   }[] = [
     { key: 'all', label: t.filterAll, count: totalResults, dot: 'bg-slate-400', active: 'border-slate-300 bg-slate-50 ring-2 ring-slate-300' },
-    { key: 'green', label: t.filterGreen, count: stats.greenCount, dot: 'bg-green-500', active: 'border-green-300 bg-green-50 ring-2 ring-green-300' },
-    { key: 'yellow', label: t.filterYellow, count: stats.yellowCount, dot: 'bg-amber-500', active: 'border-amber-300 bg-amber-50 ring-2 ring-amber-300' },
-    { key: 'red', label: t.filterRed, count: stats.redCount, dot: 'bg-rose-500', active: 'border-rose-300 bg-rose-50 ring-2 ring-rose-300' },
-    { key: 'blue', label: t.filterBlue, count: stats.blueCount, dot: 'bg-blue-600', active: 'border-blue-300 bg-blue-50 ring-2 ring-blue-300' },
-    { key: 'unmatched', label: t.filterUnmatched, count: stats.unmatchedCount, dot: 'bg-violet-500', active: 'border-violet-300 bg-violet-50 ring-2 ring-violet-300' },
+    { key: 'green', label: t.filterGreen, count: stats.greenCount ?? 0, dot: 'bg-green-500', active: 'border-green-300 bg-green-50 ring-2 ring-green-300' },
+    { key: 'yellow', label: t.filterYellow, count: stats.yellowCount ?? 0, dot: 'bg-amber-500', active: 'border-amber-300 bg-amber-50 ring-2 ring-amber-300' },
+    { key: 'red', label: t.filterRed, count: stats.redCount ?? 0, dot: 'bg-rose-500', active: 'border-rose-300 bg-rose-50 ring-2 ring-rose-300' },
+    { key: 'blue', label: t.filterBlue, count: stats.blueCount ?? 0, dot: 'bg-blue-600', active: 'border-blue-300 bg-blue-50 ring-2 ring-blue-300' },
+    { key: 'unmatched', label: t.filterUnmatched, count: stats.unmatchedCount ?? 0, dot: 'bg-violet-500', active: 'border-violet-300 bg-violet-50 ring-2 ring-violet-300' },
   ];
 
   return (
