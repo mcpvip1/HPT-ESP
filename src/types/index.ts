@@ -25,6 +25,7 @@ export interface NormalizationRules {
   ignoreCase: boolean;
   removeSpacesAndHyphens: boolean;
   ignoreLeadingZeros: boolean;
+  trimPunctuation: boolean;
 }
 
 export type RuleCondition =

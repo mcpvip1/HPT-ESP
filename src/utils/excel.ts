@@ -257,6 +257,13 @@ export function normalizeValue(val: any, rules: NormalizationRules): string {
     str = str.toLowerCase();
   }
 
+  if (rules.trimPunctuation !== false) {
+    // Strip leading/trailing punctuation so 'TH-1099P.' matches 'TH-1099P'.
+    // Unicode-aware (\p{L}\p{N}) so Myanmar/Thai/Chinese letters are kept.
+    // Internal punctuation is untouched: '1.5' never becomes '15'.
+    str = str.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+  }
+
   if (rules.removeSpacesAndHyphens) {
     str = str.replace(/[\s\-_/]/g, '');
   }

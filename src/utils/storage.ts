@@ -199,6 +199,7 @@ export const defaultNormalizationRules: NormalizationRules = {
   ignoreCase: true,
   removeSpacesAndHyphens: false,
   ignoreLeadingZeros: false,
+  trimPunctuation: true,
 };
 
 export const defaultDecisionLayers: DecisionLayer[] = [
