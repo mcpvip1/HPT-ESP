@@ -27,7 +27,7 @@ export const GlobalLoadingSkeleton: React.FC<GlobalLoadingSkeletonProps> = ({
       <header className="h-16 border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-md px-4 sm:px-6 lg:px-8 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <img
-            src={`${import.meta.env.BASE_URL}excellent-logo-transparent.png`}
+            src={`${import.meta.env.BASE_URL}excellent-logo-web.jpg`}
             alt="Excellent Medical Technology"
             className="h-9 w-auto animate-pulse"
           />

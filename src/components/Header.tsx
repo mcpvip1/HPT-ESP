@@ -75,7 +75,7 @@ export const Header: React.FC<HeaderProps> = ({
               title="Excellent Medical Technology ESP"
             >
               <img
-                src={`${import.meta.env.BASE_URL}excellent-logo-transparent.png`}
+                src={`${import.meta.env.BASE_URL}excellent-logo-web.jpg`}
                 alt="Excellent Medical Technology"
                 className="h-9 sm:h-10 w-auto shrink-0"
               />
