@@ -262,6 +262,14 @@ export function getSharePreviewUrl(shareId: string): string {
 }
 
 /**
+ * The short fixed preview link — always shows the latest results published
+ * to the fixed public slot (no share id in the URL).
+ */
+export function getFixedPreviewUrl(): string {
+  return getShortPreviewUrl();
+}
+
+/**
  * Checks if the current page was loaded via a preview link:
  * - pathname ending with /preview or /preview/
  * - hash #/preview or #preview=...

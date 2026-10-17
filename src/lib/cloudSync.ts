@@ -403,6 +403,16 @@ export async function fetchPreviewSnapshot(uid: string): Promise<SharedPreviewPa
 // Readable by anyone with the link (no sign-in); writable only by the owner.
 // ---------------------------------------------------------------------------
 
+/**
+ * Fixed public preview slot: shares/{FIXED_PREVIEW_SHARE_ID}.
+ * A single well-known share doc that always carries the owner's latest
+ * published results, so the short fixed link /preview shows the newest data
+ * without a per-share id in the URL. It reuses the /shares Firestore rules
+ * (public read, owner write), so no rules change is needed. The literal id
+ * can never collide with generateShareId() output (uuid hex / base36).
+ */
+export const FIXED_PREVIEW_SHARE_ID = 'latest';
+
 const shareDoc = (shareId: string) => doc(db, 'shares', shareId);
 
 export async function publishSharedSnapshot(
