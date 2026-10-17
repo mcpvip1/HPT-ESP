@@ -612,12 +612,13 @@ export default function App() {
 
   // Live public share: follow the shared snapshot in real time (no sign-in).
   // If the owner turns sharing off, the last received snapshot stays visible.
+  // The fixed short link (/preview) is fetch-on-open + manual refresh only.
   useEffect(() => {
     if (!shareId || !isPreviewMode) return;
-    const isFixedSlot = shareId === FIXED_PREVIEW_SHARE_ID;
+    if (shareId === FIXED_PREVIEW_SHARE_ID) return;
     const unsub = subscribeSharedSnapshot(shareId, async (meta) => {
       if (meta === null) {
-        if (!isFixedSlot && !shareRevokedToastShownRef.current) {
+        if (!shareRevokedToastShownRef.current) {
           shareRevokedToastShownRef.current = true;
           showToast(t.toastShareRevoked, 'info');
         }
@@ -1400,7 +1401,22 @@ export default function App() {
                 initialSearchColumn={previewSearchColumn}
                 initialColumnConfigs={previewColumnConfigs}
                 onExitPreview={handleExitPreview}
-                onRefresh={() => {
+                onRefresh={async () => {
+                  // Fixed short link / live share link: pull the latest
+                  // published snapshot from the cloud.
+                  if (shareId) {
+                    try {
+                      const latest = await fetchSharedSnapshot(shareId);
+                      if (latest) {
+                        checkAndApplyPreview(latest);
+                        showToast(t.toastPreviewRefreshed, 'success');
+                        return;
+                      }
+                    } catch (e) {
+                      console.warn('Preview refresh: cloud fetch failed', e);
+                    }
+                  }
+                  // Fallback: URL-embedded snapshot (hash links)
                   const pData = parsePreviewFromUrl();
                   if (pData) {
                     checkAndApplyPreview(pData);
