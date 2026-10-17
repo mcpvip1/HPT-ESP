@@ -44,6 +44,8 @@ export interface TranslationDict {
   removeHyphensDesc: string;
   ignoreLeadingZeros: string;
   ignoreLeadingZerosDesc: string;
+  trimPunctuation: string;
+  trimPunctuationDesc: string;
   decisionLayers: string;
   decisionLayersDesc: string;
   addLayer: string;
@@ -626,6 +628,8 @@ export const translations: Record<Language, TranslationDict> = {
     removeHyphensDesc: "Strip internal spaces and dashes before matching ('A-100' = 'A100')",
     ignoreLeadingZeros: "Ignore leading zeros",
     ignoreLeadingZerosDesc: "Treat '0075' and '75' as identical matching keys",
+    trimPunctuation: "Trim edge punctuation",
+    trimPunctuationDesc: "Remove leading/trailing punctuation from keys ('TH-1099P.' = 'TH-1099P')",
     decisionLayers: "Decision Layers (Hierarchical Rules)",
     decisionLayersDesc: "Top-to-bottom prioritized rules. The first matching condition dictates row color.",
     addLayer: "+ Add Decision Layer",
@@ -922,6 +926,8 @@ export const translations: Record<Language, TranslationDict> = {
     removeHyphensDesc: "စကားလုံးအတွင်းရှိ မျဉ်းတိုများကို ဖယ်ရှားမည် ('A-100' = 'A100')",
     ignoreLeadingZeros: "ရှေ့ဆုံး သုညများကို လျစ်လျူရှုရန်",
     ignoreLeadingZerosDesc: "'0075' နှင့် '75' ကို တူညီသည်ဟု ယူဆမည်",
+    trimPunctuation: "ဘေးဘက် ပုဒ်ဖြတ်သင်္ကေတ ဖြတ်ထုတ်ရန်",
+    trimPunctuationDesc: "သော့ချက်စာလုံးရှေ့နောက် ပုဒ်ဖြတ်သင်္ကေတများ ဖယ်ရှားမည် ('TH-1099P.' = 'TH-1099P')",
     decisionLayers: "ဆုံးဖြတ်ချက်အလွှာများ (ဦးစားပေးစည်းမျဉ်းများ)",
     decisionLayersDesc: "အထက်မှအောက် ဦးစားပေးစနစ်ဖြင့် ပထမဆုံးကိုက်ညီသော စည်းမျဉ်းအတိုင်း အရောင်သတ်မှတ်ပါမည်။",
     addLayer: "+ ဆုံးဖြတ်ချက်အလွှာ အသစ်ထည့်ရန်",
@@ -1218,6 +1224,8 @@ export const translations: Record<Language, TranslationDict> = {
     removeHyphensDesc: "ตัดขีดกลางและช่องว่างภายในออก ('A-100' = 'A100')",
     ignoreLeadingZeros: "ไม่สนใจเลขศูนย์นำหน้า",
     ignoreLeadingZerosDesc: "มองว่า '0075' และ '75' มีค่าตรงกัน",
+    trimPunctuation: "ตัดเครื่องหมายวรรคตอนหน้า-หลัง",
+    trimPunctuationDesc: "ลบเครื่องหมายวรรคตอนที่ขอบของคีย์ ('TH-1099P.' = 'TH-1099P')",
     decisionLayers: "เลเยอร์การตัดสินใจ (ลำดับความสำคัญ)",
     decisionLayersDesc: "ประเมินเงื่อนไขจากบนลงล่าง เงื่อนไขแรกที่ตรงจะกำหนดสีของแถว",
     addLayer: "+ เพิ่มเลเยอร์การตัดสินใจ",
@@ -1514,6 +1522,8 @@ export const translations: Record<Language, TranslationDict> = {
     removeHyphensDesc: "比对前剥离空格与短横线（'A-100' = 'A100'）",
     ignoreLeadingZeros: "忽略前导零",
     ignoreLeadingZerosDesc: "将 '0075' 与 '75' 视作完全相同的匹配键",
+    trimPunctuation: "去除首尾标点符号",
+    trimPunctuationDesc: "去除键首尾的标点符号 ('TH-1099P.' = 'TH-1099P')",
     decisionLayers: "决策层（层级优先判定规则）",
     decisionLayersDesc: "按自顶向下顺序评估，首个命中的规则将决定该行的最终颜色。",
     addLayer: "+ 添加决策层",
