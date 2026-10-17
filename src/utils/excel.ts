@@ -836,32 +836,13 @@ export function processMatching(
   const keyGroups = new Map<string, MatchedRow[]>();
 
   const getRowKeys = (r: MatchedRow): string[] => {
+    // Group ONLY by the full composite match key. Grouping by individual
+    // identifier columns (PO / Material / Item / Lot) used to let one row's
+    // Accept force unrelated rows green merely because they shared a material
+    // — a row that "just matched, not yet passed" must stay out of green.
     const keys: string[] = [];
     if (r.matchKey && r.matchKey.trim() !== '') {
       keys.push(`mk:${r.matchKey.trim().toLowerCase()}`);
-    }
-    // Also extract primary PO / Item / Material / Lot identifiers from comparisonRow
-    for (const [colName, val] of Object.entries(r.comparisonRow)) {
-      const cleanCol = colName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (
-        cleanCol === 'po' ||
-        cleanCol === 'ponumber' ||
-        cleanCol === 'purchaseorder' ||
-        cleanCol === 'orderid' ||
-        cleanCol === 'material' ||
-        cleanCol === 'materialcode' ||
-        cleanCol === 'item' ||
-        cleanCol === 'itemcode' ||
-        cleanCol === 'partnumber' ||
-        cleanCol === 'lot' ||
-        cleanCol === 'lotno' ||
-        cleanCol === 'lotnumber'
-      ) {
-        const strVal = String(val ?? '').trim().toLowerCase();
-        if (strVal && strVal !== '-') {
-          keys.push(`${cleanCol}:${strVal}`);
-        }
-      }
     }
     return keys;
   };
