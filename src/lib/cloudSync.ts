@@ -470,11 +470,17 @@ export function subscribeSharedSnapshot(
 }
 
 export async function fetchSharedSnapshot(shareId: string): Promise<SharedPreviewPayload | null> {
+  // Try SDK first with a fast timeout so a hanging connection falls back quickly
   try {
-    const viaSdk = await fetchSnapshotFrom(shareDoc(shareId), true);
+    const viaSdk = await Promise.race([
+      fetchSnapshotFrom(shareDoc(shareId), true),
+      new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('Firestore SDK fetch timeout')), 3500)
+      ),
+    ]);
     if (viaSdk) return viaSdk;
   } catch (e) {
-    console.warn('Cloud sync: SDK fetch failed, trying REST fallback', e);
+    console.warn('Cloud sync: SDK fetch failed or timed out, trying REST fallback', e);
   }
   // Fallback: direct Firestore REST API (no SDK, no persistent connection).
   try {
@@ -489,13 +495,13 @@ export async function fetchSharedSnapshot(shareId: string): Promise<SharedPrevie
 // Uses the public web API key (same as the Firebase client config).
 const FIRESTORE_REST_BASE =
   'https://firestore.googleapis.com/v1/projects/hpt-esp/databases/(default)/documents';
-const FIRESTORE_WEB_KEY = 'AIzaSyA-GR1J6dgtg2rFEjsnAD1qSbPqnkUj5m8';
+const FIRESTORE_WEB_KEY = 'AIzaSyDdT5hqzx23BZpUyjKvX_gQarpSA9yg2pE';
 
 async function fetchSharedSnapshotViaRest(shareId: string): Promise<SharedPreviewPayload | null> {
   const key = FIRESTORE_WEB_KEY;
-  // Abort after 15s so a stalled network can't hang forever (BUG-6).
+  // Abort after 10s so a stalled network can't hang forever
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 15000);
+  const timer = setTimeout(() => ctrl.abort(), 10000);
   const sig = ctrl.signal;
   try {
   // 1. Meta doc

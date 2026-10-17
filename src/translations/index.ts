@@ -211,6 +211,7 @@ export interface TranslationDict {
   gateTitle: string;
   gateDesc: string;
   gateSignIn: string;
+  gateGuest: string;
   cloudDownloading: string;
   cloudDownloadingSub: string;
   toastCloudFilesUploaded: string;
@@ -581,6 +582,15 @@ export interface TranslationDict {
   layerTemplateMeta: string;
   layerApplyRule: string;
   layerFooterNote: string;
+  suggestionEngineTitle: string;
+  suggestionEngineSubtitle: string;
+  suggestionEngineBadge: string;
+  suggestionEngineApplyAll: string;
+  suggestionEngineApplyOne: string;
+  suggestionEngineApplied: string;
+  suggestionEngineActive: string;
+  suggestionEngineReadyToMap: string;
+  suggestionEngineNoSuggestions: string;
 }
 
 import { batchB } from './batchB';
@@ -801,6 +811,7 @@ export const translations: Record<Language, TranslationDict> = {
     gateTitle: "Sign in to sync your workspace",
     gateDesc: "Your files, settings and results are stored securely in the cloud. Sign in to pick up exactly where you left off — on any device.",
     gateSignIn: "Sign in with Google",
+    gateGuest: "Continue as Guest (Use Offline)",
     cloudDownloading: "Download Data from cloud",
     cloudDownloadingSub: "Syncing your files, settings and results…",
     toastCloudFilesUploaded: "Files uploaded to the cloud.",
@@ -1101,6 +1112,7 @@ export const translations: Record<Language, TranslationDict> = {
     gateTitle: "သင့် workspace ကို ထပ်တူညီရန် လော့ဂ်အင်ဝင်ပါ",
     gateDesc: "သင့်ဖိုင်များ၊ ဆက်တင်များနှင့် ရလဒ်များသည် cloud တွင် လုံခြုံစွာ သိမ်းဆည်းထားသည်။ မည်သည့်စက်တွင်မဆို ထားခဲ့သည့်နေရာမှ ဆက်လက်လုပ်ဆောင်ရန် လော့ဂ်အင်ဝင်ပါ။",
     gateSignIn: "Google ဖြင့် လော့ဂ်အင်ဝင်ရန်",
+    gateGuest: "အကောင့်မပါဘဲ ဆက်လက်အသုံးပြုရန်",
     cloudDownloading: "Cloud မှ Data များ Download လုပ်နေသည်",
     cloudDownloadingSub: "ဖိုင်များ၊ ဆက်တင်များနှင့် ရလဒ်များ ထပ်တူညှိနေပါသည်…",
     toastCloudFilesUploaded: "ဖိုင်များ cloud သို့ upload လုပ်ပြီးပါပြီ။",
@@ -1401,6 +1413,7 @@ export const translations: Record<Language, TranslationDict> = {
     gateTitle: "ลงชื่อเข้าใช้เพื่อซิงค์พื้นที่ทำงานของคุณ",
     gateDesc: "ไฟล์ การตั้งค่า และผลลัพธ์ของคุณถูกเก็บไว้อย่างปลอดภัยในคลาวด์ ลงชื่อเข้าใช้เพื่อทำงานต่อจากที่ค้างไว้ได้บนทุกอุปกรณ์",
     gateSignIn: "ลงชื่อเข้าใช้ด้วย Google",
+    gateGuest: "ใช้งานต่อโดยไม่ใช้บัญชี (โหมดออฟไลน์)",
     cloudDownloading: "Download Data จากคลาวด์",
     cloudDownloadingSub: "กำลังซิงค์ไฟล์ การตั้งค่า และผลลัพธ์…",
     toastCloudFilesUploaded: "อัปโหลดไฟล์ขึ้นคลาวด์แล้ว",
@@ -1701,6 +1714,7 @@ export const translations: Record<Language, TranslationDict> = {
     gateTitle: "登录以同步您的工作区",
     gateDesc: "您的文件、设置和结果都安全地存储在云端。登录后即可在任何设备上从上次离开的地方继续工作。",
     gateSignIn: "使用 Google 登录",
+    gateGuest: "无需账号继续使用（离线/访客模式）",
     cloudDownloading: "从云端下载数据",
     cloudDownloadingSub: "正在同步文件、设置和结果…",
     toastCloudFilesUploaded: "文件已上传到云端。",

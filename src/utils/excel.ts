@@ -12,8 +12,8 @@ import {
   ResultColor,
   RuleCondition,
   UnmatchedInfo,
-  UnmatchedFieldDiff,
 } from '../types';
+import { analyzeColumnSuggestions } from './suggestionEngine';
 
 /**
  * Clamps a worksheet !ref to only cells that actually contain data.
@@ -291,89 +291,34 @@ export function generateRowKey(
 /**
  * Auto-maps columns based on string similarity / token overlap
  */
+/**
+ * Auto-maps columns based on intelligent Suggestion Engine and industry terminology
+ */
 export function autoMapColumns(
   mainHeaders: string[],
   compHeaders: string[]
 ): ColumnMapping[] {
-  const mappings: ColumnMapping[] = [];
-  const usedCompHeaders = new Set<string>();
-
-  const clean = (s: string) =>
-    s.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-  for (const mainCol of mainHeaders) {
-    const mainClean = clean(mainCol);
-    if (!mainClean) continue;
-
-    let bestMatch: string | null = null;
-    let highestScore = 0;
-
-    for (const compCol of compHeaders) {
-      if (usedCompHeaders.has(compCol)) continue;
-      const compClean = clean(compCol);
-      if (!compClean) continue;
-
-      // Exact clean match
-      if (mainClean === compClean) {
-        bestMatch = compCol;
-        highestScore = 1.0;
-        break;
-      }
-
-      // Enterprise synonym pairs
-      const synonyms: [string, string][] = [
-        ['po', 'purchaseorder'],
-        ['ponumber', 'orderid'],
-        ['part', 'item'],
-        ['partnumber', 'itemcode'],
-        ['batch', 'lot'],
-        ['batchnumber', 'lotno'],
-        ['status', 'result'],
-        ['inspectionstatus', 'inspectionresult'],
-        ['quality', 'grade'],
-        ['supplier', 'vendor'],
-      ];
-
-      const isSynonym = synonyms.some(
-        ([s1, s2]) =>
-          (mainClean.includes(s1) && compClean.includes(s2)) ||
-          (mainClean.includes(s2) && compClean.includes(s1))
-      );
-
-      if (isSynonym && highestScore < 0.8) {
-        bestMatch = compCol;
-        highestScore = 0.8;
-      } else if (
-        mainClean.length >= 3 &&
-        compClean.length >= 3 &&
-        (mainClean.includes(compClean) || compClean.includes(mainClean)) &&
-        highestScore < 0.6
-      ) {
-        bestMatch = compCol;
-        highestScore = 0.6;
-      }
-    }
-
-    if (bestMatch && highestScore >= 0.6) {
-      mappings.push({
-        id: `map_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        mainCol,
-        comparisonCol: bestMatch,
-      });
-      usedCompHeaders.add(bestMatch);
-    }
+  const analysis = analyzeColumnSuggestions(mainHeaders, compHeaders);
+  if (analysis.suggestions.length > 0) {
+    return analysis.suggestions.map((s, idx) => ({
+      id: `map_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+      mainCol: s.mainCol,
+      comparisonCol: s.comparisonCol,
+    }));
   }
 
   // If none matched, pair first column
-  if (mappings.length === 0 && mainHeaders.length > 0 && compHeaders.length > 0) {
-    mappings.push({
-      id: `map_default_1`,
-      mainCol: mainHeaders[0],
-      comparisonCol: compHeaders[0],
-    });
+  if (mainHeaders.length > 0 && compHeaders.length > 0) {
+    return [
+      {
+        id: `map_default_1`,
+        mainCol: mainHeaders[0],
+        comparisonCol: compHeaders[0],
+      },
+    ];
   }
 
-  return mappings;
+  return [];
 }
 
 /**
@@ -1221,9 +1166,17 @@ export function exportStyledExcel(
     }
     if (id === 'decisionReason') return item.decisionReason;
     if (id.startsWith('[Ref] ')) {
-      return item.matchedMainRow?.[id.replace('[Ref] ', '')] ?? '';
+      let val = item.matchedMainRow?.[id.replace('[Ref] ', '')] ?? '';
+      if (item.decisionColor === 'green' && String(val).toLowerCase().includes('postpone')) {
+        val = 'Accept';
+      }
+      return val;
     }
-    return item.comparisonRow[id] ?? '';
+    let compVal = item.comparisonRow[id] ?? '';
+    if (item.decisionColor === 'green' && String(compVal).toLowerCase().includes('postpone')) {
+      compVal = 'Accept';
+    }
+    return compVal;
   };
 
   // Evaluated Results Sheet
@@ -1411,6 +1364,16 @@ export function exportStyledExcel(
             fill: { patternType: 'solid', fgColor: { rgb: tintFill } },
             alignment: { vertical: 'center', horizontal: typeof cell.v === 'number' ? 'right' : 'left' },
             border: thinBorder(tintBorder),
+          };
+        } else if (colHeader.startsWith('[Ref] ')) {
+          cell.s = {
+            font: { name: 'Calibri', sz: 10, color: { rgb: '1E3A8A' } },
+            fill: { patternType: 'solid', fgColor: { rgb: 'EFF6FF' } },
+            alignment: {
+              vertical: 'center',
+              horizontal: typeof cell.v === 'number' ? 'right' : 'left',
+            },
+            border: thinBorder('BFDBFE'),
           };
         } else {
           cell.s = {

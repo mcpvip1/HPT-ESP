@@ -137,6 +137,7 @@ export default function App() {
   // Cloud sync (Firebase): one shared workspace across every device
   const [cloudUser, setCloudUser] = useState<User | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
+  const [guestMode, setGuestMode] = useState(false);
   // Synced view state for the results (filter tab, search, Only Accept)
   const [resultFilters, setResultFilters] = useState<ResultFilters>(defaultResultFilters);
   // Bumped when cloud results are applied so the dashboard remounts with them
@@ -619,12 +620,10 @@ export default function App() {
     if (cloudUser) debouncedPublishWorkbooks(cloudUser.uid, { reference: refWb, comparison: compWb });
   };
 
-  // Live public share: follow the shared snapshot in real time (no sign-in).
+  // Live public share: follow the shared snapshot in real time (no sign-in required).
   // If the owner turns sharing off, the last received snapshot stays visible.
-  // The fixed short link (/preview) is fetch-on-open + manual refresh only.
   useEffect(() => {
     if (!shareId || !isPreviewMode) return;
-    if (shareId === FIXED_PREVIEW_SHARE_ID) return;
     const unsub = subscribeSharedSnapshot(shareId, async (meta) => {
       if (meta === null) {
         if (!shareRevokedToastShownRef.current) {
@@ -720,6 +719,98 @@ export default function App() {
     }
   };
 
+  // Dedicated loader for Live Preview Mode: runs independently of Firebase Auth state
+  // to ensure preview snapshots download completely without auth race condition cancellation.
+  useEffect(() => {
+    const isPreview =
+      typeof window !== 'undefined' &&
+      (window.location.pathname.endsWith('/preview') ||
+        window.location.pathname.endsWith('/preview/') ||
+        window.location.hash.startsWith('#/preview') ||
+        window.location.hash.includes('preview') ||
+        window.location.search.includes('preview') ||
+        getShareIdFromUrl() !== null);
+
+    if (!isPreview) return;
+
+    let active = true;
+    setIsPreviewMode(true);
+    setPreviewLoading(true);
+
+    const loadPreviewData = async () => {
+      try {
+        // Priority 0: Explicit public share id (?share=... or #share=...)
+        const urlShareId = getShareIdFromUrl();
+        if (urlShareId) {
+          setShareId(urlShareId);
+          const shared = await fetchSharedSnapshot(urlShareId);
+          if (shared && active) {
+            lastCloudPreviewAtRef.current = shared.createdAt || 0;
+            checkAndApplyPreview(shared);
+            setPreviewLoading(false);
+            setIsStorageLoading(false);
+            return;
+          }
+        }
+
+        // Priority 1: URL Hash embedded payload (#preview=...)
+        const hashData = parsePreviewFromUrl();
+        if (hashData && hashData.results && hashData.results.length > 0) {
+          if (active) {
+            checkAndApplyPreview(hashData);
+            setPreviewLoading(false);
+            setIsStorageLoading(false);
+            return;
+          }
+        }
+
+        // Priority 2: Fixed public slot (/preview -> shares/latest)
+        setShareId(FIXED_PREVIEW_SHARE_ID);
+        const fixed = await fetchSharedSnapshot(FIXED_PREVIEW_SHARE_ID);
+        if (fixed && active) {
+          lastCloudPreviewAtRef.current = fixed.createdAt || 0;
+          publicPreviewAppliedRef.current = true;
+          checkAndApplyPreview(fixed);
+          setPreviewLoading(false);
+          setIsStorageLoading(false);
+          return;
+        }
+
+        // Priority 3: Fallback to local storage cache if opened on same machine
+        if (active) {
+          const cached = parsePreviewFromUrl();
+          if (cached && checkAndApplyPreview(cached)) {
+            setPreviewLoading(false);
+            setIsStorageLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load shared preview:', err);
+      } finally {
+        if (active) {
+          setPreviewLoading(false);
+          setIsStorageLoading(false);
+        }
+      }
+    };
+
+    loadPreviewData();
+
+    const handleUrlChange = () => {
+      loadPreviewData();
+    };
+
+    window.addEventListener('hashchange', handleUrlChange);
+    window.addEventListener('popstate', handleUrlChange);
+
+    return () => {
+      active = false;
+      window.removeEventListener('hashchange', handleUrlChange);
+      window.removeEventListener('popstate', handleUrlChange);
+    };
+  }, [checkAndApplyPreview]);
+
   // Initial Load from Persistent Storage & Live Preview Link Handling
   useEffect(() => {
     let isMounted = true;
@@ -730,6 +821,7 @@ export default function App() {
 
     async function loadSavedState() {
       try {
+        // Preview mode is handled by the dedicated preview loader effect
         const isPreviewRoute =
           window.location.pathname.endsWith('/preview') ||
           window.location.pathname.endsWith('/preview/') ||
@@ -737,74 +829,8 @@ export default function App() {
           window.location.hash.includes('preview') ||
           window.location.search.includes('preview');
 
-        // Priority 0: Public live-share link (?share=...) — no sign-in required
-        const urlShareId = getShareIdFromUrl();
-        if (urlShareId && !previewHandledRef.current) {
-          previewHandledRef.current = true;
-          setShareId(urlShareId);
-          setIsPreviewMode(true);
-          try {
-            const shared = await Promise.race([
-              fetchSharedSnapshot(urlShareId),
-              new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
-            ]);
-            if (shared && isMounted) {
-              lastCloudPreviewAtRef.current = shared.createdAt || 0;
-              checkAndApplyPreview(shared);
-            }
-          } catch (e) {
-            console.warn('Failed to load shared preview', e);
-          }
+        if (isPreviewRoute || isPreviewMode) {
           if (isMounted) {
-            clearTimeout(safetyTimer);
-            setIsStorageLoading(false);
-          }
-          return;
-        }
-
-        // Priority 1: Live Preview Link (/preview, #preview=..., or ?preview=...)
-        if (isPreviewRoute && !previewHandledRef.current) {
-          previewHandledRef.current = true;
-          setIsPreviewMode(true);
-          // Embedded snapshot data in the URL hash wins when present
-          const previewData = parsePreviewFromUrl();
-          if (previewData && isMounted) {
-            const applied = checkAndApplyPreview(previewData);
-            if (applied) {
-              clearTimeout(safetyTimer);
-              setIsStorageLoading(false);
-              return;
-            }
-          }
-
-          // Bare /preview (no ?share=, no embedded data): the fixed short link.
-          // Fetch the owner's latest published results from the fixed public
-          // slot, showing a please-wait screen while the cloud fetch runs.
-          // The live-share subscription above keeps it fresh afterwards.
-          setShareId(FIXED_PREVIEW_SHARE_ID);
-          setPreviewLoading(true);
-          try {
-            // Timeout after 15s so a hanging network can't stick the UI on
-            // "Downloading..." forever; the refresh button retries.
-            const fixed = await Promise.race([
-              fetchSharedSnapshot(FIXED_PREVIEW_SHARE_ID),
-              new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
-            ]);
-            if (fixed && isMounted) {
-              lastCloudPreviewAtRef.current = fixed.createdAt || 0;
-              publicPreviewAppliedRef.current = true;
-              checkAndApplyPreview(fixed);
-            } else if (isMounted) {
-              // Fetch failed/timed out or returned nothing: show the empty
-              // state (with retry) instead of hanging on the spinner.
-              setPreviewLoading(false);
-            }
-          } catch (e) {
-            console.warn('Failed to load fixed preview', e);
-            if (isMounted) setPreviewLoading(false);
-          }
-          if (isMounted) {
-            setPreviewLoading(false);
             clearTimeout(safetyTimer);
             setIsStorageLoading(false);
           }
@@ -818,10 +844,9 @@ export default function App() {
           try { localStorage.setItem('excelmatch_language', savedLang); } catch { /* ignore */ }
         }
 
-        // Login-first: wait for auth to resolve, then require a signed-in user
-        // for the studio (the sign-in gate renders otherwise).
+        // Login-first: wait for auth to resolve, then require signed-in user or guestMode
         if (!authResolved) return;
-        if (!cloudUser) {
+        if (!cloudUser && !guestMode) {
           if (isMounted) {
             clearTimeout(safetyTimer);
             setIsStorageLoading(false);
@@ -892,51 +917,18 @@ export default function App() {
         if (isMounted) {
           clearTimeout(safetyTimer);
           setIsStorageLoading(false);
-          if (cloudUser) setLocalReady(true);
+          if (cloudUser || guestMode) setLocalReady(true);
         }
       }
     }
 
     loadSavedState();
 
-    // Listen to URL changes (e.g. clicking shared links, back/forward button, or route changes)
-    const handleUrlChange = () => {
-      const sid = getShareIdFromUrl();
-      setShareId(sid);
-      if (sid) {
-        setIsPreviewMode(true);
-        fetchSharedSnapshot(sid).then((shared) => {
-          if (shared) {
-            lastCloudPreviewAtRef.current = shared.createdAt || 0;
-            checkAndApplyPreview(shared);
-          }
-        });
-        return;
-      }
-      const pData = parsePreviewFromUrl();
-      if (pData) {
-        checkAndApplyPreview(pData);
-      } else {
-        const isPreviewRoute =
-          window.location.pathname.endsWith('/preview') ||
-          window.location.pathname.endsWith('/preview/') ||
-          window.location.hash.startsWith('#/preview') ||
-          window.location.hash.includes('preview') ||
-          window.location.search.includes('preview');
-        setIsPreviewMode(isPreviewRoute);
-      }
-    };
-
-    window.addEventListener('hashchange', handleUrlChange);
-    window.addEventListener('popstate', handleUrlChange);
-
     return () => {
       isMounted = false;
       clearTimeout(safetyTimer);
-      window.removeEventListener('hashchange', handleUrlChange);
-      window.removeEventListener('popstate', handleUrlChange);
     };
-  }, [authResolved, cloudUser?.uid]);
+  }, [authResolved, cloudUser?.uid, guestMode, isPreviewMode]);
 
   // Clear results everywhere: local state, IDB cache and the cloud doc, so a
   // removed file leaves no stale results behind on any device.
@@ -1322,7 +1314,7 @@ export default function App() {
 
   // Login-first: the studio requires a signed-in user so files, settings and
   // results sync from the cloud. Public share-preview links stay open.
-  if (!isPreviewMode && authResolved && !cloudUser) {
+  if (!isPreviewMode && authResolved && !cloudUser && !guestMode) {
     return (
       <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-6 font-sans selection:bg-emerald-500 selection:text-white">
         <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-10 w-full max-w-md shadow-sm text-center space-y-5">
@@ -1339,13 +1331,24 @@ export default function App() {
             <p className="text-sm font-semibold text-slate-700">{t.gateTitle}</p>
             <p className="text-xs text-slate-500 leading-relaxed">{t.gateDesc}</p>
           </div>
-          <button
-            onClick={handleCloudSignIn}
-            className="w-full flex items-center justify-center gap-2.5 px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl shadow-sm transition-all"
-          >
-            <Cloud className="w-4 h-4" />
-            {t.gateSignIn}
-          </button>
+          <div className="space-y-2.5">
+            <button
+              onClick={handleCloudSignIn}
+              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl shadow-sm transition-all cursor-pointer"
+            >
+              <Cloud className="w-4 h-4" />
+              {t.gateSignIn}
+            </button>
+            <button
+              onClick={() => {
+                setGuestMode(true);
+                setLocalReady(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all border border-slate-200 cursor-pointer"
+            >
+              {t.gateGuest}
+            </button>
+          </div>
           <div className="flex items-center justify-center gap-2 pt-1">
             <span className="text-[11px] text-slate-400">{t.headerSelectLanguage}:</span>
             {(['en', 'my', 'th', 'zh'] as Language[]).map((l) => (
@@ -1421,6 +1424,7 @@ export default function App() {
               </div>
             ) : results.length > 0 && stats ? (
               <ResultsDashboard
+                key={`preview-${lastCloudPreviewAtRef.current || results.length}`}
                 results={results}
                 stats={stats}
                 comparisonWb={comparisonWb}

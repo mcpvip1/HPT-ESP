@@ -155,7 +155,27 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [releaseTarget, setReleaseTarget] = useState<{ key: string; count: number } | null>(null);
   const [supervisorConfirmed, setSupervisorConfirmed] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
-  const [hideSupersededPostpone, setHideSupersededPostpone] = useState<boolean>(true);
+  const [hideSupersededPostpone, setHideSupersededPostpone] = useState<boolean>(
+    initialOnlyAccept !== undefined ? initialOnlyAccept : true
+  );
+
+  // Sync prop changes (e.g. from live preview updates or cloud snapshot reload)
+  useEffect(() => {
+    if (initialFilter) setActiveFilter(initialFilter);
+  }, [initialFilter]);
+
+  useEffect(() => {
+    if (initialOnlyAccept !== undefined) setHideSupersededPostpone(initialOnlyAccept);
+  }, [initialOnlyAccept]);
+
+  useEffect(() => {
+    if (initialSearchTerm !== undefined) setSearchTerm(initialSearchTerm);
+  }, [initialSearchTerm]);
+
+  useEffect(() => {
+    if (initialSearchColumn) setSearchColumn(initialSearchColumn);
+  }, [initialSearchColumn]);
+
   // Report the current view state (filter tab, search, Only Accept) so the
   // studio can sync it to the cloud; debounced to avoid chatter on typing.
   useEffect(() => {
@@ -592,6 +612,25 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   };
 
   const handleCopyShareLink = async () => {
+    // If logged into Firebase, immediately publish so the fixed preview link has the newest results
+    if (cloudUser && results && results.length > 0 && stats) {
+      handlePublishPreview();
+      await copyTextToClipboard(getFixedPreviewUrl(), setShareLinkCopied);
+      return;
+    }
+
+    // Guest / Offline Mode: copy portable hash preview link (contains full packed data, works everywhere without account)
+    if (results && results.length > 0 && stats) {
+      const payload = buildSharePayload();
+      const res = await copyPreviewLinkToClipboard(payload);
+      if (res.success) {
+        setShareLinkCopied(true);
+        setTimeout(() => setShareLinkCopied(false), 2000);
+        onShowToast(t.dashCopied || 'Preview link copied to clipboard', 'success');
+        return;
+      }
+    }
+
     await copyTextToClipboard(getFixedPreviewUrl(), setShareLinkCopied);
   };
 
@@ -824,7 +863,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const handleExportExcel = () => {
     try {
       const baseName = comparisonWb?.name || 'Excel_Matching_Output';
-      exportStyledExcel(results, compHeaders, stats, baseName, exportColIds);
+      const rowsToExport = sortedRows.length > 0 ? sortedRows : results;
+      exportStyledExcel(rowsToExport, compHeaders, stats, baseName, exportColIds);
       onShowToast(t.dashExcelExported.replace('{count}', String(exportColIds.length)), 'success');
     } catch (err: any) {
       onShowToast(err.message || t.dashExportFailed, 'error');
@@ -834,7 +874,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const handleExportCsv = () => {
     try {
       const baseName = comparisonWb?.name || 'Excel_Matching_Output';
-      exportCsv(results, compHeaders, baseName, exportColIds);
+      const rowsToExport = sortedRows.length > 0 ? sortedRows : results;
+      exportCsv(rowsToExport, compHeaders, baseName, exportColIds);
       onShowToast(t.dashCsvExported.replace('{count}', String(exportColIds.length)), 'success');
     } catch (err: any) {
       onShowToast(err.message || t.dashExportFailed, 'error');
