@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database, FileSpreadsheet, Loader2, Sparkles } from 'lucide-react';
+import { Database, Loader2, Sparkles } from 'lucide-react';
 import { Language } from '../types';
 import { translations } from '../translations';
 
@@ -26,14 +26,16 @@ export const GlobalLoadingSkeleton: React.FC<GlobalLoadingSkeletonProps> = ({
       {/* 1. Header Bar Skeleton */}
       <header className="h-16 border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-md px-4 sm:px-6 lg:px-8 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 animate-pulse">
-            <FileSpreadsheet className="w-5 h-5" />
-          </div>
+          <img
+            src={`${import.meta.env.BASE_URL}excellent-logo-transparent.png`}
+            alt="Excellent Medical Technology"
+            className="h-9 w-auto animate-pulse"
+          />
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-base text-white tracking-tight">ExcelMatch</span>
-              <span className="text-emerald-400 font-bold text-base">Pro</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-semibold hidden sm:inline-flex items-center gap-1">
+              <span className="font-bold text-base text-white tracking-tight">Excellent Medical Technology</span>
+              <span className="text-brand-400 font-bold text-base">ESP</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-950 text-brand-400 border border-brand-800/60 font-semibold hidden sm:inline-flex items-center gap-1">
                 <Database className="w-3 h-3" /> {t.loadingIndexedDbActive}
               </span>
             </div>
@@ -62,21 +64,21 @@ export const GlobalLoadingSkeleton: React.FC<GlobalLoadingSkeletonProps> = ({
         </div>
 
         {/* Global Loading Status Banner */}
-        <div className="bg-slate-900/90 border border-emerald-900/50 rounded-2xl p-6 sm:p-8 text-center space-y-4 shadow-xl relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-slate-800/20 to-sky-500/5 pointer-events-none" />
+        <div className="bg-slate-900/90 border border-brand-900/50 rounded-2xl p-6 sm:p-8 text-center space-y-4 shadow-xl relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-brand-500/5 via-slate-800/20 to-sky-500/5 pointer-events-none" />
 
           <div className="relative flex flex-col items-center justify-center space-y-3">
             <div className="relative">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-950/80 border border-emerald-700/60 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-950/50">
-                <Loader2 className="w-7 h-7 animate-spin text-emerald-400" />
+              <div className="w-14 h-14 rounded-2xl bg-brand-950/80 border border-brand-700/60 flex items-center justify-center text-brand-400 shadow-lg shadow-brand-950/50">
+                <Loader2 className="w-7 h-7 animate-spin text-brand-400" />
               </div>
-              <Sparkles className="w-4 h-4 text-emerald-300 absolute -top-1 -right-1 animate-bounce" />
+              <Sparkles className="w-4 h-4 text-brand-300 absolute -top-1 -right-1 animate-bounce" />
             </div>
 
             <div className="space-y-1">
               <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center justify-center gap-2">
                 <span>{t.loadingWorkspaceTitle}</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span className="w-2 h-2 rounded-full bg-brand-500 animate-ping" />
               </h2>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
                 {displayMessage}
@@ -85,7 +87,7 @@ export const GlobalLoadingSkeleton: React.FC<GlobalLoadingSkeletonProps> = ({
 
             {/* Shimmer Progress Track */}
             <div className="w-full max-w-xs h-1.5 bg-slate-800 rounded-full overflow-hidden relative">
-              <div className="h-full bg-emerald-500 rounded-full w-2/3 animate-pulse" />
+              <div className="h-full bg-brand-500 rounded-full w-2/3 animate-pulse" />
             </div>
           </div>
         </div>
