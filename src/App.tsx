@@ -59,6 +59,7 @@ import {
   isCloudDocUploading,
   publishSyncHistory,
   fetchSyncHistory,
+  FIXED_PREVIEW_SHARE_ID,
   defaultResultFilters,
 } from './lib/cloudSync';
 import type { ResultFilters } from './lib/cloudSync';
@@ -97,8 +98,10 @@ export default function App() {
     }
     return false;
   });
-  // Public live-share id from ?share=... (viewable without sign-in)
+  // Public live-share id from ?share=... (viewable without sign-in).
+  // For the bare /preview fixed link this becomes FIXED_PREVIEW_SHARE_ID.
   const [shareId, setShareId] = useState<string | null>(() => getShareIdFromUrl());
+  const [previewLoading, setPreviewLoading] = useState(false);
   const shareRevokedToastShownRef = useRef(false);
   const [previewFilter, setPreviewFilter] = useState<'all' | 'green' | 'yellow' | 'red' | 'blue' | 'unmatched'>('all');
   const [previewOnlyAccept, setPreviewOnlyAccept] = useState<boolean>(true);
@@ -610,20 +613,26 @@ export default function App() {
   // If the owner turns sharing off, the last received snapshot stays visible.
   useEffect(() => {
     if (!shareId || !isPreviewMode) return;
+    const isFixedSlot = shareId === FIXED_PREVIEW_SHARE_ID;
     const unsub = subscribeSharedSnapshot(shareId, async (meta) => {
       if (meta === null) {
-        if (!shareRevokedToastShownRef.current) {
+        if (!isFixedSlot && !shareRevokedToastShownRef.current) {
           shareRevokedToastShownRef.current = true;
           showToast(t.toastShareRevoked, 'info');
         }
+        setPreviewLoading(false);
         return;
       }
-      if (!meta.updatedAt || meta.updatedAt <= lastCloudPreviewAtRef.current) return;
+      if (!meta.updatedAt || meta.updatedAt <= lastCloudPreviewAtRef.current) {
+        setPreviewLoading(false);
+        return;
+      }
       lastCloudPreviewAtRef.current = meta.updatedAt;
       const pData = await fetchSharedSnapshot(shareId);
       if (pData && checkAndApplyPreview(pData)) {
         showToast(t.toastPreviewSynced, 'success');
       }
+      setPreviewLoading(false);
     });
     return () => unsub();
   }, [shareId, isPreviewMode, checkAndApplyPreview, showToast]);
@@ -737,10 +746,11 @@ export default function App() {
           return;
         }
 
-        // Priority 1: Check if page was loaded via a Live Preview Link (/preview, #preview=..., or ?preview=...)
+        // Priority 1: Live Preview Link (/preview, #preview=..., or ?preview=...)
         if (isPreviewRoute && !previewHandledRef.current) {
           previewHandledRef.current = true;
           setIsPreviewMode(true);
+          // Embedded snapshot data in the URL hash wins when present
           const previewData = parsePreviewFromUrl();
           if (previewData && isMounted) {
             const applied = checkAndApplyPreview(previewData);
@@ -751,24 +761,27 @@ export default function App() {
             }
           }
 
-          // Fallback if no preview in storage yet: evaluate demo dataset so preview is never blank
-          const demo = generateSampleDatasets();
-          const auto = autoMapColumns(demo.reference.headers, demo.comparison.headers);
-          const { results: evaluatedResults, stats: evaluatedStats } = processMatching(
-            demo.reference,
-            demo.comparison,
-            auto,
-            defaultNormalizationRules,
-            defaultDecisionLayers
-          );
+          // Bare /preview (no ?share=, no embedded data): the fixed short link.
+          // Fetch the owner's latest published results from the fixed public
+          // slot, showing a please-wait screen while the cloud fetch runs.
+          // The live-share subscription above keeps it fresh afterwards.
+          setShareId(FIXED_PREVIEW_SHARE_ID);
+          setPreviewLoading(true);
+          try {
+            const fixed = await fetchSharedSnapshot(FIXED_PREVIEW_SHARE_ID);
+            if (fixed && isMounted) {
+              lastCloudPreviewAtRef.current = fixed.createdAt || 0;
+              checkAndApplyPreview(fixed);
+            }
+          } catch (e) {
+            console.warn('Failed to load fixed preview', e);
+          }
           if (isMounted) {
-            setResults(evaluatedResults);
-            setStats(evaluatedStats);
-            setComparisonWb(demo.comparison);
+            setPreviewLoading(false);
             clearTimeout(safetyTimer);
             setIsStorageLoading(false);
-            return;
           }
+          return;
         }
 
         // Studio language is loaded even before sign-in so the gate renders translated
@@ -1359,7 +1372,17 @@ export default function App() {
         {/* Preview Mode: Show ONLY the Table & its toolbar (no file uploaders, no giant banners) */}
         {isPreviewMode ? (
           <div className="space-y-4">
-            {results.length > 0 && stats ? (
+            {previewLoading ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-4 shadow-sm">
+                <div className="w-12 h-12 mx-auto rounded-full border-4 border-slate-200 border-t-emerald-600 animate-spin" />
+                <h3 className="text-base font-semibold text-slate-900">
+                  {t.previewDownloading}
+                </h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  {t.previewPleaseWait}
+                </p>
+              </div>
+            ) : results.length > 0 && stats ? (
               <ResultsDashboard
                 results={results}
                 stats={stats}
@@ -1387,10 +1410,10 @@ export default function App() {
                   <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-900">
-                  {t.previewNoResultsTitle}
+                  {shareId === FIXED_PREVIEW_SHARE_ID ? t.previewFixedEmptyTitle : t.previewNoResultsTitle}
                 </h3>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  {t.previewNoResultsDesc}
+                  {shareId === FIXED_PREVIEW_SHARE_ID ? t.previewFixedEmptyDesc : t.previewNoResultsDesc}
                 </p>
               </div>
             )}
