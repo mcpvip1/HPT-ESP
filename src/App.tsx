@@ -201,6 +201,7 @@ export default function App() {
         name: pData.comparisonWbName || 'Evaluation_Results.xlsx',
         size: 0,
         lastModified: Date.now(),
+        uploadedAt: pData.comparisonWbUploadedAt,
         sheetNames: ['Results'],
         activeSheet: 'Results',
         headers: pData.results[0]?.comparisonRow ? Object.keys(pData.results[0].comparisonRow) : [],
@@ -1024,8 +1025,11 @@ export default function App() {
 
   const handleSetComparisonWb = async (wb: WorkbookData | null, autoEvaluate = true) => {
     const prevWb = comparisonWb;
-    setComparisonWb(wb);
-    if (wb) {
+    // Stamp when the user loads/replaces the file (pull/load paths bypass this handler)
+    const stamped = wb ? { ...wb, uploadedAt: Date.now() } : null;
+    setComparisonWb(stamped);
+    if (stamped) {
+      const wb = stamped;
       await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, wb);
       // A genuinely new file invalidates row-positional release state
       // (row ids can't survive a file swap); key-based hold values are kept.
@@ -1058,7 +1062,7 @@ export default function App() {
       // The old file is gone — its results must go too (cloud included)
       await clearResultsEverywhere();
     }
-    publishWorkbooksNow(referenceWb, wb);
+    publishWorkbooksNow(referenceWb, stamped);
   };
 
   // Switch Active Sheet for Main Reference File

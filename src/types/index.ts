@@ -7,6 +7,8 @@ export interface WorkbookData {
   name: string;
   size: number;
   lastModified: number;
+  /** When the file was loaded/replaced in the app (not the file's own mtime). */
+  uploadedAt?: number;
   headers: string[];
   rows: ExcelRow[];
   sheetNames: string[];
