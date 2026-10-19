@@ -33,6 +33,8 @@ import { DataPreviewModal } from './components/DataPreviewModal';
 import { Toast, ToastMessage } from './components/Toast';
 import { SyncHistoryModal } from './components/SyncHistoryModal';
 import { GlobalLoadingSkeleton } from './components/GlobalLoadingSkeleton';
+import { CountryFlag, GoogleIcon } from './components/CountryFlag';
+import { RippleButton } from './components/RippleButton';
 import { translations } from './translations';
 import {
   parsePreviewFromUrl,
@@ -1332,38 +1334,56 @@ export default function App() {
             <p className="text-xs text-slate-500 leading-relaxed">{t.gateDesc}</p>
           </div>
           <div className="space-y-2.5">
-            <button
+            <RippleButton
               onClick={handleCloudSignIn}
-              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl shadow-sm transition-all cursor-pointer"
+              rippleColor="rgba(255, 255, 255, 0.45)"
+              enableScaleHover={true}
+              title={t.gateSignIn}
+              className="w-full flex items-center justify-center gap-3 px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
-              <Cloud className="w-4 h-4" />
-              {t.gateSignIn}
-            </button>
-            <button
+              <GoogleIcon className="w-5 h-5 shrink-0" />
+              <span>{t.gateSignIn}</span>
+            </RippleButton>
+            <RippleButton
               onClick={() => {
                 setGuestMode(true);
                 setLocalReady(true);
               }}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all border border-slate-200 cursor-pointer"
+              rippleColor="rgba(0, 0, 0, 0.08)"
+              enableScaleHover={true}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all duration-200 border border-slate-200 cursor-pointer"
             >
               {t.gateGuest}
-            </button>
+            </RippleButton>
           </div>
-          <div className="flex items-center justify-center gap-2 pt-1">
-            <span className="text-[11px] text-slate-400">{t.headerSelectLanguage}:</span>
-            {(['en', 'my', 'th', 'zh'] as Language[]).map((l) => (
-              <button
-                key={l}
-                onClick={() => handleLanguageChange(l)}
-                className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-colors ${
-                  language === l
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-500 hover:bg-slate-100'
-                }`}
-              >
-                {l.toUpperCase()}
-              </button>
-            ))}
+          <div className="pt-3 mt-1 border-t border-slate-100 flex items-center justify-center gap-1.5 sm:gap-2 flex-nowrap">
+            <span className="text-[11px] font-medium text-slate-400 shrink-0 mr-0.5">{t.headerSelectLanguage}:</span>
+            {(['en', 'my', 'th', 'zh'] as Language[]).map((l) => {
+              const countryTitles: Record<Language, string> = {
+                en: 'United States (English)',
+                my: 'မြန်မာ (Myanmar)',
+                th: 'ไทย (Thailand)',
+                zh: '中文 (China)',
+              };
+              return (
+                <RippleButton
+                  key={l}
+                  onClick={() => handleLanguageChange(l)}
+                  rippleColor={language === l ? 'rgba(16, 185, 129, 0.35)' : 'rgba(0, 0, 0, 0.12)'}
+                  enableScaleHover={true}
+                  title={countryTitles[l]}
+                  aria-label={countryTitles[l]}
+                  className={`group relative flex items-center justify-center gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border text-xs font-semibold shadow-2xs transition-all duration-200 transform hover:scale-105 active:scale-95 cursor-pointer shrink-0 ${
+                    language === l
+                      ? 'bg-emerald-50 border-emerald-400 text-emerald-900 ring-2 ring-emerald-500/30 shadow-xs font-bold'
+                      : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <CountryFlag language={l} className="w-4.5 h-3 sm:w-5 sm:h-3.5 shadow-2xs" />
+                  <span className="text-[11px] font-bold tracking-wide">{l.toUpperCase()}</span>
+                </RippleButton>
+              );
+            })}
           </div>
         </div>
       </div>

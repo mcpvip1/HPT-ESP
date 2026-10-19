@@ -24,3 +24,20 @@ html, body {
     width: 0%;
   }
 }
+
+@keyframes click-ripple {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0.45;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.8);
+    opacity: 0;
+  }
+}
+
+.animate-ripple {
+  animation: click-ripple 550ms cubic-bezier(0.1, 0.2, 0.3, 1) forwards;
+  pointer-events: none;
+}
+

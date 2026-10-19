@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Globe, SlidersHorizontal, Cloud, CloudUpload, LogOut } from 'lucide-react';
 import { LOGO_DATA_URL } from '../assets/logo';
 import { ProgressRing } from './ProgressRing';
+import { CountryFlag, GoogleIcon } from './CountryFlag';
 import type { ActiveUpload } from '../types';
 import type { User } from 'firebase/auth';
 import { Language } from '../types';
@@ -147,26 +148,26 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onCloudSignIn}
                 title={t.headerSignInTitle}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors whitespace-nowrap shrink-0 shadow-xs"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 active:bg-slate-100 rounded-lg border border-slate-200 hover:border-slate-300 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap shrink-0 shadow-2xs"
               >
-                <Cloud className="w-3.5 h-3.5 text-slate-500" />
+                <GoogleIcon className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{t.headerSync}</span>
               </button>
             )}
-            {/* Language Switcher Dropdown */}
+            {/* Language Switcher Dropdown with Country Flag */}
             <div className="relative" ref={langRef}>
               <button
                 onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors whitespace-nowrap shrink-0 shadow-xs"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 active:bg-slate-100 rounded-lg border border-slate-200 hover:border-slate-300 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap shrink-0 shadow-2xs"
                 aria-label={t.headerSelectLanguage}
               >
-                <Globe className="w-3.5 h-3.5 text-slate-500" />
+                <CountryFlag language={language} className="w-4 h-3 rounded-xs shadow-2xs" />
                 <span className="hidden sm:inline">{languageLabels[language].native}</span>
                 <span className="sm:hidden">{languageLabels[language].code}</span>
               </button>
 
               {langDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-36 rounded-xl bg-white border border-slate-200 shadow-xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white border border-slate-200 shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
                   {(Object.keys(languageLabels) as Language[]).map((langKey) => (
                     <button
                       key={langKey}
@@ -176,12 +177,15 @@ export const Header: React.FC<HeaderProps> = ({
                       }}
                       className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors ${
                         language === langKey
-                          ? 'bg-emerald-50 text-emerald-700 font-semibold'
+                          ? 'bg-emerald-50 text-emerald-800 font-bold'
                           : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
-                      <span>{languageLabels[langKey].native}</span>
-                      <span className="text-slate-400 text-[10px] uppercase font-mono">
+                      <span className="flex items-center gap-2">
+                        <CountryFlag language={langKey} className="w-4 h-3 rounded-xs shadow-2xs" />
+                        <span>{languageLabels[langKey].native}</span>
+                      </span>
+                      <span className="text-slate-400 text-[10px] uppercase font-mono font-bold">
                         {languageLabels[langKey].code}
                       </span>
                     </button>
