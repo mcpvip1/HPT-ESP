@@ -12,6 +12,7 @@ import {
   ResultColor,
   RuleCondition,
   UnmatchedInfo,
+  UnmatchedFieldDiff,
 } from '../types';
 import { analyzeColumnSuggestions } from './suggestionEngine';
 

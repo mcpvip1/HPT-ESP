@@ -150,6 +150,34 @@ export interface BatchCKeys {
   layerTemplateMeta: string;
   layerApplyRule: string;
   layerFooterNote: string;
+  suggestionEngineTitle: string;
+  suggestionEngineSubtitle: string;
+  suggestionEngineBadge: string;
+  suggestionEngineApplyAll: string;
+  suggestionEngineApplyOne: string;
+  suggestionEngineApplied: string;
+  suggestionEngineActive: string;
+  suggestionEngineReadyToMap: string;
+  suggestionEngineNoSuggestions: string;
+  suggestionEngineTabDesc: string;
+  suggestionEngineConfidenceHigh: string;
+  suggestionEngineConfidenceMed: string;
+  suggestionEngineConfidenceLow: string;
+  dashFilterStatusShowing: string;
+  dashFilterStatusOf: string;
+  dashFilterStatusRows: string;
+  dashFilterStatusFiltered: string;
+  dashFilterStatusAccepted: string;
+  dashFilterStatusPostponed: string;
+  dashFilterStatusRejected: string;
+  dashFilterStatusHold: string;
+  dashFilterStatusUnmatched: string;
+  dashResetAllFilters: string;
+  dashSyncStatusSynced: string;
+  dashSyncStatusSyncing: string;
+  dashForceSyncBtn: string;
+  dashForceSyncTitle: string;
+  dashForceSyncSuccess: string;
 }
 
 export const batchC: Record<Language, BatchCKeys> = {
@@ -302,6 +330,34 @@ export const batchC: Record<Language, BatchCKeys> = {
     layerTemplateMeta: "{layers} layer · {rules} value rules",
     layerApplyRule: "Apply Rule",
     layerFooterNote: "Decision layers evaluate in sequence from top to bottom.",
+    suggestionEngineTitle: "Suggestion Engine",
+    suggestionEngineSubtitle: "Analyzes headers using enterprise & industry terminology (Financial, Procurement, Inventory, Dates, Quantities)",
+    suggestionEngineBadge: "Suggestions",
+    suggestionEngineApplyAll: "Apply All Suggestions",
+    suggestionEngineApplyOne: "Apply",
+    suggestionEngineApplied: "Applied",
+    suggestionEngineActive: "Active Mapping",
+    suggestionEngineReadyToMap: "Ready to Map",
+    suggestionEngineNoSuggestions: "No new column suggestions found",
+    suggestionEngineTabDesc: "AI-assisted column mapping proposing industry synonyms (e.g. 'Amt', 'Total', 'Net' to Value).",
+    suggestionEngineConfidenceHigh: "High Match",
+    suggestionEngineConfidenceMed: "Medium Match",
+    suggestionEngineConfidenceLow: "Low Match",
+    dashFilterStatusShowing: "Showing",
+    dashFilterStatusOf: "of",
+    dashFilterStatusRows: "rows",
+    dashFilterStatusFiltered: "Showing {count} of {total} rows",
+    dashFilterStatusAccepted: "{count} Accepted",
+    dashFilterStatusPostponed: "{count} Postponed",
+    dashFilterStatusRejected: "{count} Rejected",
+    dashFilterStatusHold: "{count} On Hold",
+    dashFilterStatusUnmatched: "{count} Unmatched",
+    dashResetAllFilters: "Reset all view filters",
+    dashSyncStatusSynced: "Preview Synced",
+    dashSyncStatusSyncing: "Syncing Preview...",
+    dashForceSyncBtn: "Force Sync",
+    dashForceSyncTitle: "Immediately push current filters, search terms, and active columns to the preview link snapshot (cloud-id: latest)",
+    dashForceSyncSuccess: "Dashboard view state successfully synced to preview snapshot (cloud-id: latest)",
   },
   my: {
     filesOpeningFile: "ဖိုင်ကို ဖွင့်နေသည်...",
@@ -452,6 +508,34 @@ export const batchC: Record<Language, BatchCKeys> = {
     layerTemplateMeta: "အလွှာ {layers} ခု · တန်ဖိုး စည်းမျဉ်း {rules} ခု",
     layerApplyRule: "စည်းမျဉ်း အသုံးချရန်",
     layerFooterNote: "ဆုံးဖြတ်ချက် အလွှာများသည် အပေါ်မှ အောက်သို့ အစီအစဉ်လိုက် အကဲဖြတ်သည်။",
+    suggestionEngineTitle: "အကြံပြုချက် အင်ဂျင်",
+    suggestionEngineSubtitle: "လုပ်ငန်းသုံး & ဘဏ္ဍာရေး အခေါ်အဝေါ်များသုံးပြီး ခေါင်းစဉ်များကို လေ့လာအကြံပြုသည်",
+    suggestionEngineBadge: "အကြံပြုချက်များ",
+    suggestionEngineApplyAll: "အကြံပြုချက်အားလုံး အသုံးပြုရန်",
+    suggestionEngineApplyOne: "အသုံးပြုရန်",
+    suggestionEngineApplied: "အသုံးပြုပြီးပြီ",
+    suggestionEngineActive: "လက်ရှိ တွဲစပ်ထားမှု",
+    suggestionEngineReadyToMap: "တွဲစပ်ရန် အဆင်သင့်",
+    suggestionEngineNoSuggestions: "ကော်လံ အကြံပြုချက် အသစ်မရှိပါ",
+    suggestionEngineTabDesc: "လုပ်ငန်းသုံး အခေါ်အဝေါ်များအပေါ် အခြေခံပြီး ကော်လံတွဲစပ်မှု အကြံပြုချက်များ။",
+    suggestionEngineConfidenceHigh: "အလွန်ကိုက်ညီမှု",
+    suggestionEngineConfidenceMed: "အလယ်အလတ် ကိုက်ညီမှု",
+    suggestionEngineConfidenceLow: "အနည်းငယ် ကိုက်ညီမှု",
+    dashFilterStatusShowing: "ပြသနေသည်",
+    dashFilterStatusOf: "မှ",
+    dashFilterStatusRows: "အတန်း",
+    dashFilterStatusFiltered: "အတန်း {total} ခုမှ {count} ခု ပြသနေသည်",
+    dashFilterStatusAccepted: "{count} ခု အောင်မြင် (Accepted)",
+    dashFilterStatusPostponed: "{count} ခု ရွှေ့ဆိုင်း (Postponed)",
+    dashFilterStatusRejected: "{count} ခု ပယ်ချ (Rejected)",
+    dashFilterStatusHold: "{count} ခု ဆိုင်းငံ့ (Hold)",
+    dashFilterStatusUnmatched: "{count} ခု မကိုက်ညီ (Unmatched)",
+    dashResetAllFilters: "စစ်ထုတ်မှု အားလုံး ပြန်လည်သတ်မှတ်ရန်",
+    dashSyncStatusSynced: "Preview ချိတ်ဆက်ပြီးပြီ",
+    dashSyncStatusSyncing: "Preview ချိတ်ဆက်နေသည်...",
+    dashForceSyncBtn: "အမြန် စင့်ခ်လုပ်ရန်",
+    dashForceSyncTitle: "လက်ရှိ စစ်ထုတ်မှုများနှင့် ကော်လံများကို Preview လင့်ခ် snapshot သို့ ချက်ချင်း ပေးပို့ရန်",
+    dashForceSyncSuccess: "Dashboard အခြေအနေကို Preview လင့်ခ် (cloud-id: latest) သို့ အောင်မြင်စွာ ပို့ဆောင်ပြီးပါပြီ",
   },
   th: {
     filesOpeningFile: "กำลังเปิดไฟล์...",
@@ -602,6 +686,34 @@ export const batchC: Record<Language, BatchCKeys> = {
     layerTemplateMeta: "{layers} เลเยอร์ · {rules} กฎค่า",
     layerApplyRule: "ใช้กฎ",
     layerFooterNote: "เลเยอร์การตัดสินใจประเมินตามลำดับจากบนลงล่าง",
+    suggestionEngineTitle: "เครื่องมือแนะนำอัจฉริยะ",
+    suggestionEngineSubtitle: "วิเคราะห์หัวตารางโดยใช้คำศัพท์เฉพาะทางธุรกิจและการเงิน (ยอดเงิน, รหัสคำสั่งซื้อ, ล็อต, วันที่)",
+    suggestionEngineBadge: "คำแนะนำ",
+    suggestionEngineApplyAll: "ใช้คำแนะนำทั้งหมด",
+    suggestionEngineApplyOne: "จับคู่",
+    suggestionEngineApplied: "จับคู่แล้ว",
+    suggestionEngineActive: "การจับคู่ปัจจุบัน",
+    suggestionEngineReadyToMap: "พร้อมจับคู่",
+    suggestionEngineNoSuggestions: "ไม่พบคำแนะนำคอลัมน์ใหม่",
+    suggestionEngineTabDesc: "ระบบจับคู่คอลัมน์อัจฉริยะที่วิเคราะห์คำเหมือนในอุตสาหกรรม (เช่น Amt, Total, Net เข้ากับ Value)",
+    suggestionEngineConfidenceHigh: "ตรงกันสูง",
+    suggestionEngineConfidenceMed: "ตรงกันปานกลาง",
+    suggestionEngineConfidenceLow: "ตรงกันต่ำ",
+    dashFilterStatusShowing: "แสดง",
+    dashFilterStatusOf: "จาก",
+    dashFilterStatusRows: "แถว",
+    dashFilterStatusFiltered: "แสดง {count} จากทั้งหมด {total} แถว",
+    dashFilterStatusAccepted: "ผ่าน {count} แถว (Accepted)",
+    dashFilterStatusPostponed: "รอทบทวน {count} แถว (Postponed)",
+    dashFilterStatusRejected: "ปฏิเสธ {count} แถว (Rejected)",
+    dashFilterStatusHold: "ระงับ {count} แถว (Hold)",
+    dashFilterStatusUnmatched: "ไม่ตรงกัน {count} แถว (Unmatched)",
+    dashResetAllFilters: "รีเซ็ตตัวกรองทั้งหมด",
+    dashSyncStatusSynced: "ซิงค์กับพรีวิวแล้ว",
+    dashSyncStatusSyncing: "กำลังซิงค์กับพรีวิว...",
+    dashForceSyncBtn: "บังคับซิงค์",
+    dashForceSyncTitle: "ส่งสถานะตัวกรองและการค้นหาปัจจุบันไปยังพรีวิวลิงก์ทันที (cloud-id: latest)",
+    dashForceSyncSuccess: "ซิงค์สถานะตัวกรองไปยังพรีวิวเรียบร้อยแล้ว (cloud-id: latest)",
   },
   zh: {
     filesOpeningFile: "正在打开文件...",
@@ -752,5 +864,33 @@ export const batchC: Record<Language, BatchCKeys> = {
     layerTemplateMeta: "{layers} 层 · {rules} 条值规则",
     layerApplyRule: "应用规则",
     layerFooterNote: "判定层按从上到下的顺序依次评估。",
+    suggestionEngineTitle: "智能映射引擎",
+    suggestionEngineSubtitle: "基于企业与行业术语智能分析表头（金额、采购单号、批号、数量、日期等）",
+    suggestionEngineBadge: "智能建议",
+    suggestionEngineApplyAll: "应用所有建议",
+    suggestionEngineApplyOne: "映射",
+    suggestionEngineApplied: "已应用",
+    suggestionEngineActive: "当前映射",
+    suggestionEngineReadyToMap: "可映射",
+    suggestionEngineNoSuggestions: "未发现新的列映射建议",
+    suggestionEngineTabDesc: "自动分析行业同义词（例如将 Amt、Total、Net 映射至金额/数值列）。",
+    suggestionEngineConfidenceHigh: "高匹配度",
+    suggestionEngineConfidenceMed: "中匹配度",
+    suggestionEngineConfidenceLow: "低匹配度",
+    dashFilterStatusShowing: "正在显示",
+    dashFilterStatusOf: "共",
+    dashFilterStatusRows: "行",
+    dashFilterStatusFiltered: "正在显示 {count} / {total} 行",
+    dashFilterStatusAccepted: "{count} 行已通过 (Accepted)",
+    dashFilterStatusPostponed: "{count} 行待复核 (Postponed)",
+    dashFilterStatusRejected: "{count} 行已拒绝 (Rejected)",
+    dashFilterStatusHold: "{count} 行已暂扣 (Hold)",
+    dashFilterStatusUnmatched: "{count} 行未匹配 (Unmatched)",
+    dashResetAllFilters: "重置所有筛选",
+    dashSyncStatusSynced: "已与预览同步",
+    dashSyncStatusSyncing: "正在同步预览...",
+    dashForceSyncBtn: "强制同步",
+    dashForceSyncTitle: "立即将当前的视图筛选、搜索词和活动列推送到预览快照 (cloud-id: latest)",
+    dashForceSyncSuccess: "仪表板视图状态已成功同步至预览快照 (cloud-id: latest)",
   },
 };

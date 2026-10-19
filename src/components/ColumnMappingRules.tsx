@@ -30,6 +30,8 @@ import {
   getRecentMappings,
   pushRecentMapping,
 } from '../utils/storage';
+import { SuggestionEnginePanel } from './SuggestionEnginePanel';
+import { analyzeColumnSuggestions } from '../utils/suggestionEngine';
 
 interface ColumnMappingRulesProps {
   referenceWb: WorkbookData | null;
@@ -66,6 +68,18 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
     { id: string; timestamp: number; mappings: ColumnMapping[]; summary: string }[]
   >([]);
   const [presetTab, setPresetTab] = useState<'saved' | 'recent' | 'templates'>('saved');
+  const [showSuggestionPanel, setShowSuggestionPanel] = useState(false);
+
+  // Analyze intelligent column suggestions based on industry terminology
+  const unmappedSuggestionsCount = React.useMemo(() => {
+    if (!referenceWb || !comparisonWb) return 0;
+    const analysis = analyzeColumnSuggestions(
+      referenceWb.headers,
+      comparisonWb.headers,
+      mappings
+    );
+    return analysis.unmappedSuggestionsCount;
+  }, [referenceWb, comparisonWb, mappings]);
 
   // Load saved presets and recent history on mount
   useEffect(() => {
@@ -255,6 +269,40 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
               </button>
             )}
 
+            {/* Suggestion Engine Toggle Button */}
+            <button
+              onClick={() => setShowSuggestionPanel((prev) => !prev)}
+              disabled={!referenceWb || !comparisonWb}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all disabled:opacity-40 shadow-xs select-none ${
+                showSuggestionPanel
+                  ? 'bg-emerald-600 text-white shadow-emerald-200 shadow-md ring-1 ring-emerald-400'
+                  : 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100/90 border border-emerald-300'
+              }`}
+              title={t.suggestionEngineSubtitle}
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${showSuggestionPanel ? 'text-white' : 'text-emerald-600'}`} />
+              <span>{t.suggestionEngineBadge || 'Suggestions'}</span>
+              {unmappedSuggestionsCount > 0 ? (
+                <span
+                  className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-bold ${
+                    showSuggestionPanel
+                      ? 'bg-emerald-800 text-emerald-100'
+                      : 'bg-emerald-200 text-emerald-900 animate-pulse'
+                  }`}
+                >
+                  {unmappedSuggestionsCount}
+                </span>
+              ) : (
+                <span
+                  className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                    showSuggestionPanel ? 'bg-emerald-800 text-emerald-200' : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  0
+                </span>
+              )}
+            </button>
+
             <button
               onClick={handleAutoMap}
               disabled={!referenceWb || !comparisonWb}
@@ -273,6 +321,39 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Expandable Suggestion Engine Panel */}
+        {showSuggestionPanel && referenceWb && comparisonWb && (
+          <div className="mt-4 pt-4 border-t border-slate-200 animate-in fade-in slide-in-from-top-2 duration-200">
+            <SuggestionEnginePanel
+              refHeaders={refHeaders}
+              compHeaders={compHeaders}
+              mappings={mappings}
+              onApplyAll={(newMappings) => {
+                onUpdateMappings(newMappings);
+              }}
+              onApplyOne={(mainCol, compCol) => {
+                const exists = mappings.some(
+                  (m) =>
+                    m.mainCol.toLowerCase() === mainCol.toLowerCase() &&
+                    m.comparisonCol.toLowerCase() === compCol.toLowerCase()
+                );
+                if (!exists) {
+                  const newMapping: ColumnMapping = {
+                    id: `map_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                    mainCol,
+                    comparisonCol: compCol,
+                  };
+                  onUpdateMappings([...mappings, newMapping]);
+                  onShowToast(`Mapped "${mainCol}" ↔ "${compCol}"`, 'success');
+                }
+              }}
+              language={language}
+              onShowToast={onShowToast}
+              isCollapsible={false}
+            />
+          </div>
+        )}
 
         {/* Quick Recent Keys Recall Ribbon if history exists */}
         {recentHistory.length > 0 && (

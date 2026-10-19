@@ -21,6 +21,8 @@ import {
 } from '../types';
 import { ColumnMappingRules } from './ColumnMappingRules';
 import { DecisionLayers } from './DecisionLayers';
+import { SuggestionEnginePanel } from './SuggestionEnginePanel';
+import { analyzeColumnSuggestions } from '../utils/suggestionEngine';
 import { translations } from '../translations';
 
 interface RulesLogicModalProps {
@@ -66,10 +68,21 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
   holdReason,
   onHoldSettingsChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<'mapping' | 'decision' | 'hold'>('mapping');
+  const [activeTab, setActiveTab] = useState<'mapping' | 'suggestions' | 'decision' | 'hold'>('mapping');
   const [holdValueSearch, setHoldValueSearch] = useState('');
   const [holdReasonDraft, setHoldReasonDraft] = useState(holdReason);
   const [holdLegacyDraft, setHoldLegacyDraft] = useState(holdValues.join('\n'));
+
+  // Calculate unmapped column suggestions based on industry terminology
+  const unmappedSuggestionsCount = useMemo(() => {
+    if (!referenceWb || !comparisonWb) return 0;
+    const analysis = analyzeColumnSuggestions(
+      referenceWb.headers,
+      comparisonWb.headers,
+      mappings
+    );
+    return analysis.unmappedSuggestionsCount;
+  }, [referenceWb, comparisonWb, mappings]);
 
   // Sync drafts whenever the modal opens
   useEffect(() => {
@@ -190,7 +203,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
 
         {/* Sub-Navigation Tabs */}
         <div className="px-6 pt-3 pb-2 border-b border-slate-200 bg-white flex items-center justify-between gap-4 shrink-0">
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
             <button
               onClick={() => setActiveTab('mapping')}
               className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
@@ -204,6 +217,28 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
               <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
                 {mappings.length}
               </span>
+            </button>
+
+            {/* Intelligent Suggestion Engine Tab */}
+            <button
+              onClick={() => setActiveTab('suggestions')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                activeTab === 'suggestions'
+                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{t.suggestionEngineTitle || 'Suggestion Engine'}</span>
+              {unmappedSuggestionsCount > 0 ? (
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-100 text-emerald-800 font-bold border border-emerald-300 animate-pulse">
+                  {unmappedSuggestionsCount}
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-200 text-slate-600">
+                  0
+                </span>
+              )}
             </button>
 
             <button
@@ -257,6 +292,36 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
                 onUpdateNormalization={onUpdateNormalization}
                 language={language}
                 onShowToast={onShowToast}
+              />
+            </div>
+          ) : activeTab === 'suggestions' ? (
+            <div className="space-y-6 animate-in fade-in duration-150">
+              <SuggestionEnginePanel
+                refHeaders={referenceWb?.headers || []}
+                compHeaders={comparisonWb?.headers || []}
+                mappings={mappings}
+                onApplyAll={(newMappings) => {
+                  onUpdateMappings(newMappings);
+                }}
+                onApplyOne={(mainCol, compCol) => {
+                  const exists = mappings.some(
+                    (m) =>
+                      m.mainCol.toLowerCase() === mainCol.toLowerCase() &&
+                      m.comparisonCol.toLowerCase() === compCol.toLowerCase()
+                  );
+                  if (!exists) {
+                    const newMapping: ColumnMapping = {
+                      id: `map_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                      mainCol,
+                      comparisonCol: compCol,
+                    };
+                    onUpdateMappings([...mappings, newMapping]);
+                    onShowToast?.(`Mapped "${mainCol}" ↔ "${compCol}"`, 'success');
+                  }
+                }}
+                language={language}
+                onShowToast={onShowToast}
+                isCollapsible={false}
               />
             </div>
           ) : activeTab === 'decision' ? (

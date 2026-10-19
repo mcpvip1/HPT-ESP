@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   Download,
   Search,
@@ -29,6 +29,7 @@ import {
   Clock,
   Link2,
   Cloud,
+  HelpCircle,
 } from 'lucide-react';
 import {
   MatchedRow,
@@ -503,14 +504,136 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const tableVisibleCount = columnConfigs.filter((c) => c.showInTable).length;
   const exportVisibleCount = columnConfigs.filter((c) => c.showInExport).length;
 
-  // Publish the latest results + active filter/search/columns to the cloud
-  // (debounced): the private workspace snapshot for the owner's devices, and
-  // the fixed public preview slot (/preview) so anyone with the share link
-  // always fetches the latest on open or refresh.
+  // Live preview snapshot sync status (cloud-id: FIXED_PREVIEW_SHARE_ID = 'latest')
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
+  const [isForceSyncing, setIsForceSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<number>(Date.now());
+
+  // Forced synchronization check: immediately pushes the current view state
+  // (filters, search term, active column, and column configs) to the preview snapshot URL & cloud ID
+  const pushSnapshotImmediate = useCallback(
+    async (overrides?: {
+      filter?: FilterType;
+      searchTerm?: string;
+      searchColumn?: string;
+      onlyAccept?: boolean;
+      columnConfigs?: ColumnConfigItem[];
+    }) => {
+      if (!results || results.length === 0 || !stats) return;
+
+      const effFilter = overrides?.filter !== undefined ? overrides.filter : activeFilter;
+      const effSearchTerm = overrides?.searchTerm !== undefined ? overrides.searchTerm : searchTerm;
+      const effSearchColumn = overrides?.searchColumn !== undefined ? overrides.searchColumn : searchColumn;
+      const effOnlyAccept = overrides?.onlyAccept !== undefined ? overrides.onlyAccept : hideSupersededPostpone;
+      const effConfigs = overrides?.columnConfigs !== undefined ? overrides.columnConfigs : columnConfigs;
+
+      const payload: SharedPreviewPayload = {
+        version: 1,
+        createdAt: Date.now(),
+        comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
+        comparisonWbUploadedAt: comparisonWb?.uploadedAt,
+        stats,
+        results,
+        filter: effFilter,
+        onlyAccept: effOnlyAccept,
+        searchTerm: effSearchTerm,
+        searchColumn: effSearchColumn,
+        columnConfigs: effConfigs,
+      };
+
+      // 1. Immediately cache locally so the public /preview slot immediately renders this exact state
+      try {
+        localStorage.setItem('emp_shared_preview_latest', JSON.stringify(payload));
+      } catch {}
+
+      // 2. Immediately notify parent of view state changes without debounce delay
+      if (!isPreviewMode && onViewStateChange) {
+        onViewStateChange({
+          activeFilter: effFilter,
+          searchTerm: effSearchTerm,
+          searchColumn: effSearchColumn,
+          onlyAccept: effOnlyAccept,
+        });
+      }
+
+      // 3. Forced synchronization push to cloud fixed snapshot (cloud-id: FIXED_PREVIEW_SHARE_ID = 'latest')
+      if (cloudUser) {
+        setSyncStatus('syncing');
+        try {
+          publishPreviewSnapshot(cloudUser.uid, payload);
+          const ok = await publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, cloudUser.uid, payload);
+          if (ok) {
+            setSyncStatus('synced');
+            setLastSyncedAt(Date.now());
+          } else {
+            setSyncStatus('error');
+          }
+        } catch (e) {
+          console.warn('Forced snapshot synchronization check failed', e);
+          setSyncStatus('error');
+        }
+      } else {
+        setSyncStatus('synced');
+        setLastSyncedAt(Date.now());
+      }
+
+      // 4. Update preview hash immediately if in preview mode
+      if (isPreviewMode) {
+        try {
+          const linkInfo = generatePreviewLink(payload);
+          const hashPart = linkInfo.hashUrl.split('#')[1];
+          if (hashPart && window.location.hash !== `#${hashPart}`) {
+            window.history.replaceState(null, '', `#${hashPart}`);
+          }
+        } catch {}
+      }
+    },
+    [
+      results,
+      stats,
+      activeFilter,
+      searchTerm,
+      searchColumn,
+      hideSupersededPostpone,
+      columnConfigs,
+      comparisonWb,
+      isPreviewMode,
+      onViewStateChange,
+      cloudUser,
+    ]
+  );
+
+  // Debounced search sync for typing keystrokes
+  const debouncedSearchSync = useRef(
+    debounce((term: string) => {
+      pushSnapshotImmediate({ searchTerm: term });
+    }, 350)
+  ).current;
+
+  // Manual button handler to force synchronization check on demand
+  const handleForceSyncCheck = async () => {
+    setIsForceSyncing(true);
+    setSyncStatus('syncing');
+    try {
+      await pushSnapshotImmediate();
+      onShowToast(
+        t.dashForceSyncSuccess ||
+          'Dashboard view state successfully synced to preview snapshot (cloud-id: latest)',
+        'success'
+      );
+    } catch {
+      onShowToast(t.dashPreviewPublishFailed || 'Failed to update preview snapshot', 'error');
+    } finally {
+      setTimeout(() => {
+        setIsForceSyncing(false);
+      }, 350);
+    }
+  };
+
+  // Background debounced synchronization fallback
   const debouncedPublishPreview = useRef(
     debounce((uid: string, payload: SharedPreviewPayload) => {
       publishPreviewSnapshot(uid, payload);
-      // Surface failures so a broken public link doesn't go unnoticed (BUG-11)
       publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, uid, payload).then((ok) => {
         if (!ok) console.warn('Auto-publish to fixed preview slot failed');
       });
@@ -533,8 +656,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       searchColumn,
       columnConfigs,
     });
-    // Cancel any pending debounced publish when deps change or unmount,
-    // so a stale timeout can't resurrect a deleted share (BUG-2).
     return () => debouncedPublishPreview.cancel();
   }, [
     isPreviewMode,
@@ -792,6 +913,58 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     return results.filter((item) => passesRowFilters(item));
   }, [results, activeFilter, columnFilters, searchTerm, searchColumn, hideSupersededPostpone]);
 
+  // Real-time breakdown of results matching current view settings (for visual indicator banner)
+  const viewStatusCounts = useMemo(() => {
+    let accepted = 0;
+    let postponed = 0;
+    let rejected = 0;
+    let hold = 0;
+    let unmatched = 0;
+
+    for (const row of filteredRows) {
+      if (row.decisionColor === 'green') accepted++;
+      else if (row.decisionColor === 'yellow') postponed++;
+      else if (row.decisionColor === 'red') rejected++;
+      else if (row.decisionColor === 'blue') hold++;
+      if (!row.isMatched) unmatched++;
+    }
+
+    return {
+      accepted,
+      postponed,
+      rejected,
+      hold,
+      unmatched,
+      total: filteredRows.length,
+    };
+  }, [filteredRows]);
+
+  const isAnyFilterActive = useMemo(() => {
+    return (
+      activeFilter !== 'all' ||
+      searchTerm.trim() !== '' ||
+      searchColumn !== 'all' ||
+      !hideSupersededPostpone ||
+      Object.keys(columnFilters).length > 0
+    );
+  }, [activeFilter, searchTerm, searchColumn, hideSupersededPostpone, columnFilters]);
+
+  const handleResetAllFilters = () => {
+    setActiveFilter('all');
+    setSearchTerm('');
+    setSearchColumn('all');
+    setColumnFilters({});
+    setHideSupersededPostpone(true);
+    setPage(1);
+    pushSnapshotImmediate({
+      filter: 'all',
+      searchTerm: '',
+      searchColumn: 'all',
+      onlyAccept: true,
+    });
+    onShowToast(t.dashResetAllFilters || 'All view filters reset to default', 'info');
+  };
+
   // Sorting Logic
   const sortedRows = useMemo(() => {
     return [...filteredRows].sort((a, b) => {
@@ -952,6 +1125,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 onClick={() => {
                   setActiveFilter(k.key);
                   setPage(1);
+                  pushSnapshotImmediate({ filter: k.key });
                 }}
                 className={`rounded-xl border p-2 sm:p-3 text-left transition-all ${
                   isActive ? k.active : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
@@ -981,8 +1155,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           {/* Only Accept toggle */}
           <button
             onClick={() => {
-              setHideSupersededPostpone(!hideSupersededPostpone);
+              const next = !hideSupersededPostpone;
+              setHideSupersededPostpone(next);
               setPage(1);
+              pushSnapshotImmediate({ onlyAccept: next });
             }}
             className="flex items-center gap-2.5 group pr-1"
             title={t.dashOnlyAcceptTitle}
@@ -1068,7 +1244,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   )}
                   <span>{shareLinkCopied ? t.dashCopied : t.dashCopyShareLink}</span>
                 </button>
-                {/* Publish to Preview: force the current results to the public /preview link immediately */}
+                {/* Publish to Preview: force current results to public /preview link */}
                 {!isPreviewMode && (
                   <button
                     onClick={handlePublishPreview}
@@ -1079,6 +1255,44 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     <span>{t.dashPublishPreview || 'Update preview'}</span>
                   </button>
                 )}
+
+                {/* Forced Synchronization Check Button */}
+                {!isPreviewMode && (
+                  <button
+                    onClick={handleForceSyncCheck}
+                    disabled={isForceSyncing}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
+                    title={t.dashForceSyncTitle}
+                  >
+                    <RefreshCw
+                      className={`w-3.5 h-3.5 text-emerald-600 ${
+                        isForceSyncing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform'
+                      }`}
+                    />
+                    <span>{t.dashForceSyncBtn || 'Force Sync'}</span>
+                  </button>
+                )}
+
+                {/* Live Sync Status indicator */}
+                <div
+                  className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-mono bg-slate-50 border border-slate-200 text-slate-600 select-none"
+                  title={t.dashForceSyncTitle || 'Snapshot preview status (cloud-id: latest)'}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      syncStatus === 'syncing'
+                        ? 'bg-amber-500 animate-ping'
+                        : syncStatus === 'error'
+                        ? 'bg-rose-500'
+                        : 'bg-emerald-500'
+                    }`}
+                  />
+                  <span className="font-sans font-semibold text-[11px]">
+                    {syncStatus === 'syncing'
+                      ? t.dashSyncStatusSyncing || 'Syncing...'
+                      : t.dashSyncStatusSynced || 'Preview Synced'}
+                  </span>
+                </div>
 
               </div>
               <div className="h-6 w-px bg-slate-200 hidden md:block" />
@@ -1116,8 +1330,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 <select
                   value={searchColumn}
                   onChange={(e) => {
-                    setSearchColumn(e.target.value);
+                    const col = e.target.value;
+                    setSearchColumn(col);
                     setPage(1);
+                    pushSnapshotImmediate({ searchColumn: col });
                   }}
                   className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 hover:text-slate-900 focus:outline-none focus:border-emerald-500 transition-colors shadow-xs max-w-full truncate"
                   title={t.dashSearchScopeTitle}
@@ -1154,8 +1370,18 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => {
-                  setSearchTerm(e.target.value);
+                  const val = e.target.value;
+                  setSearchTerm(val);
                   setPage(1);
+                  debouncedSearchSync(val);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    pushSnapshotImmediate({ searchTerm });
+                  }
+                }}
+                onBlur={() => {
+                  pushSnapshotImmediate({ searchTerm });
                 }}
                 placeholder={t.dashSearchPlaceholder}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all font-mono shadow-xs"
@@ -1165,6 +1391,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   onClick={() => {
                     setSearchTerm('');
                     setPage(1);
+                    pushSnapshotImmediate({ searchTerm: '' });
                   }}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded transition-colors"
                   title={t.dashClearSearchTitle}
@@ -1254,6 +1481,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         return next;
                       });
                       setPage(1);
+                      pushSnapshotImmediate();
                     }}
                     className="p-0.5 hover:text-slate-900 rounded hover:bg-emerald-100 transition-colors ml-0.5 text-emerald-700"
                     title={t.dashClearFilterOn.replace('{label}', label)}
@@ -1268,6 +1496,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               onClick={() => {
                 setColumnFilters({});
                 setPage(1);
+                pushSnapshotImmediate();
               }}
               className="text-xs text-rose-600 hover:text-rose-700 underline font-semibold ml-1 transition-colors"
             >
@@ -1275,6 +1504,118 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             </button>
           </div>
         )}
+      </div>
+
+      {/* 3.5 Visual Filter Status Indicator Banner & Live View Breakdown */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:px-5 sm:py-3.5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 animate-in fade-in duration-200">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
+          {/* Main Scope Indicator Icon & Summary text */}
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+              <Filter className="w-4 h-4" />
+            </span>
+            <span className="font-extrabold text-slate-800 text-xs sm:text-sm">
+              {filteredRows.length === totalResults
+                ? `${t.dashFilterStatusShowing || 'Showing'} ${totalResults.toLocaleString()} ${t.dashFilterStatusRows || 'rows'}`
+                : `${t.dashFilterStatusShowing || 'Showing'} ${filteredRows.length.toLocaleString()} ${t.dashFilterStatusOf || 'of'} ${totalResults.toLocaleString()} ${t.dashFilterStatusRows || 'rows'}`}
+            </span>
+          </div>
+
+          <span className="text-slate-300 hidden sm:inline">|</span>
+
+          {/* Outcome Breakdown Badges (e.g. 'Showing 42 Accepted, 5 Postponed') */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {viewStatusCounts.accepted > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs font-mono">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                <span>{viewStatusCounts.accepted.toLocaleString()} {t.badgePassed || 'Accepted'}</span>
+              </span>
+            )}
+            {viewStatusCounts.postponed > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs font-mono">
+                <Clock className="w-3.5 h-3.5 text-amber-600 stroke-[2.5]" />
+                <span>{viewStatusCounts.postponed.toLocaleString()} {t.badgeReview || 'Postponed'}</span>
+              </span>
+            )}
+            {viewStatusCounts.rejected > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200 shadow-2xs font-mono">
+                <XCircle className="w-3.5 h-3.5 text-rose-600 stroke-[2.5]" />
+                <span>{viewStatusCounts.rejected.toLocaleString()} {t.badgeRejected || 'Rejected'}</span>
+              </span>
+            )}
+            {viewStatusCounts.hold > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs font-mono">
+                <PauseCircle className="w-3.5 h-3.5 text-blue-600 stroke-[2.5]" />
+                <span>{viewStatusCounts.hold.toLocaleString()} {t.badgeHold || 'Hold'}</span>
+              </span>
+            )}
+            {viewStatusCounts.unmatched > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-purple-50 text-purple-800 border border-purple-200 shadow-2xs font-mono">
+                <HelpCircle className="w-3.5 h-3.5 text-purple-600 stroke-[2.5]" />
+                <span>{viewStatusCounts.unmatched.toLocaleString()} {t.filterUnmatched || 'Unmatched'}</span>
+              </span>
+            )}
+            {filteredRows.length === 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600">
+                0 rows match current view
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right side: Sync Status Indicator & Reset Filter Button */}
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          {/* Live Preview Sync Indicator with cloud-id */}
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-50 border border-slate-200 text-slate-600 select-none"
+            title={t.dashForceSyncTitle || 'Snapshot preview status (cloud-id: latest)'}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                syncStatus === 'syncing'
+                  ? 'bg-amber-500 animate-ping'
+                  : syncStatus === 'error'
+                  ? 'bg-rose-500'
+                  : 'bg-emerald-500'
+              }`}
+            />
+            <span className="font-semibold font-sans">
+              {syncStatus === 'syncing'
+                ? t.dashSyncStatusSyncing || 'Syncing...'
+                : t.dashSyncStatusSynced || 'Preview Synced'}
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono hidden lg:inline">(id: latest)</span>
+          </div>
+
+          {/* Force Sync Check Button */}
+          {!isPreviewMode && (
+            <button
+              onClick={handleForceSyncCheck}
+              disabled={isForceSyncing}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors shrink-0 group select-none"
+              title={t.dashForceSyncTitle}
+            >
+              <RefreshCw
+                className={`w-3 h-3 text-emerald-600 ${
+                  isForceSyncing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform'
+                }`}
+              />
+              <span>{t.dashForceSyncBtn || 'Force Sync'}</span>
+            </button>
+          )}
+
+          {/* Reset all filters button if any filter is active */}
+          {isAnyFilterActive && (
+            <button
+              onClick={handleResetAllFilters}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100/80 border border-rose-200 rounded-lg shadow-2xs transition-colors shrink-0 select-none"
+              title={t.dashResetAllFilters || 'Reset all filters'}
+            >
+              <X className="w-3 h-3 text-rose-600" />
+              <span>{t.dashResetAllFilters || 'Reset filters'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 4. Main Data Table with Dynamic Column Visibility & Real-Time Search Match Highlighting */}

@@ -591,6 +591,25 @@ export interface TranslationDict {
   suggestionEngineActive: string;
   suggestionEngineReadyToMap: string;
   suggestionEngineNoSuggestions: string;
+  suggestionEngineTabDesc: string;
+  suggestionEngineConfidenceHigh: string;
+  suggestionEngineConfidenceMed: string;
+  suggestionEngineConfidenceLow: string;
+  dashFilterStatusShowing: string;
+  dashFilterStatusOf: string;
+  dashFilterStatusRows: string;
+  dashFilterStatusFiltered: string;
+  dashFilterStatusAccepted: string;
+  dashFilterStatusPostponed: string;
+  dashFilterStatusRejected: string;
+  dashFilterStatusHold: string;
+  dashFilterStatusUnmatched: string;
+  dashResetAllFilters: string;
+  dashSyncStatusSynced: string;
+  dashSyncStatusSyncing: string;
+  dashForceSyncBtn: string;
+  dashForceSyncTitle: string;
+  dashForceSyncSuccess: string;
 }
 
 import { batchB } from './batchB';
