@@ -10,6 +10,8 @@ import {
   ColumnConfigItem,
   SyncHistoryEntry,
   ActiveUpload,
+  SavedMappingPreset,
+  SavedDecisionPreset,
 } from './types';
 import {
   saveToIDB,
@@ -49,6 +51,8 @@ import { LOGO_DATA_URL } from './assets/logo';
 import {
   publishRulesState,
   fetchRulesState,
+  publishColumnConfigs,
+  fetchColumnConfigs,
   subscribePreviewSnapshot,
   fetchPreviewSnapshot,
   subscribeSharedSnapshot,
@@ -66,7 +70,7 @@ import {
   FIXED_PREVIEW_SHARE_ID,
   defaultResultFilters,
 } from './lib/cloudSync';
-import type { ResultFilters } from './lib/cloudSync';
+import type { ResultFilters, StoredColumnSettings } from './lib/cloudSync';
 import {
   FileSpreadsheet,
   CheckCircle2,
@@ -112,6 +116,7 @@ export default function App() {
   const [previewSearchTerm, setPreviewSearchTerm] = useState<string>('');
   const [previewSearchColumn, setPreviewSearchColumn] = useState<string>('all');
   const [previewColumnConfigs, setPreviewColumnConfigs] = useState<ColumnConfigItem[] | undefined>(undefined);
+  const [studioColumnConfigs, setStudioColumnConfigs] = useState<ColumnConfigItem[] | undefined>(undefined);
 
   // Workbooks
   const [referenceWb, setReferenceWb] = useState<WorkbookData | null>(null);
@@ -267,8 +272,9 @@ export default function App() {
     const pullSafety = setTimeout(() => setIsCloudPulling(false), 30000);
     (async () => {
       try {
-        const [cloudRules, cloudWbs, cloudResults, wbsUploading, resultsUploading, cloudHistory] = await Promise.all([
+        const [cloudRules, cloudColConfigs, cloudWbs, cloudResults, wbsUploading, resultsUploading, cloudHistory] = await Promise.all([
           fetchRulesState(cloudUser.uid),
+          fetchColumnConfigs(cloudUser.uid),
           fetchWorkbooks(cloudUser.uid),
           fetchResultsState(cloudUser.uid),
           isCloudDocUploading(cloudUser.uid, 'workbooks'),
@@ -308,6 +314,26 @@ export default function App() {
         let effRef = refWbRef.current;
         let effComp = compWbRef.current;
 
+        // Restore column configs (Column View Settings) from cloud so every device opens with same column order & visibility
+        const effectiveColSettings = cloudColConfigs || cloudRules?.columnConfigs;
+        if (effectiveColSettings && Array.isArray(effectiveColSettings.order) && effectiveColSettings.order.length > 0) {
+          try {
+            localStorage.setItem('excelmatch_column_settings_v2', JSON.stringify(effectiveColSettings));
+            localStorage.setItem('emp_column_configs', JSON.stringify(effectiveColSettings));
+            await saveToIDB(StorageKeys.COLUMN_CONFIGS, effectiveColSettings);
+            const configs: ColumnConfigItem[] = effectiveColSettings.order.map((id) => ({
+              id,
+              label: id,
+              category: 'data',
+              showInTable: effectiveColSettings.visibility?.[id]?.table !== false,
+              showInExport: effectiveColSettings.visibility?.[id]?.export !== false,
+            }));
+            setStudioColumnConfigs(configs);
+          } catch (e) {
+            console.warn('Could not store pulled column configs', e);
+          }
+        }
+
         if (cloudRules && cloudRules.updatedAt) {
           if (cloudRules.normalization) {
             setNormalization(cloudRules.normalization);
@@ -344,6 +370,12 @@ export default function App() {
             await saveToIDB(StorageKeys.RELEASED_ROWS, cloudRules.releasedRowIds);
             effReleased = cloudRules.releasedRowIds;
           }
+          if (cloudRules.mappingPresets && Array.isArray(cloudRules.mappingPresets)) {
+            await saveToIDB(StorageKeys.SAVED_MAPPING_PRESETS, cloudRules.mappingPresets);
+          }
+          if (cloudRules.decisionPresets && Array.isArray(cloudRules.decisionPresets)) {
+            await saveToIDB(StorageKeys.SAVED_DECISION_PRESETS, cloudRules.decisionPresets);
+          }
           lastRulesPublishRef.current = JSON.stringify({
             n: cloudRules.normalization,
             l: cloudRules.layers,
@@ -356,7 +388,22 @@ export default function App() {
           showToast(t.toastCloudRulesSynced, 'success');
         } else {
           const cur = rulesStateRef.current;
-          await publishRulesState(cloudUser.uid, cur);
+          const mapPresets = (await getFromIDB<SavedMappingPreset[]>(StorageKeys.SAVED_MAPPING_PRESETS)) || [];
+          const decPresets = (await getFromIDB<SavedDecisionPreset[]>(StorageKeys.SAVED_DECISION_PRESETS)) || [];
+          let curColConfigs: StoredColumnSettings | undefined = undefined;
+          try {
+            const raw = localStorage.getItem('excelmatch_column_settings_v2');
+            if (raw) curColConfigs = JSON.parse(raw);
+          } catch {}
+          await publishRulesState(cloudUser.uid, {
+            ...cur,
+            mappingPresets: mapPresets,
+            decisionPresets: decPresets,
+            columnConfigs: curColConfigs,
+          });
+          if (curColConfigs) {
+            await publishColumnConfigs(cloudUser.uid, curColConfigs);
+          }
           lastRulesPublishRef.current = JSON.stringify({
             n: cur.normalization,
             l: cur.layers,
@@ -894,12 +941,30 @@ export default function App() {
         if (savedHoldReason !== null && savedHoldReason !== undefined && isMounted) setHoldReason(savedHoldReason);
         if (savedReleased && isMounted) setReleasedRowIds(savedReleased);
 
+        if (savedMappings && isMounted) {
+          setMappings(savedMappings);
+        }
         if (savedRef && isMounted) {
           setReferenceWb(savedRef);
-          if (savedMappings) setMappings(savedMappings);
         }
         if (savedComp && isMounted) {
           setComparisonWb(savedComp);
+        }
+
+        const savedColSettings = await getFromIDB<StoredColumnSettings>(StorageKeys.COLUMN_CONFIGS);
+        if (savedColSettings && Array.isArray(savedColSettings.order) && isMounted) {
+          try {
+            localStorage.setItem('excelmatch_column_settings_v2', JSON.stringify(savedColSettings));
+            localStorage.setItem('emp_column_configs', JSON.stringify(savedColSettings));
+            const configs: ColumnConfigItem[] = savedColSettings.order.map((id) => ({
+              id,
+              label: id,
+              category: 'data',
+              showInTable: savedColSettings.visibility?.[id]?.table !== false,
+              showInExport: savedColSettings.visibility?.[id]?.export !== false,
+            }));
+            setStudioColumnConfigs(configs);
+          } catch {}
         }
         // Restore cached results instantly; the cloud pull may overwrite with
         // newer synced results. Regenerate only when files exist but no cache.
@@ -1013,21 +1078,14 @@ export default function App() {
     if (wb) {
       await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, wb);
       let effectiveMappings = mappings;
-      // Drop mappings that reference columns no longer present in the new file
-      const validMappings = mappings.filter((m) => wb.headers.includes(m.mainCol));
-      if (validMappings.length === 0 && comparisonWb) {
+      // If user has not yet configured any mappings and comparison file exists, attempt auto-mapping
+      if (effectiveMappings.length === 0 && comparisonWb) {
         const auto = autoMapColumns(wb.headers, comparisonWb.headers);
         if (auto.length > 0) {
           effectiveMappings = auto;
           setMappings(auto);
           await saveToIDB(StorageKeys.COLUMN_MAPPINGS, auto);
-        } else {
-          effectiveMappings = [];
         }
-      } else if (validMappings.length !== mappings.length) {
-        effectiveMappings = validMappings;
-        setMappings(validMappings);
-        await saveToIDB(StorageKeys.COLUMN_MAPPINGS, validMappings);
       }
 
       if (comparisonWb) {
@@ -1194,13 +1252,61 @@ export default function App() {
     showToast(t.toastExitedPreview, 'info');
   };
 
-  // Explicit Save Settings confirmation for user
+  // Explicit Save Settings confirmation for user - immediately persists locally and pushes to Cloud
   const handleSaveAllSettingsExplicit = async () => {
     await saveToIDB(StorageKeys.COLUMN_MAPPINGS, mappings);
     await saveToIDB(StorageKeys.NORMALIZATION_RULES, normalization);
     await saveToIDB(StorageKeys.DECISION_LAYERS, layers);
+    await saveToIDB(StorageKeys.HOLD_COLUMN, holdColumn);
+    await saveToIDB(StorageKeys.HOLD_VALUES, holdValues);
+    await saveToIDB(StorageKeys.HOLD_REASON, holdReason);
+    await saveToIDB(StorageKeys.RELEASED_ROWS, releasedRowIds);
+
+    const mappingPresets = (await getFromIDB<SavedMappingPreset[]>(StorageKeys.SAVED_MAPPING_PRESETS)) || [];
+    const decisionPresets = (await getFromIDB<SavedDecisionPreset[]>(StorageKeys.SAVED_DECISION_PRESETS)) || [];
+
+    let colSettings: StoredColumnSettings | undefined = undefined;
+    try {
+      const raw = localStorage.getItem('excelmatch_column_settings_v2') || localStorage.getItem('emp_column_configs');
+      if (raw) colSettings = JSON.parse(raw);
+    } catch {}
+
+    if (colSettings) {
+      await saveToIDB(StorageKeys.COLUMN_CONFIGS, colSettings);
+    }
+
+    if (cloudUser) {
+      const tt = tRef.current;
+      beginUpload('settings', tt.syncSettingsLabel, 'Explicit save');
+      const payload = {
+        normalization,
+        layers,
+        mappings,
+        holdColumn,
+        holdValues,
+        holdReason,
+        releasedRowIds,
+        mappingPresets,
+        decisionPresets,
+        columnConfigs: colSettings,
+      };
+      const ok = await publishRulesState(cloudUser.uid, payload);
+      if (colSettings) {
+        await publishColumnConfigs(cloudUser.uid, colSettings);
+      }
+      lastRulesPublishRef.current = JSON.stringify({
+        n: normalization,
+        l: layers,
+        m: mappings,
+        hc: holdColumn,
+        h: holdValues,
+        hr: holdReason,
+        rr: releasedRowIds,
+      });
+      endUpload({ kind: 'settings', title: tt.syncSettingsLabel, status: ok ? 'done' : 'failed' });
+    }
     showToast(
-      t.toastRulesSaved,
+      cloudUser ? `${t.toastRulesSaved} (Synced to Cloud)` : t.toastRulesSaved,
       'success'
     );
   };
@@ -1539,8 +1645,8 @@ export default function App() {
                   initialFilter={isValidFilter(resultFilters.activeFilter) ? resultFilters.activeFilter : 'all'}
                   initialOnlyAccept={resultFilters.onlyAccept}
                   initialSearchTerm={resultFilters.searchTerm}
-                  initialSearchColumn={resultFilters.searchColumn}
-                  initialColumnConfigs={previewColumnConfigs}
+                  initialColumnConfigs={studioColumnConfigs || previewColumnConfigs}
+                  onSaveColumnConfigs={(configs) => setStudioColumnConfigs(configs)}
                   cloudUser={cloudUser}
                   holdReason={holdReason}
                   onReleaseHoldKey={handleReleaseHoldKey}
@@ -1583,6 +1689,7 @@ export default function App() {
         holdValues={holdValues}
         holdReason={holdReason}
         onHoldSettingsChange={handleHoldSettingsChange}
+        cloudUser={cloudUser}
       />
 
 

@@ -192,6 +192,7 @@ export const StorageKeys = {
   RELEASED_ROWS: 'released_rows',
   RESULTS_STATE: 'results_state',
   SYNC_HISTORY: 'sync_history',
+  COLUMN_CONFIGS: 'column_configs',
 };
 
 export const defaultNormalizationRules: NormalizationRules = {

@@ -47,9 +47,12 @@ import type { User } from 'firebase/auth';
 import {
   publishPreviewSnapshot,
   publishSharedSnapshot,
+  publishColumnConfigs,
+  publishRulesState,
   debounce,
   FIXED_PREVIEW_SHARE_ID,
 } from '../lib/cloudSync';
+import { saveToIDB, StorageKeys } from '../utils/storage';
 import { RowDetailModal } from './RowDetailModal';
 import { ColumnCustomizationModal } from './ColumnCustomizationModal';
 import { ExcelColumnFilter, UniqueValueItem } from './ExcelColumnFilter';
@@ -72,6 +75,7 @@ interface ResultsDashboardProps {
   holdReason?: string;
   onReleaseHoldKey?: (key: string) => Promise<{ key: string; green: number; yellow: number; total: number }>;
   onViewStateChange?: (v: { activeFilter: FilterType; searchTerm: string; searchColumn: string; onlyAccept: boolean }) => void;
+  onSaveColumnConfigs?: (configs: ColumnConfigItem[]) => void;
 }
 
 type FilterType = 'all' | 'green' | 'yellow' | 'red' | 'blue' | 'unmatched';
@@ -138,6 +142,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   holdReason = '',
   onReleaseHoldKey,
   onViewStateChange,
+  onSaveColumnConfigs,
 }) => {
   const t = translations[language];
 
@@ -200,17 +205,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      // Re-sync latest saved column view settings from localStorage
-      const saved = localStorage.getItem('excelmatch_column_settings_v2');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setColumnConfigs(parsed);
-            setHasUnsavedColumnChanges(false);
-          }
-        } catch {}
-      }
+      // Re-sync latest saved column view settings
+      setColumnConfigs(loadStoredConfigs(allCandidateColumns));
+      setHasUnsavedColumnChanges(false);
       if (onRefresh) await onRefresh();
       onShowToast(t.dashRefreshedLatest, 'success');
     } catch {
@@ -326,11 +323,25 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
   // Load custom column order and visibility (priority: preview link -> stored v2 -> default candidate)
   const loadStoredConfigs = (candidateCols: ColumnConfigItem[]): ColumnConfigItem[] => {
-    if (initialColumnConfigs && initialColumnConfigs.length > 0) {
+    // In Preview Mode, use the exact frozen snapshot from the shared link
+    if (isPreviewMode && initialColumnConfigs && initialColumnConfigs.length > 0) {
       return initialColumnConfigs;
     }
     try {
-      const stored = localStorage.getItem('excelmatch_column_settings_v2');
+      let stored = localStorage.getItem('excelmatch_column_settings_v2');
+      if (!stored) {
+        stored = localStorage.getItem('emp_column_configs');
+      }
+      if (!stored && initialColumnConfigs && initialColumnConfigs.length > 0) {
+        const fallbackObj = {
+          order: initialColumnConfigs.map((c) => c.id),
+          visibility: {} as Record<string, { table: boolean; export: boolean }>,
+        };
+        initialColumnConfigs.forEach((c) => {
+          fallbackObj.visibility[c.id] = { table: c.showInTable, export: c.showInExport };
+        });
+        stored = JSON.stringify(fallbackObj);
+      }
       if (stored) {
         const parsed: {
           order: string[];
@@ -420,6 +431,20 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         saveObj.visibility[c.id] = { table: c.showInTable, export: c.showInExport };
       });
       localStorage.setItem('excelmatch_column_settings_v2', JSON.stringify(saveObj));
+      localStorage.setItem('emp_column_configs', JSON.stringify(saveObj));
+      saveToIDB(StorageKeys.COLUMN_CONFIGS, saveObj).catch(() => {});
+
+      if (cloudUser) {
+        publishColumnConfigs(cloudUser.uid, saveObj);
+        publishRulesState(cloudUser.uid, { columnConfigs: saveObj });
+      }
+      if (onSaveColumnConfigs) {
+        onSaveColumnConfigs(newConfigs);
+      }
+      onShowToast(
+        cloudUser ? `${t.dashSaveView} (Synced to Cloud)` : t.dashSaveView,
+        'success'
+      );
 
       // Sync to shared preview cache
       const latestPreview = localStorage.getItem('emp_shared_preview_latest');
@@ -913,57 +938,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     return results.filter((item) => passesRowFilters(item));
   }, [results, activeFilter, columnFilters, searchTerm, searchColumn, hideSupersededPostpone]);
 
-  // Real-time breakdown of results matching current view settings (for visual indicator banner)
-  const viewStatusCounts = useMemo(() => {
-    let accepted = 0;
-    let postponed = 0;
-    let rejected = 0;
-    let hold = 0;
-    let unmatched = 0;
-
-    for (const row of filteredRows) {
-      if (row.decisionColor === 'green') accepted++;
-      else if (row.decisionColor === 'yellow') postponed++;
-      else if (row.decisionColor === 'red') rejected++;
-      else if (row.decisionColor === 'blue') hold++;
-      if (!row.isMatched) unmatched++;
-    }
-
-    return {
-      accepted,
-      postponed,
-      rejected,
-      hold,
-      unmatched,
-      total: filteredRows.length,
-    };
-  }, [filteredRows]);
-
-  const isAnyFilterActive = useMemo(() => {
-    return (
-      activeFilter !== 'all' ||
-      searchTerm.trim() !== '' ||
-      searchColumn !== 'all' ||
-      !hideSupersededPostpone ||
-      Object.keys(columnFilters).length > 0
-    );
-  }, [activeFilter, searchTerm, searchColumn, hideSupersededPostpone, columnFilters]);
-
-  const handleResetAllFilters = () => {
-    setActiveFilter('all');
-    setSearchTerm('');
-    setSearchColumn('all');
-    setColumnFilters({});
-    setHideSupersededPostpone(true);
-    setPage(1);
-    pushSnapshotImmediate({
-      filter: 'all',
-      searchTerm: '',
-      searchColumn: 'all',
-      onlyAccept: true,
-    });
-    onShowToast(t.dashResetAllFilters || 'All view filters reset to default', 'info');
-  };
 
   // Sorting Logic
   const sortedRows = useMemo(() => {
@@ -1115,7 +1089,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* 1. Results overview: clickable KPI stat cards (filter the table) */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm space-y-4">
-        <div className="grid grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-2.5 md:gap-3">
           {kpiDefs.map((k) => {
             const pct = totalResults > 0 ? Math.round((k.count / totalResults) * 100) : 0;
             const isActive = activeFilter === k.key;
@@ -1151,7 +1125,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         </div>
 
         {/* 2. Action toolbar — grouped View / Share / Export actions */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-3 pt-3 border-t border-slate-100">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 lg:gap-3 pt-3 border-t border-slate-100">
           {/* Only Accept toggle */}
           <button
             onClick={() => {
@@ -1160,7 +1134,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               setPage(1);
               pushSnapshotImmediate({ onlyAccept: next });
             }}
-            className="flex items-center gap-2.5 group pr-1"
+            className="flex items-center gap-2 group pr-1 shrink-0 select-none cursor-pointer"
             title={t.dashOnlyAcceptTitle}
           >
             <span
@@ -1179,27 +1153,26 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             </span>
           </button>
 
-          <div className="h-6 w-px bg-slate-200 hidden md:block" />
+          <div className="hidden lg:block h-5 w-px bg-slate-200 shrink-0" />
 
           {/* View group */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             {/* Refresh Button */}
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 group"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 group select-none"
               title={t.dashRefreshTitle}
             >
               <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 group-hover:rotate-180 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
               <span>{t.dashRefresh}</span>
             </button>
 
-
             {/* Save Column View & Sync button (Main Results page) */}
             {!isPreviewMode && (
               <button
                 onClick={() => handleSaveColumnConfigs(columnConfigs)}
-                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none ${
                   hasUnsavedColumnChanges
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-200 shadow-md ring-1 ring-emerald-400 animate-pulse'
                     : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
@@ -1211,10 +1184,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               </button>
             )}
 
-            {/* Customize Columns Button (Exact same settings in both evaluation results & styled export and preview page) */}
+            {/* Customize Columns Button */}
             <button
               onClick={() => setShowColumnModal(true)}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
               title={t.dashColumnsTitle}
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
@@ -1223,18 +1196,17 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 {tableVisibleCount}
               </span>
             </button>
-
           </div>
+
           {!isPreviewMode && (
             <>
-              <div className="h-6 w-px bg-slate-200 hidden md:block" />
+              <div className="hidden lg:block h-5 w-px bg-slate-200 shrink-0" />
               {/* Share group */}
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Copy Share Link Button: copies the fixed public preview link (/preview).
-                    Anyone opening it fetches the latest results from the cloud — no sign-in. */}
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                {/* Copy Share Link Button */}
                 <button
                   onClick={handleCopyShareLink}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
                   title={t.dashCopyShareLink}
                 >
                   {shareLinkCopied ? (
@@ -1244,38 +1216,35 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   )}
                   <span>{shareLinkCopied ? t.dashCopied : t.dashCopyShareLink}</span>
                 </button>
-                {/* Publish to Preview: force current results to public /preview link */}
-                {!isPreviewMode && (
-                  <button
-                    onClick={handlePublishPreview}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none"
-                    title={t.dashPublishPreview || 'Update the public preview link with these results'}
-                  >
-                    <Cloud className="w-3.5 h-3.5 shrink-0" />
-                    <span>{t.dashPublishPreview || 'Update preview'}</span>
-                  </button>
-                )}
+
+                {/* Publish to Preview */}
+                <button
+                  onClick={handlePublishPreview}
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none"
+                  title={t.dashPublishPreview || 'Update the public preview link with these results'}
+                >
+                  <Cloud className="w-3.5 h-3.5 shrink-0" />
+                  <span>{t.dashPublishPreview || 'Update preview'}</span>
+                </button>
 
                 {/* Forced Synchronization Check Button */}
-                {!isPreviewMode && (
-                  <button
-                    onClick={handleForceSyncCheck}
-                    disabled={isForceSyncing}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
-                    title={t.dashForceSyncTitle}
-                  >
-                    <RefreshCw
-                      className={`w-3.5 h-3.5 text-emerald-600 ${
-                        isForceSyncing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform'
-                      }`}
-                    />
-                    <span>{t.dashForceSyncBtn || 'Force Sync'}</span>
-                  </button>
-                )}
+                <button
+                  onClick={handleForceSyncCheck}
+                  disabled={isForceSyncing}
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
+                  title={t.dashForceSyncTitle}
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 text-emerald-600 ${
+                      isForceSyncing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform'
+                    }`}
+                  />
+                  <span>{t.dashForceSyncBtn || 'Force Sync'}</span>
+                </button>
 
                 {/* Live Sync Status indicator */}
                 <div
-                  className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-mono bg-slate-50 border border-slate-200 text-slate-600 select-none"
+                  className="hidden xl:inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-[11px] font-mono bg-slate-50 border border-slate-200 text-slate-600 select-none shrink-0"
                   title={t.dashForceSyncTitle || 'Snapshot preview status (cloud-id: latest)'}
                 >
                   <span
@@ -1293,26 +1262,26 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       : t.dashSyncStatusSynced || 'Preview Synced'}
                   </span>
                 </div>
-
               </div>
-              <div className="h-6 w-px bg-slate-200 hidden md:block" />
+
+              <div className="hidden lg:block h-5 w-px bg-slate-200 shrink-0" />
               {/* Export group */}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <button
                   onClick={handleExportExcel}
-                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none"
                   title={t.dashExportExcelTitle}
                 >
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-100 shrink-0" />
                   <span>{t.exportExcel}</span>
                 </button>
 
                 <button
                   onClick={handleExportCsv}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none"
                   title={t.dashExportCsvTitle}
                 >
-                  <Download className="w-3.5 h-3.5 text-slate-200" />
+                  <Download className="w-3.5 h-3.5 text-slate-200 shrink-0" />
                   <span>{t.exportCsv}</span>
                 </button>
               </div>
@@ -1506,117 +1475,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         )}
       </div>
 
-      {/* 3.5 Visual Filter Status Indicator Banner & Live View Breakdown */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:px-5 sm:py-3.5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 animate-in fade-in duration-200">
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
-          {/* Main Scope Indicator Icon & Summary text */}
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-              <Filter className="w-4 h-4" />
-            </span>
-            <span className="font-extrabold text-slate-800 text-xs sm:text-sm">
-              {filteredRows.length === totalResults
-                ? `${t.dashFilterStatusShowing || 'Showing'} ${totalResults.toLocaleString()} ${t.dashFilterStatusRows || 'rows'}`
-                : `${t.dashFilterStatusShowing || 'Showing'} ${filteredRows.length.toLocaleString()} ${t.dashFilterStatusOf || 'of'} ${totalResults.toLocaleString()} ${t.dashFilterStatusRows || 'rows'}`}
-            </span>
-          </div>
-
-          <span className="text-slate-300 hidden sm:inline">|</span>
-
-          {/* Outcome Breakdown Badges (e.g. 'Showing 42 Accepted, 5 Postponed') */}
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            {viewStatusCounts.accepted > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs font-mono">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
-                <span>{viewStatusCounts.accepted.toLocaleString()} {t.badgePassed || 'Accepted'}</span>
-              </span>
-            )}
-            {viewStatusCounts.postponed > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs font-mono">
-                <Clock className="w-3.5 h-3.5 text-amber-600 stroke-[2.5]" />
-                <span>{viewStatusCounts.postponed.toLocaleString()} {t.badgeReview || 'Postponed'}</span>
-              </span>
-            )}
-            {viewStatusCounts.rejected > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200 shadow-2xs font-mono">
-                <XCircle className="w-3.5 h-3.5 text-rose-600 stroke-[2.5]" />
-                <span>{viewStatusCounts.rejected.toLocaleString()} {t.badgeRejected || 'Rejected'}</span>
-              </span>
-            )}
-            {viewStatusCounts.hold > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs font-mono">
-                <PauseCircle className="w-3.5 h-3.5 text-blue-600 stroke-[2.5]" />
-                <span>{viewStatusCounts.hold.toLocaleString()} {t.badgeHold || 'Hold'}</span>
-              </span>
-            )}
-            {viewStatusCounts.unmatched > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-purple-50 text-purple-800 border border-purple-200 shadow-2xs font-mono">
-                <HelpCircle className="w-3.5 h-3.5 text-purple-600 stroke-[2.5]" />
-                <span>{viewStatusCounts.unmatched.toLocaleString()} {t.filterUnmatched || 'Unmatched'}</span>
-              </span>
-            )}
-            {filteredRows.length === 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600">
-                0 rows match current view
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Right side: Sync Status Indicator & Reset Filter Button */}
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          {/* Live Preview Sync Indicator with cloud-id */}
-          <div
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-50 border border-slate-200 text-slate-600 select-none"
-            title={t.dashForceSyncTitle || 'Snapshot preview status (cloud-id: latest)'}
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                syncStatus === 'syncing'
-                  ? 'bg-amber-500 animate-ping'
-                  : syncStatus === 'error'
-                  ? 'bg-rose-500'
-                  : 'bg-emerald-500'
-              }`}
-            />
-            <span className="font-semibold font-sans">
-              {syncStatus === 'syncing'
-                ? t.dashSyncStatusSyncing || 'Syncing...'
-                : t.dashSyncStatusSynced || 'Preview Synced'}
-            </span>
-            <span className="text-[10px] text-slate-400 font-mono hidden lg:inline">(id: latest)</span>
-          </div>
-
-          {/* Force Sync Check Button */}
-          {!isPreviewMode && (
-            <button
-              onClick={handleForceSyncCheck}
-              disabled={isForceSyncing}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors shrink-0 group select-none"
-              title={t.dashForceSyncTitle}
-            >
-              <RefreshCw
-                className={`w-3 h-3 text-emerald-600 ${
-                  isForceSyncing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform'
-                }`}
-              />
-              <span>{t.dashForceSyncBtn || 'Force Sync'}</span>
-            </button>
-          )}
-
-          {/* Reset all filters button if any filter is active */}
-          {isAnyFilterActive && (
-            <button
-              onClick={handleResetAllFilters}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100/80 border border-rose-200 rounded-lg shadow-2xs transition-colors shrink-0 select-none"
-              title={t.dashResetAllFilters || 'Reset all filters'}
-            >
-              <X className="w-3 h-3 text-rose-600" />
-              <span>{t.dashResetAllFilters || 'Reset filters'}</span>
-            </button>
-          )}
-        </div>
-      </div>
 
       {/* 4. Main Data Table with Dynamic Column Visibility & Real-Time Search Match Highlighting */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">

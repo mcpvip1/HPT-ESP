@@ -34,6 +34,8 @@ import {
   getRecentDecisionLayers,
   pushRecentDecisionLayers,
 } from '../utils/storage';
+import type { User } from 'firebase/auth';
+import { publishRulesState, publishDecisionPresets } from '../lib/cloudSync';
 
 interface DecisionLayersProps {
   referenceWb: WorkbookData | null;
@@ -43,6 +45,7 @@ interface DecisionLayersProps {
   onExecuteMatching: () => void;
   isProcessing: boolean;
   language: Language;
+  cloudUser?: User | null;
 }
 
 export const DecisionLayers: React.FC<DecisionLayersProps> = ({
@@ -53,6 +56,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
   onExecuteMatching,
   isProcessing,
   language,
+  cloudUser,
 }) => {
   const t = translations[language];
 
@@ -66,7 +70,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
   >([]);
   const [presetTab, setPresetTab] = useState<'saved' | 'recent' | 'templates'>('saved');
 
-  // Load saved presets on mount
+  // Load saved presets on mount or when presets modal opens
   useEffect(() => {
     async function loadPresets() {
       try {
@@ -78,7 +82,7 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
       }
     }
     loadPresets();
-  }, []);
+  }, [showPresetsModal]);
 
   // Auto-record to recent history whenever layers change
   useEffect(() => {
@@ -276,6 +280,10 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
       setSavedPresets(updated);
       setNewPresetName('');
       setShowSaveDialog(false);
+      if (cloudUser) {
+        publishDecisionPresets(cloudUser.uid, updated);
+        publishRulesState(cloudUser.uid, { layers, decisionPresets: updated });
+      }
     } catch (e) {
       console.warn('Failed to save decision preset', e);
     }
@@ -292,6 +300,9 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
     try {
       const updated = await deleteDecisionPreset(id);
       setSavedPresets(updated);
+      if (cloudUser) {
+        publishDecisionPresets(cloudUser.uid, updated);
+      }
     } catch {}
   };
 

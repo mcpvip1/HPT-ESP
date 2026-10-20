@@ -24,6 +24,7 @@ import { DecisionLayers } from './DecisionLayers';
 import { SuggestionEnginePanel } from './SuggestionEnginePanel';
 import { analyzeColumnSuggestions } from '../utils/suggestionEngine';
 import { translations } from '../translations';
+import type { User } from 'firebase/auth';
 
 interface RulesLogicModalProps {
   isOpen: boolean;
@@ -45,6 +46,7 @@ interface RulesLogicModalProps {
   holdValues: string[];
   holdReason: string;
   onHoldSettingsChange: (column: string, values: string[], reason: string) => void;
+  cloudUser?: User | null;
 }
 
 export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
@@ -67,6 +69,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
   holdValues,
   holdReason,
   onHoldSettingsChange,
+  cloudUser,
 }) => {
   const [activeTab, setActiveTab] = useState<'mapping' | 'suggestions' | 'decision' | 'hold'>('mapping');
   const [holdValueSearch, setHoldValueSearch] = useState('');
@@ -292,6 +295,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
                 onUpdateNormalization={onUpdateNormalization}
                 language={language}
                 onShowToast={onShowToast}
+                cloudUser={cloudUser}
               />
             </div>
           ) : activeTab === 'suggestions' ? (
@@ -334,6 +338,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
                 onExecuteMatching={onExecuteMatching}
                 isProcessing={isProcessing}
                 language={language}
+                cloudUser={cloudUser}
               />
             </div>
           ) : (

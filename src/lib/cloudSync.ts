@@ -21,6 +21,8 @@ import type {
   MatchedRow,
   MatchingStats,
   NormalizationRules,
+  SavedDecisionPreset,
+  SavedMappingPreset,
   SyncHistoryEntry,
   WorkbookData,
 } from '../types';
@@ -59,9 +61,16 @@ export function generateShareId(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Rule settings sync: normalization rules, decision layers, column mappings.
-// Stored at workspaces/{uid}/state/rules — shared across every device.
+// Rule settings sync: normalization rules, decision layers, column mappings,
+// presets, and column view settings.
+// Stored at workspaces/{uid}/state/rules and state/columnConfigs.
 // ---------------------------------------------------------------------------
+
+export interface StoredColumnSettings {
+  order: string[];
+  visibility: Record<string, { table: boolean; export: boolean }>;
+  updatedAt?: number;
+}
 
 export interface CloudRulesState {
   normalization: NormalizationRules;
@@ -71,6 +80,9 @@ export interface CloudRulesState {
   holdValues: string[];
   holdReason: string;
   releasedRowIds: string[];
+  mappingPresets?: SavedMappingPreset[];
+  decisionPresets?: SavedDecisionPreset[];
+  columnConfigs?: StoredColumnSettings;
   updatedAt: number;
 }
 
@@ -78,10 +90,10 @@ const stateDoc = (uid: string, name: string) => doc(db, 'workspaces', uid, 'stat
 
 export async function publishRulesState(
   uid: string,
-  state: Omit<CloudRulesState, 'updatedAt'>
+  state: Partial<Omit<CloudRulesState, 'updatedAt'>>
 ): Promise<boolean> {
   try {
-    await setDoc(stateDoc(uid, 'rules'), { ...state, updatedAt: Date.now() });
+    await setDoc(stateDoc(uid, 'rules'), { ...state, updatedAt: Date.now() }, { merge: true });
     return true;
   } catch (e) {
     console.warn('Cloud sync: failed to publish rules', e);
@@ -97,6 +109,67 @@ export async function fetchRulesState(uid: string): Promise<CloudRulesState | nu
   } catch (e) {
     console.warn('Cloud sync: failed to fetch rules', e);
     return null;
+  }
+}
+
+export async function publishColumnConfigs(
+  uid: string,
+  settings: StoredColumnSettings
+): Promise<boolean> {
+  try {
+    await Promise.all([
+      setDoc(stateDoc(uid, 'columnConfigs'), { ...settings, updatedAt: Date.now() }, { merge: true }),
+      setDoc(stateDoc(uid, 'rules'), { columnConfigs: settings, updatedAt: Date.now() }, { merge: true }),
+    ]);
+    return true;
+  } catch (e) {
+    console.warn('Cloud sync: failed to publish columnConfigs', e);
+    return false;
+  }
+}
+
+export async function fetchColumnConfigs(uid: string): Promise<StoredColumnSettings | null> {
+  try {
+    const snap = await getDoc(stateDoc(uid, 'columnConfigs'));
+    if (snap.exists()) {
+      return snap.data() as StoredColumnSettings;
+    }
+    // Fallback: check inside rules doc in case columnConfigs was stored there
+    const rulesSnap = await getDoc(stateDoc(uid, 'rules'));
+    if (rulesSnap.exists()) {
+      const data = rulesSnap.data() as CloudRulesState;
+      if (data?.columnConfigs) return data.columnConfigs;
+    }
+    return null;
+  } catch (e) {
+    console.warn('Cloud sync: failed to fetch columnConfigs', e);
+    return null;
+  }
+}
+
+export async function publishMappingPresets(
+  uid: string,
+  presets: SavedMappingPreset[]
+): Promise<boolean> {
+  try {
+    await setDoc(stateDoc(uid, 'rules'), { mappingPresets: presets, updatedAt: Date.now() }, { merge: true });
+    return true;
+  } catch (e) {
+    console.warn('Cloud sync: failed to publish mappingPresets', e);
+    return false;
+  }
+}
+
+export async function publishDecisionPresets(
+  uid: string,
+  presets: SavedDecisionPreset[]
+): Promise<boolean> {
+  try {
+    await setDoc(stateDoc(uid, 'rules'), { decisionPresets: presets, updatedAt: Date.now() }, { merge: true });
+    return true;
+  } catch (e) {
+    console.warn('Cloud sync: failed to publish decisionPresets', e);
+    return false;
   }
 }
 

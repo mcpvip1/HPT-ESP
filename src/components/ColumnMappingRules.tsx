@@ -21,6 +21,7 @@ import {
   Language,
   SavedMappingPreset,
 } from '../types';
+import type { User } from 'firebase/auth';
 import { translations } from '../translations';
 import { autoMapColumns } from '../utils/excel';
 import {
@@ -30,6 +31,7 @@ import {
   getRecentMappings,
   pushRecentMapping,
 } from '../utils/storage';
+import { publishRulesState, publishMappingPresets } from '../lib/cloudSync';
 import { SuggestionEnginePanel } from './SuggestionEnginePanel';
 import { analyzeColumnSuggestions } from '../utils/suggestionEngine';
 
@@ -42,6 +44,7 @@ interface ColumnMappingRulesProps {
   onUpdateNormalization: (norm: NormalizationRules) => void;
   language: Language;
   onShowToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+  cloudUser?: User | null;
 }
 
 export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
@@ -53,6 +56,7 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
   onUpdateNormalization,
   language,
   onShowToast,
+  cloudUser,
 }) => {
   const t = translations[language];
 
@@ -93,7 +97,7 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
       }
     }
     loadPresets();
-  }, []);
+  }, [showPresetsModal]);
 
   // Whenever mappings change and have at least 1 rule, save to auto-recent history
   useEffect(() => {
@@ -160,7 +164,13 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
       setSavedPresets(updated);
       setNewPresetName('');
       setShowSaveDialog(false);
-      onShowToast(t.mapPresetSaved.replace('{name}', name), 'success')
+      if (cloudUser) {
+        publishMappingPresets(cloudUser.uid, updated);
+        publishRulesState(cloudUser.uid, { mappings, mappingPresets: updated });
+        onShowToast(`${t.mapPresetSaved.replace('{name}', name)} (Synced to Cloud)`, 'success');
+      } else {
+        onShowToast(t.mapPresetSaved.replace('{name}', name), 'success');
+      }
     } catch {
       onShowToast(t.mapPresetSaveFailed, 'error');
     }
@@ -183,7 +193,7 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
     const mainFound = newMappings.filter(m => refHeaders.includes(m.mainCol)).length;
     const compFound = newMappings.filter(m => compHeaders.includes(m.comparisonCol)).length;
 
-    onShowToast(t.mapPresetApplied.replace('{name}', name).replace('{total}', String(newMappings.length)).replace('{mainFound}', String(mainFound)).replace('{compFound}', String(compFound)), 'success')
+    onShowToast(t.mapPresetApplied.replace('{name}', name).replace('{total}', String(newMappings.length)).replace('{mainFound}', String(mainFound)).replace('{compFound}', String(compFound)), 'success');
   };
 
   const handleDeleteSavedPreset = async (id: string, e: React.MouseEvent) => {
@@ -191,6 +201,9 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
     try {
       const updated = await deleteMappingPreset(id);
       setSavedPresets(updated);
+      if (cloudUser) {
+        publishMappingPresets(cloudUser.uid, updated);
+      }
       onShowToast(t.mapPresetDeleted, 'info');
     } catch {
       onShowToast(t.mapPresetDeleteFailed, 'error');
