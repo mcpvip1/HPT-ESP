@@ -158,6 +158,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRow, setSelectedRow] = useState<MatchedRow | null>(null);
   const [copiedCellId, setCopiedCellId] = useState<string | null>(null);
+  const [flashedRowId, setFlashedRowId] = useState<string | null>(null);
+  const lastToastTimeRef = useRef<{ time: number; text: string }>({ time: 0, text: '' });
 
   const [releaseTarget, setReleaseTarget] = useState<{ key: string; count: number } | null>(null);
   const [supervisorConfirmed, setSupervisorConfirmed] = useState(false);
@@ -772,18 +774,36 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     } catch {}
   };
 
-  // 1-Click copy text handler with hover highlight & immediate feedback for any cell (e.g. AD202N)
-  const copyCellText = useCallback((text: any, cellId: string, colName?: string) => {
+  // 1-Click copy text handler with hover highlight, row color flash confirmation & debounced toast
+  const copyCellText = useCallback((text: any, cellId: string, rowId?: string) => {
     const raw = String(text ?? '').trim();
     if (!raw || raw === '—') return;
+
+    // Trigger row visual confirmation flash and scale effect
+    if (rowId) {
+      setFlashedRowId(rowId);
+      setTimeout(() => {
+        setFlashedRowId((curr) => (curr === rowId ? null : curr));
+      }, 450);
+    }
+
+    const now = Date.now();
+    // Prevent excessive toast spamming if user clicks rapidly
+    const isRapidRepeat =
+      now - lastToastTimeRef.current.time < 600 &&
+      (lastToastTimeRef.current.text === raw || now - lastToastTimeRef.current.time < 350);
 
     const onSuccess = () => {
       setCopiedCellId(cellId);
       setTimeout(() => {
         setCopiedCellId((curr) => (curr === cellId ? null : curr));
       }, 1800);
-      const snippet = raw.length > 25 ? `${raw.slice(0, 25)}…` : raw;
-      onShowToast(`Copied! "${snippet}"`, 'success');
+
+      if (!isRapidRepeat) {
+        lastToastTimeRef.current = { time: now, text: raw };
+        const snippet = raw.length > 25 ? `${raw.slice(0, 25)}…` : raw;
+        onShowToast(`Copied! "${snippet}"`, 'success');
+      }
     };
 
     try {
@@ -817,7 +837,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       }
     }
     const fullText = lines.join('\n');
-    copyCellText(fullText, `${row.id}_fullRow`);
+    copyCellText(fullText, `${row.id}_fullRow`, row.id);
   }, [copyCellText]);
 
   const handleCopyShareLink = async () => {
@@ -1767,15 +1787,17 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       key={row.id}
                       title="Click to copy"
                       className={`results-table-row group/row transition-all duration-150 border-b border-slate-100 ${
-                        isGreen
-                          ? 'bg-emerald-50/30 hover:bg-emerald-100/80 border-l-[4px] border-l-emerald-500 hover:shadow-2xs'
+                        flashedRowId === row.id
+                          ? 'copy-flash ring-2 ring-emerald-500/90 bg-emerald-100/95 scale-[0.992] shadow-sm z-10 relative'
+                          : isGreen
+                          ? 'bg-emerald-50/30 hover:bg-emerald-100/80 border-l-[4px] border-l-emerald-500 hover:shadow-2xs active:scale-[0.995]'
                           : isYellow
-                          ? 'bg-amber-50/30 hover:bg-amber-100/80 border-l-[4px] border-l-amber-500 hover:shadow-2xs'
+                          ? 'bg-amber-50/30 hover:bg-amber-100/80 border-l-[4px] border-l-amber-500 hover:shadow-2xs active:scale-[0.995]'
                           : isRed
-                          ? 'bg-rose-50/30 hover:bg-rose-100/80 border-l-[4px] border-l-rose-500 hover:shadow-2xs'
+                          ? 'bg-rose-50/30 hover:bg-rose-100/80 border-l-[4px] border-l-rose-500 hover:shadow-2xs active:scale-[0.995]'
                           : isBlue
-                          ? 'bg-blue-50/40 hover:bg-blue-100/90 border-l-[4px] border-l-blue-600 hover:shadow-2xs'
-                          : 'even:bg-slate-50/40 hover:bg-slate-100/90 border-l-[4px] border-l-transparent hover:shadow-2xs'
+                          ? 'bg-blue-50/40 hover:bg-blue-100/90 border-l-[4px] border-l-blue-600 hover:shadow-2xs active:scale-[0.995]'
+                          : 'even:bg-slate-50/40 hover:bg-slate-100/90 border-l-[4px] border-l-transparent hover:shadow-2xs active:scale-[0.995]'
                       }`}
                     >
                       {visibleTableColumns.map((col) => {
@@ -1787,7 +1809,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           return (
                             <td
                               key={col.id}
-                              onClick={() => copyCellText(valStr, cellId, 'Row Number')}
+                              onClick={() => copyCellText(valStr, cellId, row.id)}
                               className={`py-1.5 px-2 sm:py-2.5 sm:px-3 border-r border-slate-200 text-center text-slate-600 font-mono tabular-nums text-[11px] font-bold sticky left-0 z-[5] cursor-pointer group/cell hover:bg-slate-200/90 transition-colors ${frozenBg}`}
                               title="Click to copy"
                             >
@@ -1808,7 +1830,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           return (
                             <td
                               key={col.id}
-                              onClick={() => copyCellText(statusStr, cellId, 'Decision Status')}
+                              onClick={() => copyCellText(statusStr, cellId, row.id)}
                               className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap cursor-pointer group/cell hover:bg-slate-100 transition-colors"
                               title="Click to copy"
                             >
@@ -1835,7 +1857,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           return (
                             <td
                               key={col.id}
-                              onClick={() => copyCellText(copyVal, cellId, 'Match Status')}
+                              onClick={() => copyCellText(copyVal, cellId, row.id)}
                               className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap cursor-pointer group/cell hover:bg-slate-100 transition-colors"
                               title="Click to copy"
                             >
@@ -1882,7 +1904,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                     className="font-mono text-xs font-bold text-amber-900 bg-amber-100/80 hover:bg-amber-200/90 border border-amber-300/80 px-1.5 py-0.5 rounded cursor-pointer truncate max-w-[220px] transition-all flex items-center justify-between gap-1 group/ident shadow-2xs"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      copyCellText(copyVal, cellId, 'Identifier');
+                                      copyCellText(copyVal, cellId, row.id);
                                     }}
                                     title={`Click 1 time to copy identifier "${copyVal}"`}
                                   >
@@ -1920,7 +1942,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           return (
                             <td
                               key={col.id}
-                              onClick={() => copyCellText(valStr, cellId, 'Decision Reason')}
+                              onClick={() => copyCellText(valStr, cellId, row.id)}
                               className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 text-xs text-slate-700 font-medium truncate max-w-xs cursor-pointer group/cell hover:bg-amber-50/90 transition-colors"
                               title="Click to copy"
                             >
@@ -1981,7 +2003,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           return (
                             <td
                               key={col.id}
-                              onClick={() => hasValue && copyCellText(valStr, cellId, col.id)}
+                              onClick={() => hasValue && copyCellText(valStr, cellId, row.id)}
                               className={`py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800 bg-blue-50/20 transition-all ${
                                 hasValue
                                   ? 'cursor-pointer group/cell hover:bg-blue-100/80 hover:text-blue-950'
@@ -2022,7 +2044,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         return (
                           <td
                             key={col.id}
-                            onClick={() => hasValue && copyCellText(valStr, cellId, col.id)}
+                            onClick={() => hasValue && copyCellText(valStr, cellId, row.id)}
                             className={`py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800 transition-all ${
                               hasValue
                                 ? 'cursor-pointer group/cell hover:bg-emerald-100/70 hover:text-emerald-950 shadow-inner'

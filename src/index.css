@@ -41,12 +41,34 @@ html, body {
   pointer-events: none;
 }
 
+@keyframes row-copy-flash {
+  0% {
+    transform: scale(0.99);
+    background-color: rgba(16, 185, 129, 0.32);
+  }
+  50% {
+    transform: scale(0.996);
+    background-color: rgba(16, 185, 129, 0.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .results-table-row {
-  transition: background-color 150ms ease, box-shadow 150ms ease;
+  transition: background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
   cursor: pointer;
 }
 
 .results-table-row:hover {
   background-color: rgba(241, 245, 249, 0.85);
+}
+
+.results-table-row:active {
+  transform: scale(0.994);
+}
+
+.results-table-row.copy-flash {
+  animation: row-copy-flash 450ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
