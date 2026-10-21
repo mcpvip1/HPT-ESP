@@ -62,6 +62,7 @@ import {
   publishWorkbooks,
   fetchWorkbooks,
   publishResultsState,
+  publishResultFilters,
   fetchResultsState,
   deleteResultsState,
   isCloudDocUploading,
@@ -543,7 +544,6 @@ export default function App() {
     saveToIDB(StorageKeys.SYNC_HISTORY, next).catch(() => {});
     // Sync the log to the cloud so other devices see this upload too
     if (uidRef.current) debouncedPublishHistory(uidRef.current, next);
-    return () => debouncedPublishHistory.cancel();
   }, [pickActiveUpload, debouncedPublishHistory]);
 
   // Human-readable reason for a settings upload, by diffing rule sections
@@ -571,7 +571,7 @@ export default function App() {
     }
   }, []);
 
-  // Publish rule settings to the cloud whenever they change (debounced).
+  // Publish rule settings to the cloud whenever they change (optimized debounce).
   const debouncedPublishRules = useRef(
     debounce((uid: string, st: { normalization: NormalizationRules; layers: DecisionLayer[]; mappings: ColumnMapping[]; holdColumn: string; holdValues: string[]; holdReason: string; releasedRowIds: string[] }, reason: string) => {
       const key = JSON.stringify({ n: st.normalization, l: st.layers, m: st.mappings, hc: st.holdColumn, h: st.holdValues, hr: st.holdReason, rr: st.releasedRowIds });
@@ -584,7 +584,7 @@ export default function App() {
         if (ok) showToast(tt.toastCloudSettingsUploaded, 'success');
         else showToast(tt.toastCloudSettingsSyncFailed, 'error');
       });
-    }, 1500)
+    }, 500)
   ).current;
 
   useEffect(() => {
@@ -598,11 +598,9 @@ export default function App() {
     return () => debouncedPublishRules.cancel();
   }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds, debouncedPublishRules, describeRulesChange]);
 
-  // Publish evaluated results (+ view filters) to the cloud whenever they
-  // change, so signing in on another device restores the same results.
+  // Publish evaluated results to the cloud whenever matching is executed.
   // Pull-applied results are skipped via pulledResultsRef (no echo).
-  // The generation guard drops a pending publish after the results were
-  // cleared (e.g. file removed) so stale results can't be resurrected.
+  // The generation guard drops a pending publish after results are cleared.
   const resultsPublishGenRef = useRef(0);
   const debouncedPublishResults = useRef(
     debounce((uid: string, state: { results: MatchedRow[]; stats: MatchingStats; filters: ResultFilters }, gen: number) => {
@@ -618,21 +616,35 @@ export default function App() {
       });
       // Keep the local instant-paint cache in step
       saveToIDB(StorageKeys.RESULTS_STATE, state).catch(() => {});
-    }, 2500)
+    }, 500)
   );
+
+  // Dedicated lightweight filter updater: updates metadata only, never re-uploads whole dataset
+  const debouncedPublishResultFilters = useRef(
+    debounce((uid: string, filters: ResultFilters) => {
+      publishResultFilters(uid, filters);
+    }, 400)
+  ).current;
+
+  // Trigger full chunked upload ONLY when results or stats actually change
   useEffect(() => {
     if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current) return;
     if (results.length === 0 || !stats) return;
     if (pulledResultsRef.current === results) {
-      // Pull echo: skip publish, but keep the ref until results actually change
-      // (don't null it, or a later filter change will spuriously re-publish)
       return;
     }
-    // Results are new (not from pull): clear the echo guard
     pulledResultsRef.current = null;
     debouncedPublishResults.current(cloudUser.uid, { results, stats, filters: resultFilters }, resultsPublishGenRef.current);
     return () => debouncedPublishResults.current.cancel();
-  }, [cloudUser, isPreviewMode, localReady, results, stats, resultFilters, debouncedPublishResults]);
+  }, [cloudUser, isPreviewMode, localReady, results, stats, debouncedPublishResults]);
+
+  // When only view filters change, publish lightweight filter metadata (super fast, no re-chunking)
+  useEffect(() => {
+    if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current) return;
+    if (results.length === 0 || !stats) return;
+    debouncedPublishResultFilters(cloudUser.uid, resultFilters);
+    return () => debouncedPublishResultFilters.cancel();
+  }, [cloudUser, isPreviewMode, localReady, resultFilters, debouncedPublishResultFilters]);
 
   const VALID_FILTERS = ['all', 'green', 'yellow', 'red', 'blue', 'unmatched'] as const;
   const isValidFilter = (f: string): f is typeof VALID_FILTERS[number] =>
@@ -662,7 +674,7 @@ export default function App() {
         if (ok) showToast(tt.toastCloudFilesUploaded, 'success');
         else showToast(tt.toastCloudFilesSyncFailed, 'error');
       });
-    }, 2000)
+    }, 300)
   ).current;
 
   const publishWorkbooksNow = (refWb: WorkbookData | null, compWb: WorkbookData | null) => {

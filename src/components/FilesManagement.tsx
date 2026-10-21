@@ -282,7 +282,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2 mt-6 pt-4 border-t border-slate-200">
+              <div className="flex flex-wrap items-center gap-2 mt-6 pt-4 border-t border-slate-200">
                 <button
                   onClick={() => onPreviewWb(referenceWb, t.referenceFile)}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 shadow-xs transition-colors"
@@ -519,7 +519,7 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2 mt-6 pt-4 border-t border-slate-200">
+              <div className="flex flex-wrap items-center gap-2 mt-6 pt-4 border-t border-slate-200">
                 <button
                   onClick={() => onPreviewWb(comparisonWb, t.incomingFile)}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 shadow-xs transition-colors"

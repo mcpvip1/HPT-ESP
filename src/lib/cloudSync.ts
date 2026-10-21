@@ -260,9 +260,14 @@ async function publishChunkedDoc(
   const chunks = splitIntoByteChunks(json, CHUNK_BYTES);
   const chunksCol = collection(metaRef, 'chunks');
 
-  // Small/atomic path: single batch, all-or-nothing (previous behavior).
-  if (opts.atomic) {
+  const uploadId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const total = chunks.length;
+
+  // Small/atomic path or single chunk: commit everything in a single atomic batch
+  // (drastically speeds up uploads, cuts roundtrips from 4 down to 1).
+  if (opts.atomic || total <= 1) {
     try {
+      opts.onProgress?.(0, Math.max(total, 1));
       const prevSnap = await getDoc(metaRef).catch(() => null);
       const prevCount =
         prevSnap && prevSnap.exists()
@@ -270,44 +275,51 @@ async function publishChunkedDoc(
           : 0;
       const batch = writeBatch(db);
       chunks.forEach((data, i) => {
-        batch.set(doc(chunksCol, String(i)), { data, ...chunkFields });
+        batch.set(doc(chunksCol, String(i)), { data, uploadId, ...chunkFields });
       });
       for (let i = chunks.length; i < prevCount; i++) {
         batch.delete(doc(chunksCol, String(i)));
       }
-      batch.set(metaRef, { ...metaFields, chunkCount: chunks.length });
+      batch.set(
+        metaRef,
+        {
+          ...metaFields,
+          chunkCount: chunks.length,
+          uploading: false,
+          uploadId,
+          uploadStartedAt: Date.now(),
+        },
+        { merge: true }
+      );
       await batch.commit();
-      opts.onProgress?.(chunks.length, chunks.length);
+      opts.onProgress?.(total, Math.max(total, 1));
       return true;
     } catch (e) {
-      console.warn('Cloud sync: failed to publish chunked doc', e);
+      console.warn('Cloud sync: failed to publish atomic/single chunked doc', e);
       return false;
     }
   }
 
-  // Progressive path: upload chunks with real progress, then finalize
-  // atomically. An "uploading" marker tells concurrent readers to wait
-  // instead of reading a partial payload; every chunk carries an uploadId
-  // so a reader can detect chunks from an overlapping upload.
-  const uploadId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  const total = chunks.length;
+  // Progressive path: upload multi-chunk payloads with real progress and bounded concurrency
   try {
-    const prevSnap = await getDoc(metaRef).catch(() => null);
+    opts.onProgress?.(0, total);
+
+    // 1. Marker and previous count check in parallel
+    const [prevSnap] = await Promise.all([
+      getDoc(metaRef).catch(() => null),
+      setDoc(
+        metaRef,
+        { ...metaFields, chunkCount: 0, uploading: true, uploadId, uploadStartedAt: Date.now() },
+        { merge: true }
+      ),
+    ]);
     const prevCount =
       prevSnap && prevSnap.exists()
         ? ((prevSnap.data() as { chunkCount?: number }).chunkCount || 0)
         : 0;
 
-    // 1. Marker first (quick single write)
-    await setDoc(
-      metaRef,
-      { ...metaFields, chunkCount: 0, uploading: true, uploadId, uploadStartedAt: Date.now() },
-      { merge: true }
-    );
-
-    // 2. Chunks with real progress (bounded concurrency)
-    opts.onProgress?.(0, total);
-    const CONCURRENCY = 6;
+    // 2. Chunks with real progress (increased concurrency from 6 to 10 for faster uploads)
+    const CONCURRENCY = 10;
     for (let i = 0; i < total; i += CONCURRENCY) {
       const end = Math.min(i + CONCURRENCY, total);
       await Promise.all(
@@ -668,6 +680,31 @@ export interface CloudWorkbooks {
   updatedAt: number;
 }
 
+function compactWorkbook(wb: WorkbookData | null): WorkbookData | null {
+  if (!wb) return null;
+  // If sheets contains activeSheet, wb.rows is identical to wb.sheets[activeSheet].rows.
+  // We can omit duplicating rows in wb.rows when sending to cloud, cutting bytes by up to 50%.
+  if (wb.sheets && wb.activeSheet && wb.sheets[wb.activeSheet]) {
+    return {
+      ...wb,
+      rows: [],
+    };
+  }
+  return wb;
+}
+
+function restoreWorkbook(wb: WorkbookData | null): WorkbookData | null {
+  if (!wb) return null;
+  if ((!wb.rows || wb.rows.length === 0) && wb.sheets && wb.activeSheet && wb.sheets[wb.activeSheet]) {
+    return {
+      ...wb,
+      rows: wb.sheets[wb.activeSheet].rows || [],
+      headers: wb.headers && wb.headers.length > 0 ? wb.headers : (wb.sheets[wb.activeSheet].headers || []),
+    };
+  }
+  return wb;
+}
+
 export async function publishWorkbooks(
   uid: string,
   wbs: { reference: WorkbookData | null; comparison: WorkbookData | null },
@@ -675,7 +712,7 @@ export async function publishWorkbooks(
 ): Promise<boolean> {
   return publishChunkedDoc(
     stateDoc(uid, 'workbooks'),
-    JSON.stringify({ reference: wbs.reference, comparison: wbs.comparison }),
+    JSON.stringify({ reference: compactWorkbook(wbs.reference), comparison: compactWorkbook(wbs.comparison) }),
     { updatedAt: Date.now() },
     {},
     { onProgress }
@@ -691,8 +728,8 @@ export async function fetchWorkbooks(uid: string): Promise<CloudWorkbooks | null
       comparison?: WorkbookData | null;
     };
     return {
-      reference: data.reference || null,
-      comparison: data.comparison || null,
+      reference: restoreWorkbook(data.reference || null),
+      comparison: restoreWorkbook(data.comparison || null),
       updatedAt: (res.meta.updatedAt as number) || 0,
     };
   } catch (e) {
@@ -740,6 +777,23 @@ export async function publishResultsState(
     {},
     { onProgress }
   );
+}
+
+export async function publishResultFilters(
+  uid: string,
+  filters: ResultFilters
+): Promise<boolean> {
+  try {
+    await setDoc(
+      stateDoc(uid, 'results'),
+      { filters, updatedAt: Date.now() },
+      { merge: true }
+    );
+    return true;
+  } catch (e) {
+    console.warn('Cloud sync: failed to publish result filters', e);
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------

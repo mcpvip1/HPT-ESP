@@ -254,6 +254,11 @@ export function normalizeValue(val: any, rules: NormalizationRules): string {
     str = str.trim();
   }
 
+  // Strip trailing '.0' or '.00' on numeric integers from Excel/CSV (e.g. '45001.0' -> '45001')
+  if (/^\d+\.0+$/.test(str)) {
+    str = str.replace(/\.0+$/, '');
+  }
+
   if (rules.ignoreCase) {
     str = str.toLowerCase();
   }
@@ -277,23 +282,28 @@ export function normalizeValue(val: any, rules: NormalizationRules): string {
 }
 
 /**
- * Generates composite normalized key for a row based on column list
+ * Generates composite normalized key for a row based on column list.
+ * Prevents blank rows from matching: if all key parts are empty, returns ''
+ * Uses getRowFieldValue for case- and [Ref]-resilient header lookup.
  */
 export function generateRowKey(
   row: ExcelRow,
   columns: string[],
   rules: NormalizationRules
 ): string {
-  return columns
-    .map((col) => normalizeValue(row[col], rules))
-    .join('|||');
+  if (!columns || columns.length === 0) return '';
+  const parts = columns.map((col) => {
+    const val = getRowFieldValue(row, col);
+    return normalizeValue(val, rules);
+  });
+  // If all key parts are empty, this row has no valid composite key
+  if (parts.every((p) => p === '')) return '';
+  return parts.join('|||');
 }
 
 /**
- * Auto-maps columns based on string similarity / token overlap
- */
-/**
- * Auto-maps columns based on intelligent Suggestion Engine and industry terminology
+ * Auto-maps columns based on intelligent Suggestion Engine and industry terminology.
+ * Enforces strictly 1-to-1 unique pairings so no column is mapped more than once.
  */
 export function autoMapColumns(
   mainHeaders: string[],
@@ -301,11 +311,25 @@ export function autoMapColumns(
 ): ColumnMapping[] {
   const analysis = analyzeColumnSuggestions(mainHeaders, compHeaders);
   if (analysis.suggestions.length > 0) {
-    return analysis.suggestions.map((s, idx) => ({
-      id: `map_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
-      mainCol: s.mainCol,
-      comparisonCol: s.comparisonCol,
-    }));
+    const claimedMain = new Set<string>();
+    const claimedComp = new Set<string>();
+    const uniqueMappings: ColumnMapping[] = [];
+
+    for (const s of analysis.suggestions) {
+      if (!claimedMain.has(s.mainCol) && !claimedComp.has(s.comparisonCol)) {
+        claimedMain.add(s.mainCol);
+        claimedComp.add(s.comparisonCol);
+        uniqueMappings.push({
+          id: `map_${Date.now()}_${uniqueMappings.length}_${Math.random().toString(36).substring(2, 6)}`,
+          mainCol: s.mainCol,
+          comparisonCol: s.comparisonCol,
+        });
+      }
+    }
+
+    if (uniqueMappings.length > 0) {
+      return uniqueMappings;
+    }
   }
 
   // If none matched, pair first column
@@ -599,19 +623,20 @@ export function analyzeUnmatchedRow(
     };
   }
 
-  // Scan reference rows to detect closest candidate or partial matches
+  // Scan reference rows to detect closest candidate or partial matches (capped to avoid thread freeze)
   let bestCandidate: ExcelRow | null = null;
   let bestMatchCount = 0;
   let bestDiffs: UnmatchedFieldDiff[] = [];
+  const maxScan = Math.min(mainWb.rows.length, 300);
 
-  for (let r = 0; r < mainWb.rows.length; r++) {
+  for (let r = 0; r < maxScan; r++) {
     const refRow = mainWb.rows[r];
     let matchCount = 0;
     const diffs: UnmatchedFieldDiff[] = [];
 
     for (const m of mappings) {
-      const compVal = compRow[m.comparisonCol];
-      const refVal = refRow[m.mainCol];
+      const compVal = getRowFieldValue(compRow, m.comparisonCol);
+      const refVal = getRowFieldValue(refRow, m.mainCol);
       const compNorm = normalizeValue(compVal, normalization);
       const refNorm = normalizeValue(refVal, normalization);
 
@@ -631,6 +656,10 @@ export function analyzeUnmatchedRow(
       bestMatchCount = matchCount;
       bestCandidate = refRow;
       bestDiffs = diffs;
+      // Early exit if optimal partial match found
+      if (bestMatchCount >= mappings.length - 1 && mappings.length > 1) {
+        break;
+      }
     }
   }
 
@@ -655,7 +684,7 @@ export function analyzeUnmatchedRow(
   const defaultDiffs: UnmatchedFieldDiff[] = mappings.map((m) => ({
     comparisonCol: m.comparisonCol,
     mainCol: m.mainCol,
-    compValue: compRow[m.comparisonCol],
+    compValue: getRowFieldValue(compRow, m.comparisonCol),
     refValue: undefined,
     isMatch: false,
   }));
@@ -685,8 +714,20 @@ export function processMatching(
   results: MatchedRow[];
   stats: MatchingStats;
 } {
-  const mainCols = mappings.map((m) => m.mainCol);
-  const compCols = mappings.map((m) => m.comparisonCol);
+  // Deduplicate mappings by (mainCol, comparisonCol) pair
+  const seenPairs = new Set<string>();
+  const effectiveMappings: ColumnMapping[] = [];
+  for (const m of mappings) {
+    if (!m.mainCol || !m.comparisonCol) continue;
+    const pair = `${m.mainCol.trim()}|||${m.comparisonCol.trim()}`;
+    if (!seenPairs.has(pair)) {
+      seenPairs.add(pair);
+      effectiveMappings.push(m);
+    }
+  }
+
+  const mainCols = effectiveMappings.map((m) => m.mainCol);
+  const compCols = effectiveMappings.map((m) => m.comparisonCol);
 
   // Build key map for reference workbook (preferring Accept/Waive rows on duplicates)
   const mainKeyMap = new Map<string, ExcelRow>();

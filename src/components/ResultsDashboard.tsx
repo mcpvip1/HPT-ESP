@@ -1153,10 +1153,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             </span>
           </button>
 
-          <div className="hidden lg:block h-5 w-px bg-slate-200 shrink-0" />
+          <div className="hidden sm:block h-5 w-px bg-slate-200 shrink-0" />
 
           {/* View group */}
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             {/* Refresh Button */}
             <button
               onClick={handleRefresh}
@@ -1200,9 +1200,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
           {!isPreviewMode && (
             <>
-              <div className="hidden lg:block h-5 w-px bg-slate-200 shrink-0" />
+              <div className="hidden md:block h-5 w-px bg-slate-200 shrink-0" />
               {/* Share group */}
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
                 {/* Copy Share Link Button */}
                 <button
                   onClick={handleCopyShareLink}
@@ -1266,7 +1266,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
               <div className="hidden lg:block h-5 w-px bg-slate-200 shrink-0" />
               {/* Export group */}
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
                 <button
                   onClick={handleExportExcel}
                   className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none"
@@ -1291,11 +1291,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
 
         {/* 3. DEDICATED REAL-TIME SEARCH BAR & SCOPE SELECTOR */}
-        <div className="pt-3 border-t border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          <div className="flex flex-1 items-center gap-2 max-w-2xl">
+        <div className="pt-3 border-t border-slate-200 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 sm:gap-3">
+          <div className="flex flex-1 flex-wrap sm:flex-nowrap items-center gap-2 max-w-2xl">
             {/* Search Scope Dropdown */}
             {!isPreviewMode && (
-              <div className="relative shrink-0 max-w-[45vw]">
+              <div className="relative shrink-0 max-w-full sm:max-w-[45vw]">
                 <select
                   value={searchColumn}
                   onChange={(e) => {
@@ -1333,7 +1333,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             )}
 
             {/* Real-time Search Input Field */}
-            <div className="relative flex-1 min-w-0">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
@@ -1373,7 +1373,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
             {/* Match Counter Badge */}
             {searchTerm.trim() && (
-              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 font-mono">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 font-mono">
                 <Filter className="w-3 h-3" />
                 {t.dashRowsFound.replace('{count}', filteredRows.length.toLocaleString())}
               </span>
@@ -1382,7 +1382,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
           {/* Currently viewed file + last replaced time */}
           {comparisonWb && (
-            <div className="flex flex-wrap items-center gap-2 max-w-full self-end md:self-auto ml-auto">
+            <div className="flex flex-wrap items-center gap-2 max-w-full self-start lg:self-auto ml-0 lg:ml-auto">
               <span
                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px]"
                 title={comparisonWb.name}
@@ -1405,7 +1405,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
           {/* Rows Per Page Selector (Only in Studio mode since Preview mode shows all rows) */}
           {!isPreviewMode && (
-            <div className="flex items-center gap-3 text-xs text-slate-500 self-end md:self-auto shrink-0">
+            <div className="flex items-center gap-2 text-xs text-slate-500 self-start lg:self-auto shrink-0">
               <span>{t.rowsPerPage}:</span>
               <select
                 value={pageSize}

@@ -87,8 +87,10 @@ export const SyncHistoryModal: React.FC<SyncHistoryModalProps> = ({
                     {activeUpload.fileName}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-0.5 tabular-nums">
-                    {activeUpload.total > 0
-                      ? `${activeUpload.done} / ${activeUpload.total}`
+                    {activeUpload.total > 1
+                      ? `Chunk ${activeUpload.done} of ${activeUpload.total} (${pct ?? 0}%)`
+                      : pct !== null
+                      ? `${pct}% uploaded`
                       : activeUpload.label}
                   </p>
                 </div>
