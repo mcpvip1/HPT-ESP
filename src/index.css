@@ -41,3 +41,12 @@ html, body {
   pointer-events: none;
 }
 
+.results-table-row {
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+  cursor: pointer;
+}
+
+.results-table-row:hover {
+  background-color: rgba(241, 245, 249, 0.85);
+}
+

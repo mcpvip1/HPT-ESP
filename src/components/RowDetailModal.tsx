@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   CheckCircle2,
@@ -9,6 +9,8 @@ import {
   GitCompare,
   ArrowRight,
   Sparkles,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Language, MatchedRow } from '../types';
 import { translations } from '../translations';
@@ -29,11 +31,59 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
   if (!isOpen || !row) return null;
 
   const t = translations[language];
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const compKeys = Object.keys(row.comparisonRow);
   const refKeys = row.matchedMainRow ? Object.keys(row.matchedMainRow) : [];
   const unmatched = row.unmatchedInfo;
   const closestRef = unmatched?.closestReferenceRow;
+
+  const copyText = (text: string, keyName: string) => {
+    if (!text || text === '—') return;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedKey(keyName);
+      setTimeout(() => setCopiedKey(null), 1800);
+    }).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopiedKey(keyName);
+      setTimeout(() => setCopiedKey(null), 1800);
+    });
+  };
+
+  const handleCopyEntireRow = () => {
+    const lines: string[] = [
+      `=== Row #${row.rowIndex} Inspection & Discrepancy Breakdown ===`,
+      `Match Key: ${row.matchKey || 'N/A'}`,
+      `Match Status: ${row.isMatched ? 'Matched' : 'Unmatched'}`,
+      `Decision Status: ${row.decisionColor.toUpperCase()} (${row.decisionReason})`,
+      '',
+      `[Incoming Comparison Record]`,
+    ];
+    for (const [k, v] of Object.entries(row.comparisonRow)) {
+      lines.push(`${k}: ${v ?? ''}`);
+    }
+    if (row.matchedMainRow) {
+      lines.push('', `[Matched Reference Record]`);
+      for (const [k, v] of Object.entries(row.matchedMainRow)) {
+        lines.push(`${k}: ${v ?? ''}`);
+      }
+    } else if (closestRef) {
+      lines.push('', `[Closest Reference Candidate]`);
+      for (const [k, v] of Object.entries(closestRef)) {
+        lines.push(`${k}: ${v ?? ''}`);
+      }
+    }
+    if (unmatched?.reason) {
+      lines.push('', `[Diagnostic Note] ${unmatched.reason}`);
+    }
+
+    copyText(lines.join('\n'), 'entire_row');
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-150">
@@ -60,19 +110,48 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
               </h3>
               <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                 <span>{t.modalMatchKey}</span>
-                <span className="font-mono text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                  {row.matchKey || t.modalNotAvailable}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => copyText(row.matchKey, 'header_key')}
+                  className="font-mono text-emerald-700 font-semibold bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200 transition-colors flex items-center gap-1 group cursor-pointer"
+                  title="Click to copy match key"
+                >
+                  <span>{row.matchKey || t.modalNotAvailable}</span>
+                  {copiedKey === 'header_key' ? (
+                    <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                  ) : (
+                    <Copy className="w-2.5 h-2.5 opacity-60 group-hover:opacity-100" />
+                  )}
+                </button>
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 transition-colors"
-            title={t.close}
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopyEntireRow}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-all shadow-xs cursor-pointer"
+              title="Copy all row data to clipboard"
+            >
+              {copiedKey === 'entire_row' ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
+                  <span className="text-emerald-700 font-bold">{t.dashCopied || 'Copied!'}</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="hidden sm:inline">Copy Row</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
+              title={t.close}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* 1. UNMATCHED ROOT-CAUSE DIAGNOSIS BANNER */}
@@ -87,11 +166,21 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
                   <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
                     {t.modalUnmatchedAnalysis}
                   </span>
-                  <h4 className="text-sm font-bold text-slate-900 font-mono">
-                    {t.modalWhichUnmatched}{' '}
-                    <span className="text-amber-800 font-bold underline decoration-amber-400">
-                      {unmatched?.primaryIdentifier || row.matchKey || t.modalThisRecord}
-                    </span>
+                  <h4 className="text-sm font-bold text-slate-900 font-mono flex items-center gap-1.5 flex-wrap">
+                    <span>{t.modalWhichUnmatched}</span>
+                    <button
+                      type="button"
+                      onClick={() => copyText(unmatched?.primaryIdentifier || row.matchKey, 'diag_id')}
+                      className="text-amber-800 font-bold underline decoration-amber-400 hover:bg-amber-100 px-1 py-0.5 rounded transition-colors inline-flex items-center gap-1 cursor-pointer"
+                      title="Click to copy identifier"
+                    >
+                      <span>{unmatched?.primaryIdentifier || row.matchKey || t.modalThisRecord}</span>
+                      {copiedKey === 'diag_id' ? (
+                        <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                      ) : (
+                        <Copy className="w-3 h-3 text-amber-600 opacity-60" />
+                      )}
+                    </button>
                   </h4>
                 </div>
               </div>
@@ -109,7 +198,19 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-slate-500 font-semibold shrink-0">{t.modalIncomingKeyValues}</span>
-                <span className="font-mono text-amber-800 font-semibold">{unmatched?.unmatchedKeyDisplay || row.matchKey}</span>
+                <button
+                  type="button"
+                  onClick={() => copyText(unmatched?.unmatchedKeyDisplay || row.matchKey, 'key_display')}
+                  className="font-mono text-amber-800 font-semibold hover:bg-amber-100/70 px-1 py-0.5 rounded transition-colors text-left inline-flex items-center gap-1 cursor-pointer"
+                  title="Click to copy key values"
+                >
+                  <span>{unmatched?.unmatchedKeyDisplay || row.matchKey}</span>
+                  {copiedKey === 'key_display' ? (
+                    <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-amber-600 opacity-60" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -205,19 +306,23 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
               <span>{t.modalIncomingRecord}</span>
               <span className="text-[11px] font-mono text-slate-500">{t.modalRowNum}{row.rowIndex}</span>
             </h4>
-            <div className="space-y-2 text-xs overflow-y-auto flex-1 divide-y divide-slate-200/80">
+            <div className="space-y-1.5 text-xs overflow-y-auto flex-1 divide-y divide-slate-200/80">
               {compKeys.map((k) => {
                 const val = row.comparisonRow[k];
                 const isFailedKey = unmatched?.fieldDiffs.some(
                   (d) => d.comparisonCol === k && !d.isMatch
                 );
+                const fieldId = `comp_${k}`;
+                const isCopied = copiedKey === fieldId;
 
                 return (
                   <div
                     key={k}
-                    className={`flex items-start justify-between py-1.5 gap-4 ${
-                      isFailedKey ? 'bg-rose-50 px-2 rounded' : ''
+                    onClick={() => copyText(String(val ?? ''), fieldId)}
+                    className={`flex items-start justify-between py-1.5 px-2 rounded-lg gap-4 cursor-pointer hover:bg-blue-50/80 active:scale-[0.99] transition-all group/item ${
+                      isFailedKey ? 'bg-rose-50/70 hover:bg-rose-100/70' : ''
                     }`}
+                    title="Click to copy value"
                   >
                     <div className="flex items-center gap-1.5 shrink-0">
                       <span className="text-slate-500 font-mono text-[11px] font-medium">{k}</span>
@@ -227,9 +332,19 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
                         </span>
                       )}
                     </div>
-                    <span className="text-slate-900 font-mono text-right break-all font-semibold">
-                      {String(val ?? '—')}
-                    </span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-slate-900 font-mono text-right break-all font-semibold">
+                        {String(val ?? '—')}
+                      </span>
+                      {isCopied ? (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 shrink-0">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          <span>Copied</span>
+                        </span>
+                      ) : (
+                        <Copy className="w-3 h-3 text-slate-300 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0" />
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -254,21 +369,39 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
             </h4>
 
             {row.matchedMainRow ? (
-              <div className="space-y-2 text-xs overflow-y-auto flex-1 divide-y divide-slate-200/80">
-                {refKeys.map((k) => (
-                  <div
-                    key={k}
-                    className="flex items-start justify-between py-1.5 gap-4"
-                  >
-                    <span className="text-slate-500 font-mono text-[11px] font-medium shrink-0">{k}</span>
-                    <span className="text-slate-900 font-mono text-right break-all font-semibold">
-                      {String(row.matchedMainRow![k] ?? '—')}
-                    </span>
-                  </div>
-                ))}
+              <div className="space-y-1.5 text-xs overflow-y-auto flex-1 divide-y divide-slate-200/80">
+                {refKeys.map((k) => {
+                  const val = row.matchedMainRow![k];
+                  const fieldId = `ref_${k}`;
+                  const isCopied = copiedKey === fieldId;
+
+                  return (
+                    <div
+                      key={k}
+                      onClick={() => copyText(String(val ?? ''), fieldId)}
+                      className="flex items-start justify-between py-1.5 px-2 rounded-lg gap-4 cursor-pointer hover:bg-emerald-50/80 active:scale-[0.99] transition-all group/item"
+                      title="Click to copy value"
+                    >
+                      <span className="text-slate-500 font-mono text-[11px] font-medium shrink-0">{k}</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-slate-900 font-mono text-right break-all font-semibold">
+                          {String(val ?? '—')}
+                        </span>
+                        {isCopied ? (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 shrink-0">
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                            <span>Copied</span>
+                          </span>
+                        ) : (
+                          <Copy className="w-3 h-3 text-slate-300 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             ) : closestRef ? (
-              <div className="space-y-2 text-xs overflow-y-auto flex-1 divide-y divide-slate-200/80">
+              <div className="space-y-1.5 text-xs overflow-y-auto flex-1 divide-y divide-slate-200/80">
                 <div className="pb-2 text-[11px] text-amber-700 font-medium">
                   {t.modalClosestDesc}
                 </div>
@@ -280,17 +413,21 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
                   const isDifferingCol = unmatched?.fieldDiffs.some(
                     (d) => d.mainCol === k && !d.isMatch
                   );
+                  const fieldId = `closest_${k}`;
+                  const isCopied = copiedKey === fieldId;
 
                   return (
                     <div
                       key={k}
-                      className={`flex items-start justify-between py-1.5 gap-4 ${
+                      onClick={() => copyText(String(val ?? ''), fieldId)}
+                      className={`flex items-start justify-between py-1.5 px-2 rounded-lg gap-4 cursor-pointer hover:bg-emerald-50/80 active:scale-[0.99] transition-all group/item ${
                         isMatchingCol
-                          ? 'bg-emerald-50 px-2 rounded'
+                          ? 'bg-emerald-50/70 hover:bg-emerald-100/70'
                           : isDifferingCol
-                          ? 'bg-rose-50 px-2 rounded'
+                          ? 'bg-rose-50/70 hover:bg-rose-100/70'
                           : ''
                       }`}
+                      title="Click to copy value"
                     >
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="text-slate-500 font-mono text-[11px] font-medium">{k}</span>
@@ -305,9 +442,19 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
                           </span>
                         )}
                       </div>
-                      <span className="text-slate-900 font-mono text-right break-all font-semibold">
-                        {String(val ?? '—')}
-                      </span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-slate-900 font-mono text-right break-all font-semibold">
+                          {String(val ?? '—')}
+                        </span>
+                        {isCopied ? (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 shrink-0">
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                            <span>Copied</span>
+                          </span>
+                        ) : (
+                          <Copy className="w-3 h-3 text-slate-300 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0" />
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -331,12 +478,30 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
           <div className="text-xs text-slate-600 font-mono">
             {t.modalStatus} <span className="text-slate-900 font-bold">{row.isMatched ? t.modalMatched : t.modalUnmatchedNew}</span> · {t.modalLayer} <span className="text-emerald-700 font-bold">{row.decisionLayerName || 'Inspection'}</span>
           </div>
-          <button
-            onClick={onClose}
-            className="px-5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-xs"
-          >
-            {t.close}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopyEntireRow}
+              className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              {copiedKey === 'entire_row' ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
+                  <span className="text-emerald-700 font-bold">{t.dashCopied || 'Copied!'}</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Copy Row</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={onClose}
+              className="px-5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-xs cursor-pointer"
+            >
+              {t.close}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -597,7 +597,7 @@ export function analyzeUnmatchedRow(
   mainWb: WorkbookData
 ): UnmatchedInfo {
   const primaryMapping = mappings[0];
-  const primaryVal = primaryMapping ? compRow[primaryMapping.comparisonCol] : '';
+  const primaryVal = primaryMapping ? getRowFieldValue(compRow, primaryMapping.comparisonCol) : '';
   const primaryCol = primaryMapping ? primaryMapping.comparisonCol : 'Key Column';
 
   const primaryIdentifier =
@@ -610,7 +610,7 @@ export function analyzeUnmatchedRow(
 
   const unmatchedKeyDisplay =
     mappings.length > 0
-      ? mappings.map((m) => `${m.comparisonCol}: "${compRow[m.comparisonCol] ?? '—'}"`).join(' · ')
+      ? mappings.map((m) => `${m.comparisonCol}: "${getRowFieldValue(compRow, m.comparisonCol) ?? '—'}"`).join(' · ')
       : `Row Value: ${primaryIdentifier}`;
 
   if (mappings.length === 0) {
@@ -623,13 +623,12 @@ export function analyzeUnmatchedRow(
     };
   }
 
-  // Scan reference rows to detect closest candidate or partial matches (capped to avoid thread freeze)
+  // 1. Scan reference rows to detect closest candidate or partial matches across mapped columns
   let bestCandidate: ExcelRow | null = null;
   let bestMatchCount = 0;
   let bestDiffs: UnmatchedFieldDiff[] = [];
-  const maxScan = Math.min(mainWb.rows.length, 300);
 
-  for (let r = 0; r < maxScan; r++) {
+  for (let r = 0; r < mainWb.rows.length; r++) {
     const refRow = mainWb.rows[r];
     let matchCount = 0;
     const diffs: UnmatchedFieldDiff[] = [];
@@ -656,8 +655,8 @@ export function analyzeUnmatchedRow(
       bestMatchCount = matchCount;
       bestCandidate = refRow;
       bestDiffs = diffs;
-      // Early exit if optimal partial match found
-      if (bestMatchCount >= mappings.length - 1 && mappings.length > 1) {
+      // Early exit if all mapped columns matched
+      if (bestMatchCount >= mappings.length && mappings.length > 0) {
         break;
       }
     }
@@ -667,7 +666,7 @@ export function analyzeUnmatchedRow(
     const matchedCols = bestDiffs.filter((d) => d.isMatch).map((d) => d.comparisonCol);
     const failedFields = bestDiffs.filter((d) => !d.isMatch);
     const failedDesc = failedFields
-      .map((d) => `${d.comparisonCol} is '${d.compValue ?? ''}' (Ref has '${d.refValue ?? ''}')`)
+      .map((d) => `${d.comparisonCol} is '${d.compValue ?? '—'}' (Ref has '${d.refValue ?? '—'}')`)
       .join(', ');
 
     return {
@@ -680,7 +679,57 @@ export function analyzeUnmatchedRow(
     };
   }
 
-  // Completely missing in reference
+  // 2. Intelligent Fallback: Check if the key identifier (e.g. '48545T') exists anywhere in the Reference catalog
+  // (handles relaxed formatting with hyphens/spaces stripped, or located under another column)
+  if (primaryIdentifier && primaryIdentifier !== 'Unidentified') {
+    const cleanId = primaryIdentifier.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    for (let r = 0; r < mainWb.rows.length; r++) {
+      const refRow = mainWb.rows[r];
+
+      for (const [colName, val] of Object.entries(refRow)) {
+        if (val === undefined || val === null || val === '') continue;
+        const valStr = String(val).trim();
+        const cleanRefVal = valStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        if (cleanRefVal === cleanId || (cleanId.length >= 4 && cleanRefVal.includes(cleanId))) {
+          bestCandidate = refRow;
+
+          const diffs: UnmatchedFieldDiff[] = mappings.map((m) => {
+            const compVal = getRowFieldValue(compRow, m.comparisonCol);
+            const refVal = getRowFieldValue(refRow, m.mainCol);
+            const compNorm = normalizeValue(compVal, normalization);
+            const refNorm = normalizeValue(refVal, normalization);
+            const isMatch = compNorm === refNorm && compNorm !== '';
+            return {
+              comparisonCol: m.comparisonCol,
+              mainCol: m.mainCol,
+              compValue: compVal,
+              refValue: refVal ?? (m.mainCol.toLowerCase().includes(colName.toLowerCase()) ? valStr : undefined),
+              isMatch,
+            };
+          });
+
+          const isFormatDiff = cleanRefVal === cleanId && valStr !== primaryIdentifier;
+          const diffReason = isFormatDiff
+            ? `Formatting difference: Reference row #${r + 1} contains '${valStr}' in column '${colName}' (differs in punctuation/spacing from incoming '${primaryIdentifier}')`
+            : `Identifier '${primaryIdentifier}' located in Reference row #${r + 1} under column '${colName}' ('${valStr}')`;
+
+          return {
+            unmatchedKeyDisplay,
+            primaryIdentifier,
+            reason: diffReason,
+            matchType: 'partial_mismatch',
+            fieldDiffs: diffs,
+            closestReferenceRow: bestCandidate,
+          };
+        }
+      }
+      if (bestCandidate) break;
+    }
+  }
+
+  // 3. Completely missing in reference
   const defaultDiffs: UnmatchedFieldDiff[] = mappings.map((m) => ({
     comparisonCol: m.comparisonCol,
     mainCol: m.mainCol,
@@ -784,7 +833,7 @@ export function processMatching(
 
     // Granular Unmatched Root Cause Diagnosis
     const unmatchedInfo = !isMatched
-      ? analyzeUnmatchedRow(compRow, mappings, normalization, mainWb)
+      ? analyzeUnmatchedRow(compRow, effectiveMappings, normalization, mainWb)
       : undefined;
 
     const evaluation = evaluateDecisionLayers(

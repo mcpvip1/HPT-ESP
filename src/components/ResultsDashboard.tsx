@@ -157,6 +157,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [sortColumn, setSortColumn] = useState<string>('rowIndex');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRow, setSelectedRow] = useState<MatchedRow | null>(null);
+  const [copiedCellId, setCopiedCellId] = useState<string | null>(null);
 
   const [releaseTarget, setReleaseTarget] = useState<{ key: string; count: number } | null>(null);
   const [supervisorConfirmed, setSupervisorConfirmed] = useState(false);
@@ -756,6 +757,68 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       onShowToast(t.dashCopyLinkFailed, 'error');
     }
   };
+
+  const fallbackCopyText = (str: string) => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = str;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch {}
+  };
+
+  // 1-Click copy text handler with hover highlight & immediate feedback for any cell (e.g. AD202N)
+  const copyCellText = useCallback((text: any, cellId: string, colName?: string) => {
+    const raw = String(text ?? '').trim();
+    if (!raw || raw === '—') return;
+
+    const onSuccess = () => {
+      setCopiedCellId(cellId);
+      setTimeout(() => {
+        setCopiedCellId((curr) => (curr === cellId ? null : curr));
+      }, 1800);
+      const snippet = raw.length > 25 ? `${raw.slice(0, 25)}…` : raw;
+      onShowToast(`Copied! "${snippet}"`, 'success');
+    };
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(raw).then(onSuccess).catch(() => {
+          fallbackCopyText(raw);
+          onSuccess();
+        });
+      } else {
+        fallbackCopyText(raw);
+        onSuccess();
+      }
+    } catch {
+      fallbackCopyText(raw);
+      onSuccess();
+    }
+  }, [onShowToast]);
+
+  const handleCopyRowData = useCallback((row: MatchedRow) => {
+    const lines: string[] = [
+      `Row #${row.rowIndex} | Key: ${row.matchKey || 'N/A'} | Status: ${row.decisionColor.toUpperCase()} (${row.decisionReason})`,
+      '--- Incoming Row ---'
+    ];
+    for (const [k, v] of Object.entries(row.comparisonRow)) {
+      lines.push(`${k}: ${v ?? ''}`);
+    }
+    if (row.matchedMainRow) {
+      lines.push('--- Matched Reference Row ---');
+      for (const [k, v] of Object.entries(row.matchedMainRow)) {
+        lines.push(`${k}: ${v ?? ''}`);
+      }
+    }
+    const fullText = lines.join('\n');
+    copyCellText(fullText, `${row.id}_fullRow`);
+  }, [copyCellText]);
 
   const handleCopyShareLink = async () => {
     // If logged into Firebase, immediately publish so the fixed preview link has the newest results
@@ -1378,6 +1441,12 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 {t.dashRowsFound.replace('{count}', filteredRows.length.toLocaleString())}
               </span>
             )}
+
+            {/* Quick 1-Click Copy Tip */}
+            <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-200 shrink-0 select-none">
+              <Copy className="w-3 h-3 text-emerald-600" />
+              <span>Click any cell to copy text</span>
+            </span>
           </div>
 
           {/* Currently viewed file + last replaced time */}
@@ -1696,46 +1765,98 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   return (
                     <tr
                       key={row.id}
-                      className={`transition-colors border-b border-slate-100 ${
+                      title="Click to copy"
+                      className={`results-table-row group/row transition-all duration-150 border-b border-slate-100 ${
                         isGreen
-                          ? 'bg-emerald-50/30 hover:bg-emerald-50/70 border-l-[4px] border-l-emerald-500'
+                          ? 'bg-emerald-50/30 hover:bg-emerald-100/80 border-l-[4px] border-l-emerald-500 hover:shadow-2xs'
                           : isYellow
-                          ? 'bg-amber-50/30 hover:bg-amber-50/70 border-l-[4px] border-l-amber-500'
+                          ? 'bg-amber-50/30 hover:bg-amber-100/80 border-l-[4px] border-l-amber-500 hover:shadow-2xs'
                           : isRed
-                          ? 'bg-rose-50/30 hover:bg-rose-50/70 border-l-[4px] border-l-rose-500'
+                          ? 'bg-rose-50/30 hover:bg-rose-100/80 border-l-[4px] border-l-rose-500 hover:shadow-2xs'
                           : isBlue
-                          ? 'bg-blue-50/40 hover:bg-blue-50/80 border-l-[4px] border-l-blue-600'
-                          : 'even:bg-slate-50/40 hover:bg-slate-50 border-l-[4px] border-l-transparent'
+                          ? 'bg-blue-50/40 hover:bg-blue-100/90 border-l-[4px] border-l-blue-600 hover:shadow-2xs'
+                          : 'even:bg-slate-50/40 hover:bg-slate-100/90 border-l-[4px] border-l-transparent hover:shadow-2xs'
                       }`}
                     >
                       {visibleTableColumns.map((col) => {
+                        const cellId = `${row.id}_${col.id}`;
+                        const isCopied = copiedCellId === cellId;
+
                         if (col.id === 'rowIndex') {
+                          const valStr = String(row.rowIndex);
                           return (
                             <td
                               key={col.id}
-                              className={`py-1.5 px-2 sm:py-2.5 sm:px-3 border-r border-slate-200 text-center text-slate-500 font-mono tabular-nums text-[11px] font-bold sticky left-0 z-[5] ${frozenBg}`}
+                              onClick={() => copyCellText(valStr, cellId, 'Row Number')}
+                              className={`py-1.5 px-2 sm:py-2.5 sm:px-3 border-r border-slate-200 text-center text-slate-600 font-mono tabular-nums text-[11px] font-bold sticky left-0 z-[5] cursor-pointer group/cell hover:bg-slate-200/90 transition-colors ${frozenBg}`}
+                              title="Click to copy"
                             >
-                              {highlightText(row.rowIndex, searchTerm)}
+                              <div className="flex items-center justify-center gap-1">
+                                <span>{highlightText(row.rowIndex, searchTerm)}</span>
+                                {isCopied ? (
+                                  <Check className="w-3 h-3 text-emerald-600 stroke-[3] shrink-0" />
+                                ) : (
+                                  <Copy className="w-2.5 h-2.5 text-slate-400 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
+                                )}
+                              </div>
                             </td>
                           );
                         }
 
                         if (col.id === 'decisionStatus') {
+                          const statusStr = row.decisionColor.toUpperCase();
                           return (
-                            <td key={col.id} className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap">
-                              {getSolidBadge(row.decisionColor)}
+                            <td
+                              key={col.id}
+                              onClick={() => copyCellText(statusStr, cellId, 'Decision Status')}
+                              className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap cursor-pointer group/cell hover:bg-slate-100 transition-colors"
+                              title="Click to copy"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                {getSolidBadge(row.decisionColor)}
+                                {isCopied ? (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1 py-0.5 rounded border border-emerald-300">
+                                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                    <span>Copied</span>
+                                  </span>
+                                ) : (
+                                  <Copy className="w-3 h-3 text-slate-400 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
+                                )}
+                              </div>
                             </td>
                           );
                         }
 
                         if (col.id === 'matchStatus') {
+                          const copyVal = row.isMatched
+                            ? (row.matchKey || 'MATCHED')
+                            : (row.unmatchedInfo?.primaryIdentifier || row.matchKey || 'UNMATCHED');
+
                           return (
-                            <td key={col.id} className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap">
+                            <td
+                              key={col.id}
+                              onClick={() => copyCellText(copyVal, cellId, 'Match Status')}
+                              className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap cursor-pointer group/cell hover:bg-slate-100 transition-colors"
+                              title="Click to copy"
+                            >
                               {row.isMatched ? (
-                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 px-2.5 py-1 rounded-md shadow-xs">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
-                                  {t.dashCellMatched}
-                                </span>
+                                <div
+                                  className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-blue-100/70 transition-colors"
+                                  title="Click to copy"
+                                >
+                                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 px-2.5 py-1 rounded-md shadow-xs">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
+                                    {t.dashCellMatched}
+                                  </span>
+                                  {isCopied ? (
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1 py-0.5 rounded border border-emerald-300">
+                                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                      <span>Copied</span>
+                                    </span>
+                                  ) : (
+                                    <Copy className="w-3 h-3 text-slate-400 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
+                                  )}
+                                </div>
                               ) : (
                                 <div className="flex flex-col gap-0.5">
                                   <div className="flex items-center gap-1.5">
@@ -1748,13 +1869,37 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                         {t.dashCellDiffers}
                                       </span>
                                     )}
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedRow(row)}
+                                      className="text-[10px] text-amber-700 hover:text-amber-900 underline font-medium ml-0.5"
+                                      title="Open full inspection breakdown"
+                                    >
+                                      Inspect
+                                    </button>
                                   </div>
                                   <div
-                                    className="font-mono text-xs font-bold text-amber-800 hover:text-amber-900 cursor-pointer truncate max-w-[210px]"
-                                    onClick={() => setSelectedRow(row)}
-                                    title={row.unmatchedInfo?.unmatchedKeyDisplay || row.matchKey}
+                                    className="font-mono text-xs font-bold text-amber-900 bg-amber-100/80 hover:bg-amber-200/90 border border-amber-300/80 px-1.5 py-0.5 rounded cursor-pointer truncate max-w-[220px] transition-all flex items-center justify-between gap-1 group/ident shadow-2xs"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      copyCellText(copyVal, cellId, 'Identifier');
+                                    }}
+                                    title={`Click 1 time to copy identifier "${copyVal}"`}
                                   >
-                                    {highlightText(row.unmatchedInfo?.primaryIdentifier || row.matchKey || t.dashUnidentified, searchTerm)}
+                                    <span className="truncate">
+                                      {highlightText(copyVal, searchTerm)}
+                                    </span>
+                                    {isCopied ? (
+                                      <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1 py-0.2 rounded border border-emerald-300 shrink-0">
+                                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                        <span>Copied</span>
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-0.5 text-[9px] text-amber-800 opacity-70 group-hover/ident:opacity-100 transition-opacity shrink-0">
+                                        <Copy className="w-2.5 h-2.5" />
+                                        <span className="hidden sm:inline">Copy</span>
+                                      </span>
+                                    )}
                                   </div>
                                   <span
                                     className="text-[10px] text-slate-500 truncate max-w-[210px] font-sans"
@@ -1771,11 +1916,27 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         }
 
                         if (col.id === 'decisionReason') {
+                          const valStr = String(row.decisionReason || '');
                           return (
-                            <td key={col.id} className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 text-xs text-slate-700 font-medium truncate max-w-xs">
-                              <span title={row.decisionReason}>
-                                {highlightText(row.decisionReason, searchTerm)}
-                              </span>
+                            <td
+                              key={col.id}
+                              onClick={() => copyCellText(valStr, cellId, 'Decision Reason')}
+                              className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 text-xs text-slate-700 font-medium truncate max-w-xs cursor-pointer group/cell hover:bg-amber-50/90 transition-colors"
+                              title="Click to copy"
+                            >
+                              <div className="flex items-center justify-between gap-1.5">
+                                <span className="truncate" title={row.decisionReason}>
+                                  {highlightText(row.decisionReason, searchTerm)}
+                                </span>
+                                {isCopied ? (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1 py-0.5 rounded border border-emerald-300 shrink-0">
+                                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                    <span>Copied</span>
+                                  </span>
+                                ) : (
+                                  <Copy className="w-3 h-3 text-slate-400 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
+                                )}
+                              </div>
                             </td>
                           );
                         }
@@ -1815,40 +1976,90 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             valStr = 'Accept';
                           }
                           const isInspectionCol = col.id.toLowerCase().includes('status') || col.id.toLowerCase().includes('result') || col.id.toLowerCase().includes('grade');
+                          const hasValue = valStr.trim() !== '' && valStr !== '—';
 
                           return (
                             <td
                               key={col.id}
-                              className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800 bg-blue-50/20"
+                              onClick={() => hasValue && copyCellText(valStr, cellId, col.id)}
+                              className={`py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800 bg-blue-50/20 transition-all ${
+                                hasValue
+                                  ? 'cursor-pointer group/cell hover:bg-blue-100/80 hover:text-blue-950'
+                                  : ''
+                              }`}
+                              title="Click to copy"
                             >
-                              {isInspectionCol ? renderFilledInspectionCell(valStr) : highlightText(valStr, searchTerm)}
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="truncate">
+                                  {isInspectionCol ? renderFilledInspectionCell(valStr) : highlightText(valStr, searchTerm)}
+                                </span>
+                                {hasValue && (
+                                  isCopied ? (
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1 py-0.2 rounded border border-emerald-300 shrink-0">
+                                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                      <span>Copied</span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-blue-700 bg-blue-100/80 px-1 py-0.2 rounded border border-blue-200 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0">
+                                      <Copy className="w-2.5 h-2.5" />
+                                      <span className="hidden sm:inline">Copy</span>
+                                    </span>
+                                  )
+                                )}
+                              </div>
                             </td>
                           );
                         }
 
-                        // Default: Comparison column
+                        // Default: Comparison column (e.g. AD202N, Part Number, etc.)
                         let valStr = String(row.comparisonRow[col.id] ?? '');
                         if (row.decisionColor === 'green' && valStr.toLowerCase().includes('postpone')) {
                           valStr = 'Accept';
                         }
                         const isInspectionCol = col.id.toLowerCase().includes('status') || col.id.toLowerCase().includes('result') || col.id.toLowerCase().includes('grade');
+                        const hasValue = valStr.trim() !== '' && valStr !== '—';
 
                         return (
                           <td
                             key={col.id}
-                            className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800"
+                            onClick={() => hasValue && copyCellText(valStr, cellId, col.id)}
+                            className={`py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800 transition-all ${
+                              hasValue
+                                ? 'cursor-pointer group/cell hover:bg-emerald-100/70 hover:text-emerald-950 shadow-inner'
+                                : ''
+                            }`}
+                            title="Click to copy"
                           >
-                            {isInspectionCol ? renderFilledInspectionCell(valStr) : highlightText(valStr, searchTerm)}
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate">
+                                {isInspectionCol ? renderFilledInspectionCell(valStr) : highlightText(valStr, searchTerm)}
+                              </span>
+                              {hasValue && (
+                                isCopied ? (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-300 shrink-0">
+                                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                    <span>Copied</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] text-emerald-800 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0">
+                                    <Copy className="w-2.5 h-2.5" />
+                                    <span className="hidden sm:inline">Copy</span>
+                                  </span>
+                                )
+                              )}
+                            </div>
                           </td>
                         );
                       })}
 
-                      {/* Row Inspect Button — frozen on the right for mobile reachability */}
+                      {/* Row Action Buttons: Copy Row + Inspect Detail */}
                       <td className={`py-1.5 px-2 sm:py-2.5 sm:px-3 text-center whitespace-nowrap sticky right-0 z-[5] border-l border-slate-200 ${frozenBg}`}>
-                        <div className="flex items-center justify-center gap-1.5">
+                        <div className="flex items-center justify-center gap-1">
                           {!isPreviewMode && row.isHold && row.holdKey && onReleaseHoldKey && (
                             <button
-                              onClick={() => {
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 const count = results.filter((r) => r.isHold && r.holdKey === row.holdKey).length;
                                 setReleaseTarget({ key: row.holdKey as string, count });
                                 setSupervisorConfirmed(false);
@@ -1861,8 +2072,27 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             </button>
                           )}
                           <button
-                            onClick={() => setSelectedRow(row)}
-                            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyRowData(row);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                            title="Copy entire row to clipboard"
+                          >
+                            {copiedCellId === `${row.id}_fullRow` ? (
+                              <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRow(row);
+                            }}
+                            className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
                             title={t.dashInspectRowTitle}
                           >
                             <Eye className="w-4 h-4" />
