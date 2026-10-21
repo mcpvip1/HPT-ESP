@@ -158,7 +158,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRow, setSelectedRow] = useState<MatchedRow | null>(null);
   const [copiedCellId, setCopiedCellId] = useState<string | null>(null);
-  const [flashedRowId, setFlashedRowId] = useState<string | null>(null);
   const lastToastTimeRef = useRef<{ time: number; text: string }>({ time: 0, text: '' });
 
   const [releaseTarget, setReleaseTarget] = useState<{ key: string; count: number } | null>(null);
@@ -779,12 +778,18 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     const raw = String(text ?? '').trim();
     if (!raw || raw === '—') return;
 
-    // Trigger row visual confirmation flash and scale effect
+    // Trigger high-performance hardware-accelerated row flash & scale effect (zero React re-renders)
     if (rowId) {
-      setFlashedRowId(rowId);
-      setTimeout(() => {
-        setFlashedRowId((curr) => (curr === rowId ? null : curr));
-      }, 450);
+      const rowEl = document.getElementById(`row-${rowId}`);
+      if (rowEl) {
+        rowEl.classList.remove('copy-flash');
+        // Force reflow for smooth, instant restartable animation
+        void rowEl.offsetWidth;
+        rowEl.classList.add('copy-flash');
+        setTimeout(() => {
+          rowEl.classList.remove('copy-flash');
+        }, 420);
+      }
     }
 
     const now = Date.now();
@@ -1785,19 +1790,19 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   return (
                     <tr
                       key={row.id}
+                      id={`row-${row.id}`}
+                      data-row-id={row.id}
                       title="Click to copy"
-                      className={`results-table-row group/row transition-all duration-150 border-b border-slate-100 ${
-                        flashedRowId === row.id
-                          ? 'copy-flash ring-2 ring-emerald-500/90 bg-emerald-100/95 scale-[0.992] shadow-sm z-10 relative'
-                          : isGreen
-                          ? 'bg-emerald-50/30 hover:bg-emerald-100/80 border-l-[4px] border-l-emerald-500 hover:shadow-2xs active:scale-[0.995]'
+                      className={`results-table-row group/row transition-colors duration-150 border-b border-slate-100 ${
+                        isGreen
+                          ? 'bg-emerald-50/30 hover:bg-emerald-100/80 border-l-[4px] border-l-emerald-500 hover:shadow-2xs'
                           : isYellow
-                          ? 'bg-amber-50/30 hover:bg-amber-100/80 border-l-[4px] border-l-amber-500 hover:shadow-2xs active:scale-[0.995]'
+                          ? 'bg-amber-50/30 hover:bg-amber-100/80 border-l-[4px] border-l-amber-500 hover:shadow-2xs'
                           : isRed
-                          ? 'bg-rose-50/30 hover:bg-rose-100/80 border-l-[4px] border-l-rose-500 hover:shadow-2xs active:scale-[0.995]'
+                          ? 'bg-rose-50/30 hover:bg-rose-100/80 border-l-[4px] border-l-rose-500 hover:shadow-2xs'
                           : isBlue
-                          ? 'bg-blue-50/40 hover:bg-blue-100/90 border-l-[4px] border-l-blue-600 hover:shadow-2xs active:scale-[0.995]'
-                          : 'even:bg-slate-50/40 hover:bg-slate-100/90 border-l-[4px] border-l-transparent hover:shadow-2xs active:scale-[0.995]'
+                          ? 'bg-blue-50/40 hover:bg-blue-100/90 border-l-[4px] border-l-blue-600 hover:shadow-2xs'
+                          : 'even:bg-slate-50/40 hover:bg-slate-100/90 border-l-[4px] border-l-transparent hover:shadow-2xs'
                       }`}
                     >
                       {visibleTableColumns.map((col) => {
