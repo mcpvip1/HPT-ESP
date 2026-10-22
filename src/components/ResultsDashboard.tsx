@@ -788,7 +788,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         rowEl.classList.add('copy-flash');
         setTimeout(() => {
           rowEl.classList.remove('copy-flash');
-        }, 420);
+        }, 360);
       }
     }
 
@@ -1213,43 +1213,43 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         </div>
 
         {/* 2. Action toolbar — grouped View / Share / Export actions */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 lg:gap-3 pt-3 border-t border-slate-100">
-          {/* Only Accept toggle */}
-          <button
-            onClick={() => {
-              const next = !hideSupersededPostpone;
-              setHideSupersededPostpone(next);
-              setPage(1);
-              pushSnapshotImmediate({ onlyAccept: next });
-            }}
-            className="flex items-center gap-2 group pr-1 shrink-0 select-none cursor-pointer"
-            title={t.dashOnlyAcceptTitle}
-          >
-            <span
-              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                hideSupersededPostpone ? 'bg-emerald-600' : 'bg-slate-300'
-              }`}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 pt-3 border-t border-slate-100">
+          {/* Left: View & Sync Actions */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+            {/* Only Accept toggle */}
+            <button
+              onClick={() => {
+                const next = !hideSupersededPostpone;
+                setHideSupersededPostpone(next);
+                setPage(1);
+                pushSnapshotImmediate({ onlyAccept: next });
+              }}
+              className="flex items-center gap-2 group pr-1 shrink-0 select-none cursor-pointer"
+              title={t.dashOnlyAcceptTitle}
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                  hideSupersededPostpone ? 'translate-x-4' : 'translate-x-0.5'
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                  hideSupersededPostpone ? 'bg-emerald-600' : 'bg-slate-300'
                 }`}
-              />
-            </span>
-            <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 whitespace-nowrap">
-              {t.dashOnlyAccept}
-            </span>
-          </button>
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    hideSupersededPostpone ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </span>
+              <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 whitespace-nowrap">
+                {t.dashOnlyAccept}
+              </span>
+            </button>
 
-          <div className="hidden sm:block h-5 w-px bg-slate-200 shrink-0" />
+            <div className="hidden sm:block h-5 w-px bg-slate-200 shrink-0" />
 
-          {/* View group */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             {/* Refresh Button */}
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 group select-none"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 group select-none cursor-pointer"
               title={t.dashRefreshTitle}
             >
               <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 group-hover:rotate-180 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -1260,7 +1260,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             {!isPreviewMode && (
               <button
                 onClick={() => handleSaveColumnConfigs(columnConfigs)}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none cursor-pointer ${
                   hasUnsavedColumnChanges
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-200 shadow-md ring-1 ring-emerald-400 animate-pulse'
                     : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
@@ -1275,7 +1275,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             {/* Customize Columns Button */}
             <button
               onClick={() => setShowColumnModal(true)}
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group cursor-pointer"
               title={t.dashColumnsTitle}
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
@@ -1284,17 +1284,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 {tableVisibleCount}
               </span>
             </button>
-          </div>
 
-          {!isPreviewMode && (
-            <>
-              <div className="hidden md:block h-5 w-px bg-slate-200 shrink-0" />
-              {/* Share group */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+            {!isPreviewMode && (
+              <>
+                <div className="hidden md:block h-5 w-px bg-slate-200 shrink-0" />
                 {/* Copy Share Link Button */}
                 <button
                   onClick={handleCopyShareLink}
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group cursor-pointer"
                   title={t.dashCopyShareLink}
                 >
                   {shareLinkCopied ? (
@@ -1308,7 +1305,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 {/* Publish to Preview */}
                 <button
                   onClick={handlePublishPreview}
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none cursor-pointer"
                   title={t.dashPublishPreview || 'Update the public preview link with these results'}
                 >
                   <Cloud className="w-3.5 h-3.5 shrink-0" />
@@ -1319,7 +1316,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 <button
                   onClick={handleForceSyncCheck}
                   disabled={isForceSyncing}
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group cursor-pointer"
                   title={t.dashForceSyncTitle}
                 >
                   <RefreshCw
@@ -1332,7 +1329,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
                 {/* Live Sync Status indicator */}
                 <div
-                  className="hidden xl:inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-[11px] font-mono bg-slate-50 border border-slate-200 text-slate-600 select-none shrink-0"
+                  className="hidden 2xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-mono bg-slate-50 border border-slate-200 text-slate-600 select-none shrink-0"
                   title={t.dashForceSyncTitle || 'Snapshot preview status (cloud-id: latest)'}
                 >
                   <span
@@ -1350,40 +1347,42 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       : t.dashSyncStatusSynced || 'Preview Synced'}
                   </span>
                 </div>
-              </div>
+              </>
+            )}
+          </div>
 
-              <div className="hidden lg:block h-5 w-px bg-slate-200 shrink-0" />
-              {/* Export group */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-                <button
-                  onClick={handleExportExcel}
-                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none"
-                  title={t.dashExportExcelTitle}
-                >
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-100 shrink-0" />
-                  <span>{t.exportExcel}</span>
-                </button>
+          {/* Right: Export group (Neatly aligned to the right, cleanly wraps on mobile) */}
+          {!isPreviewMode && (
+            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 ml-auto">
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none cursor-pointer"
+                title={t.dashExportExcelTitle}
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-100 shrink-0" />
+                <span>{t.exportExcel}</span>
+              </button>
 
-                <button
-                  onClick={handleExportCsv}
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none"
-                  title={t.dashExportCsvTitle}
-                >
-                  <Download className="w-3.5 h-3.5 text-slate-200 shrink-0" />
-                  <span>{t.exportCsv}</span>
-                </button>
-              </div>
-            </>
+              <button
+                onClick={handleExportCsv}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none cursor-pointer"
+                title={t.dashExportCsvTitle}
+              >
+                <Download className="w-3.5 h-3.5 text-slate-200 shrink-0" />
+                <span>{t.exportCsv}</span>
+              </button>
+            </div>
           )}
         </div>
 
 
         {/* 3. DEDICATED REAL-TIME SEARCH BAR & SCOPE SELECTOR */}
-        <div className="pt-3 border-t border-slate-200 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 sm:gap-3">
-          <div className="flex flex-1 flex-wrap sm:flex-nowrap items-center gap-2 max-w-2xl">
+        <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
+          {/* Left: Search input + Scope Dropdown + Match count */}
+          <div className="flex flex-1 items-center gap-2 min-w-[260px] sm:min-w-[320px] max-w-xl">
             {/* Search Scope Dropdown */}
             {!isPreviewMode && (
-              <div className="relative shrink-0 max-w-full sm:max-w-[45vw]">
+              <div className="relative shrink-0">
                 <select
                   value={searchColumn}
                   onChange={(e) => {
@@ -1392,7 +1391,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     setPage(1);
                     pushSnapshotImmediate({ searchColumn: col });
                   }}
-                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 hover:text-slate-900 focus:outline-none focus:border-emerald-500 transition-colors shadow-xs max-w-full truncate"
+                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 hover:text-slate-900 focus:outline-none focus:border-emerald-500 transition-colors shadow-xs max-w-[150px] sm:max-w-[190px] truncate cursor-pointer"
                   title={t.dashSearchScopeTitle}
                 >
                   <option value="all">{t.dashSearchScopeAll}</option>
@@ -1421,7 +1420,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             )}
 
             {/* Real-time Search Input Field */}
-            <div className="relative flex-1 min-w-[200px]">
+            <div className="relative flex-1 min-w-[140px]">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
@@ -1461,61 +1460,68 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
             {/* Match Counter Badge */}
             {searchTerm.trim() && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 font-mono">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 font-mono whitespace-nowrap">
                 <Filter className="w-3 h-3" />
                 {t.dashRowsFound.replace('{count}', filteredRows.length.toLocaleString())}
               </span>
             )}
+          </div>
 
-            {/* Quick 1-Click Copy Tip */}
-            <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-200 shrink-0 select-none">
+          {/* Right: Copy tip, Cohesive File Pill, and Rows Per Page */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 ml-auto shrink-0">
+            {/* Quick 1-Click Copy Tip — visible on xl+ to prevent crowding */}
+            <span
+              className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-200 shrink-0 select-none whitespace-nowrap"
+              title="Click any table cell to copy its text to your clipboard"
+            >
               <Copy className="w-3 h-3 text-emerald-600" />
               <span>Click any cell to copy text</span>
             </span>
-          </div>
 
-          {/* Currently viewed file + last replaced time */}
-          {comparisonWb && (
-            <div className="flex flex-wrap items-center gap-2 max-w-full self-start lg:self-auto ml-0 lg:ml-auto">
-              <span
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px]"
-                title={comparisonWb.name}
+            {/* Currently viewed file + last replaced time: unified into ONE cohesive pill badge */}
+            {comparisonWb && (
+              <div
+                className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 shrink-0 select-none max-w-full"
+                title={`${comparisonWb.name}${comparisonWb.uploadedAt ? ' · ' + formatFileDateTime(comparisonWb.uploadedAt, language) : ''}`}
               >
                 <FileText className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="font-semibold text-slate-700 max-w-[160px] truncate">
+                <span className="font-semibold text-slate-700 max-w-[130px] sm:max-w-[190px] truncate">
                   {comparisonWb.name}
                 </span>
-              </span>
-              {comparisonWb.uploadedAt ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px]">
-                  <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="font-mono text-slate-600 whitespace-nowrap">
-                    {formatFileDateTime(comparisonWb.uploadedAt, language)}
+                {comparisonWb.uploadedAt && (
+                  <span className="inline-flex items-center gap-1 pl-2 border-l border-slate-200 text-[11px] font-mono text-slate-500 whitespace-nowrap shrink-0">
+                    <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span className="hidden sm:inline">
+                      {formatFileDateTime(comparisonWb.uploadedAt, language)}
+                    </span>
+                    <span className="sm:hidden">
+                      {new Date(comparisonWb.uploadedAt).toLocaleDateString(localeForDate(language))}
+                    </span>
                   </span>
-                </span>
-              ) : null}
-            </div>
-          )}
+                )}
+              </div>
+            )}
 
-          {/* Rows Per Page Selector (Only in Studio mode since Preview mode shows all rows) */}
-          {!isPreviewMode && (
-            <div className="flex items-center gap-2 text-xs text-slate-500 self-start lg:self-auto shrink-0">
-              <span>{t.rowsPerPage}:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="bg-white border border-slate-200 rounded-md px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-emerald-500 font-mono shadow-xs"
-              >
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={250}>250</option>
-              </select>
-            </div>
-          )}
+            {/* Rows Per Page Selector (Only in Studio mode since Preview mode shows all rows) */}
+            {!isPreviewMode && (
+              <div className="flex items-center gap-1.5 text-xs text-slate-600 shrink-0 select-none">
+                <span className="whitespace-nowrap">{t.rowsPerPage}:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="bg-white border border-slate-200 rounded-md px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-emerald-500 font-mono shadow-xs cursor-pointer"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={250}>250</option>
+                </select>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Active Excel Column Filters Pill Bar */}
