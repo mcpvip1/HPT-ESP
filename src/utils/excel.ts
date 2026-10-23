@@ -623,9 +623,15 @@ export function analyzeUnmatchedRow(
     };
   }
 
-  // 1. Scan reference rows to detect closest candidate or partial matches across mapped columns
+  // 1. Scan reference rows to detect closest candidate or partial matches across mapped columns.
+  // The candidate is anchored on the PRIMARY key column (the first mapping, e.g.
+  // Material Code ↔ Item #): a reference row for the SAME item always outranks a
+  // row for a different item, even when the other row shares more secondary key
+  // fields (PO, PON, …). Within the same tier, the most matched key columns win;
+  // ties keep the earliest row.
   let bestCandidate: ExcelRow | null = null;
   let bestMatchCount = 0;
+  let bestPrimaryMatch = false;
   let bestDiffs: UnmatchedFieldDiff[] = [];
 
   for (let r = 0; r < mainWb.rows.length; r++) {
@@ -651,8 +657,14 @@ export function analyzeUnmatchedRow(
       });
     }
 
-    if (matchCount > bestMatchCount) {
+    const primaryMatch = diffs.length > 0 && diffs[0].isMatch;
+    const isBetter =
+      (primaryMatch && !bestPrimaryMatch) ||
+      (primaryMatch === bestPrimaryMatch && matchCount > bestMatchCount);
+
+    if (isBetter) {
       bestMatchCount = matchCount;
+      bestPrimaryMatch = primaryMatch;
       bestCandidate = refRow;
       bestDiffs = diffs;
       // Early exit if all mapped columns matched
