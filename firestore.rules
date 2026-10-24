@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Connectivity test endpoint
+    match /test/{testId} {
+      allow get: if isValidId(testId);
+      allow list, write: if false;
+    }
+
+    // Private user workspace data
+    match /workspaces/{userId}/state/{stateDoc} {
+      allow read, delete: if isValidId(userId) && isValidId(stateDoc) && isOwner(userId);
+      allow create, update: if isValidId(userId) && isValidId(stateDoc) && isOwner(userId);
+
+      // Chunks subcollection for multi-part large document storage
+      match /chunks/{chunkId} {
+        allow read, delete: if isValidId(userId) && isValidId(stateDoc) && isValidId(chunkId) && isOwner(userId);
+        allow create, update: if isValidId(userId) && isValidId(stateDoc) && isValidId(chunkId) && isOwner(userId);
+      }
+    }
+
+    // Public shared previews (read by anyone with shareId, managed by owner)
+    match /shares/{shareId} {
+      allow get: if isValidId(shareId);
+      allow list: if false;
+      allow create: if isValidId(shareId) && isSignedIn() && incoming().ownerUid == request.auth.uid;
+      allow update: if isValidId(shareId) && isSignedIn() && existing().ownerUid == request.auth.uid && incoming().ownerUid == request.auth.uid;
+      allow delete: if isValidId(shareId) && isSignedIn() && existing().ownerUid == request.auth.uid;
+
+      // Public preview chunks
+      match /chunks/{chunkId} {
+        allow get: if isValidId(shareId) && isValidId(chunkId);
+        allow list: if isValidId(shareId);
+        allow create: if isValidId(shareId) && isValidId(chunkId) && isSignedIn();
+        allow update: if isValidId(shareId) && isValidId(chunkId) && isSignedIn();
+        allow delete: if isValidId(shareId) && isValidId(chunkId) && isSignedIn();
+      }
+    }
+  }
+}

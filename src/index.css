@@ -1,10 +1,726 @@
 @import "tailwindcss";
 
+/* ================================================================
+   Theme Variables — Light (Default)
+   From UI_THEME_STYLE_GUIDE_02d51ffb.md
+   ================================================================ */
+:root {
+    /* Font Stacks */
+    --font-ui: 'Inter', 'Noto Sans Thai', 'Noto Sans Myanmar',
+        'Padauk', 'Myanmar Text', 'Leelawadee UI',
+        system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Noto Sans Thai', 'Noto Sans Myanmar',
+        ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+    /* Backgrounds & Surfaces */
+    --bg-page: #f8fafc;          /* Crisp neutral canvas backdrop (Slate 50) */
+    --bg-surface: #ffffff;       /* Main cards, modals & panels (Pure White) */
+    --bg-surface-alt: #f8fafc;   /* Elevated panels, drawer headers */
+    --bg-surface-soft: #f1f5f9;  /* Secondary pill containers, active rows (Slate 100) */
+    --bg-input: #ffffff;         /* Form inputs & segment pickers (Clean White) */
+
+    /* Borders */
+    --border: #e2e8f0;           /* Clean, subtle structural border (Slate 200) */
+    --border-light: #f1f5f9;     /* Sub-dividers & cell boundaries (Slate 100) */
+    --border-faint: #f8fafc;     /* Subtle grid lines */
+
+    /* Text Hierarchy */
+    --text-primary: #0f172a;     /* Crisp high contrast text (Slate 900) */
+    --text-secondary: #334155;   /* Body copy & descriptions (Slate 700) */
+    --text-muted: #64748b;       /* Metadata, captions & timestamps (Slate 500) */
+    --text-faint: #94a3b8;       /* Placeholders, disabled states (Slate 400) */
+
+    /* Accent & Brand (Electric Indigo / Violet) */
+    --accent: #4f46e5;           /* Primary interactive color (Indigo 600) */
+    --accent-light: #6366f1;     /* Hover & active state (Indigo 500) */
+    --accent-soft: #eef2ff;      /* Tinted pill backgrounds (Indigo 50) */
+    --accent-soft-bd: #c7d2fe;   /* Tinted borders (Indigo 200) */
+    --accent-soft-tx: #3730a3;   /* High-contrast text on tint (Indigo 800) */
+
+    /* Warning & Inspection (Warm Amber) */
+    --warn: #d97706;             /* Warning alerts (Amber 600) */
+    --warn-soft: #fffbeb;        /* Warning badge background (Amber 50) */
+    --warn-soft-bd: #fde68a;     /* Warning badge border (Amber 200) */
+    --warn-soft-tx: #92400e;     /* Warning text (Amber 800) */
+
+    /* Success & Compliant (Emerald Green) */
+    --success: #059669;          /* In-spec readings (Emerald 600) */
+    --success-soft: rgba(16, 185, 129, 0.10);
+    --success-border: rgba(16, 185, 129, 0.25);
+
+    /* Danger & Excursion (Rose Red) */
+    --danger: #dc2626;           /* Out-of-spec excursions (Red 600) */
+    --danger-soft: rgba(239, 68, 68, 0.08);
+    --danger-border: rgba(239, 68, 68, 0.25);
+
+    /* Elevation & Shadows */
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+}
+
+/* ================================================================
+   Theme Variables — Dark Mode
+   Applied via [data-theme="dark"] or .dark on <html> / <body>
+   ================================================================ */
+[data-theme="dark"],
+html.dark,
+body.dark {
+    /* Backgrounds & Surfaces */
+    --bg-page: #0b1220;          /* Deep space midnight */
+    --bg-surface: #111827;       /* Card surface (Gray 900) */
+    --bg-surface-alt: #1a2436;   /* Highlighted container surface */
+    --bg-surface-soft: #0f172a;  /* Inset wells & dark slots */
+    --bg-input: #1e293b;         /* Input wells (Slate 800) */
+
+    /* Borders */
+    --border: #334155;           /* Structural border (Slate 700) */
+    --border-light: #1e293b;     /* Sub-dividers */
+    --border-faint: #1e293b;
+
+    /* Text Hierarchy */
+    --text-primary: #f1f5f9;     /* Crisp white-slate (Slate 100) */
+    --text-secondary: #cbd5e1;   /* Neutral secondary (Slate 300) */
+    --text-muted: #94a3b8;       /* Dim labels (Slate 400) */
+    --text-faint: #64748b;       /* Subtle placeholders (Slate 500) */
+
+    /* Accent & Brand */
+    --accent: #6366f1;           /* Luminous Indigo (Indigo 500) */
+    --accent-light: #818cf8;     /* Indigo 400 */
+    --accent-soft: rgba(99, 102, 241, 0.14);
+    --accent-soft-bd: rgba(99, 102, 241, 0.38);
+    --accent-soft-tx: #a5b4fc;   /* Indigo 200 */
+
+    /* Warning & Inspection */
+    --warn: #fbbf24;
+    --warn-soft: rgba(245, 158, 11, 0.12);
+    --warn-soft-bd: rgba(245, 158, 11, 0.35);
+    --warn-soft-tx: #fbbf24;
+
+    /* Success & Compliant */
+    --success: #10b981;
+    --success-soft: rgba(16, 185, 129, 0.16);
+    --success-border: rgba(16, 185, 129, 0.35);
+
+    /* Danger & Excursion */
+    --danger: #ef4444;
+    --danger-soft: rgba(239, 68, 68, 0.14);
+    --danger-border: rgba(239, 68, 68, 0.35);
+
+    /* Elevation & Shadows */
+    --shadow-sm: 0 4px 16px -6px rgba(0, 0, 0, 0.40);
+    --shadow-md: 0 12px 30px -8px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 25px 60px -15px rgba(0, 0, 0, 0.65);
+}
+
 html, body {
   overflow-x: clip;
   max-width: 100vw;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
+/* ================================================================
+   Typography Utility Classes
+   ================================================================ */
+.font-ui {
+  font-family: var(--font-ui);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================================================================
+   Micro-Icon Container & Button Styles (.tbtn)
+   ================================================================ */
+.tbtn__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+}
+
+.tbtn__icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.tbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px 0 6px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  transition: all 0.16s ease;
+  font-family: var(--font-ui);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.tbtn:hover:not(:disabled) {
+  background: var(--bg-surface-alt);
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+.tbtn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* 1. Upload Button (Cyan Accent) */
+.tbtn--upload {
+  background: #ffffff;
+  border-color: #bae6fd;
+  color: #0284c7;
+}
+.tbtn--upload .tbtn__icon {
+  background: #e0f2fe;
+  color: #0284c7;
+}
+.tbtn--upload:hover:not(:disabled) {
+  background: #f0f9ff;
+  border-color: #7dd3fc;
+  color: #0369a1;
+  box-shadow: 0 3px 10px -2px rgba(14, 165, 233, 0.25);
+}
+.dark .tbtn--upload,
+[data-theme="dark"] .tbtn--upload {
+  background: rgba(6, 182, 212, 0.10);
+  border-color: rgba(6, 182, 212, 0.35);
+  color: #67e8f9;
+}
+.dark .tbtn--upload .tbtn__icon,
+[data-theme="dark"] .tbtn--upload .tbtn__icon {
+  background: rgba(6, 182, 212, 0.18);
+  color: #22d3ee;
+}
+.dark .tbtn--upload:hover:not(:disabled),
+[data-theme="dark"] .tbtn--upload:hover:not(:disabled) {
+  background: rgba(6, 182, 212, 0.20);
+  border-color: rgba(6, 182, 212, 0.60);
+  color: #a5f3fc;
+  box-shadow: 0 6px 20px -8px rgba(6, 182, 212, 0.55);
+}
+
+/* 2. Print / Neutral Action Button (Slate) */
+.tbtn--print {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+.tbtn--print .tbtn__icon {
+  background: #f1f5f9;
+  color: #475569;
+}
+.tbtn--print:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+  box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.08);
+}
+.dark .tbtn--print,
+[data-theme="dark"] .tbtn--print {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: var(--text-secondary);
+}
+.dark .tbtn--print .tbtn__icon,
+[data-theme="dark"] .tbtn--print .tbtn__icon {
+  background: rgba(148, 163, 184, 0.18);
+  color: var(--text-secondary);
+}
+.dark .tbtn--print:hover:not(:disabled),
+[data-theme="dark"] .tbtn--print:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.22);
+  border-color: rgba(148, 163, 184, 0.50);
+  color: var(--text-primary);
+  box-shadow: 0 6px 20px -8px rgba(148, 163, 184, 0.40);
+}
+
+/* 3. PNG Export (Violet Accent) */
+.tbtn--png {
+  background: #ffffff;
+  border-color: #ddd6fe;
+  color: #7c3aed;
+}
+.tbtn--png .tbtn__icon {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+.tbtn--png:hover:not(:disabled) {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+  color: #6d28d9;
+  box-shadow: 0 3px 10px -2px rgba(139, 92, 246, 0.25);
+}
+.dark .tbtn--png,
+[data-theme="dark"] .tbtn--png {
+  background: rgba(139, 92, 246, 0.10);
+  border-color: rgba(139, 92, 246, 0.35);
+  color: #c4b5fd;
+}
+.dark .tbtn--png .tbtn__icon,
+[data-theme="dark"] .tbtn--png .tbtn__icon {
+  background: rgba(139, 92, 246, 0.20);
+  color: #a78bfa;
+}
+.dark .tbtn--png:hover:not(:disabled),
+[data-theme="dark"] .tbtn--png:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.20);
+  border-color: rgba(139, 92, 246, 0.60);
+  color: #ddd6fe;
+  box-shadow: 0 6px 20px -8px rgba(139, 92, 246, 0.55);
+}
+
+/* 4. PDF Vector Export (Crimson / Rose Accent) */
+.tbtn--pdf {
+  background: #ffffff;
+  border-color: #fecdd3;
+  color: #e11d48;
+}
+.tbtn--pdf .tbtn__icon {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+.tbtn--pdf:hover:not(:disabled) {
+  background: #fff1f2;
+  border-color: #fda4af;
+  color: #be123c;
+  box-shadow: 0 3px 10px -2px rgba(239, 68, 68, 0.25);
+}
+.dark .tbtn--pdf,
+[data-theme="dark"] .tbtn--pdf {
+  background: rgba(220, 38, 38, 0.10);
+  border-color: rgba(220, 38, 38, 0.35);
+  color: #f87171;
+}
+.dark .tbtn--pdf .tbtn__icon,
+[data-theme="dark"] .tbtn--pdf .tbtn__icon {
+  background: rgba(220, 38, 38, 0.18);
+  color: #f87171;
+}
+.dark .tbtn--pdf:hover:not(:disabled),
+[data-theme="dark"] .tbtn--pdf:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.20);
+  border-color: rgba(220, 38, 38, 0.60);
+  color: #fca5a5;
+  box-shadow: 0 6px 20px -8px rgba(220, 38, 38, 0.55);
+}
+
+/* 5. Excel Spreadsheet Export (Emerald Accent) */
+.tbtn--excel {
+  background: #ffffff;
+  border-color: #86efac;
+  color: #047857;
+  font-weight: 700;
+}
+.tbtn--excel .tbtn__icon {
+  background: #dcfce7;
+  color: #059669;
+}
+.tbtn--excel:hover:not(:disabled) {
+  background: #f0fdf4;
+  border-color: #4ade80;
+  color: #065f46;
+  box-shadow: 0 3px 10px -2px rgba(16, 185, 129, 0.25);
+}
+.dark .tbtn--excel,
+[data-theme="dark"] .tbtn--excel {
+  background: rgba(5, 150, 105, 0.10);
+  border-color: rgba(5, 150, 105, 0.35);
+  color: #34d399;
+}
+.dark .tbtn--excel .tbtn__icon,
+[data-theme="dark"] .tbtn--excel .tbtn__icon {
+  background: rgba(5, 150, 105, 0.18);
+  color: #059669;
+}
+.dark .tbtn--excel:hover:not(:disabled),
+[data-theme="dark"] .tbtn--excel:hover:not(:disabled) {
+  background: rgba(5, 150, 105, 0.20);
+  border-color: rgba(5, 150, 105, 0.60);
+  color: #6ee7b7;
+  box-shadow: 0 6px 20px -8px rgba(5, 150, 105, 0.55);
+}
+
+/* 6. Primary Action Button (Indigo Gradient) */
+.tbtn--primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 4px 12px -2px rgba(79, 70, 229, 0.40);
+}
+.tbtn--primary .tbtn__icon {
+  background: rgba(255, 255, 255, 0.20);
+  color: #ffffff;
+}
+.tbtn--primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  box-shadow: 0 6px 16px -2px rgba(79, 70, 229, 0.50);
+  transform: translateY(-1px);
+}
+.tbtn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* 7. Warning & Rule Action (Warm Amber) */
+.tbtn--warn {
+  background: #ffffff;
+  border-color: #fde68a;
+  color: #b45309;
+}
+.tbtn--warn .tbtn__icon {
+  background: #fef3c7;
+  color: #d97706;
+}
+.tbtn--warn:hover:not(:disabled) {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+  box-shadow: 0 3px 10px -2px rgba(245, 158, 11, 0.25);
+}
+.dark .tbtn--warn,
+[data-theme="dark"] .tbtn--warn {
+  background: rgba(217, 119, 6, 0.10);
+  border-color: rgba(217, 119, 6, 0.35);
+  color: #fbbf24;
+}
+.dark .tbtn--warn .tbtn__icon,
+[data-theme="dark"] .tbtn--warn .tbtn__icon {
+  background: rgba(217, 119, 6, 0.18);
+  color: #fbbf24;
+}
+.dark .tbtn--warn:hover:not(:disabled),
+[data-theme="dark"] .tbtn--warn:hover:not(:disabled) {
+  background: rgba(217, 119, 6, 0.20);
+  border-color: rgba(217, 119, 6, 0.60);
+  color: #fde68a;
+  box-shadow: 0 6px 20px -8px rgba(217, 119, 6, 0.55);
+}
+
+/* 8. Neutral & Secondary Action (Slate) */
+.tbtn--neutral {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+.tbtn--neutral .tbtn__icon {
+  background: #f1f5f9;
+  color: #64748b;
+}
+.tbtn--neutral:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+  box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+.dark .tbtn--neutral,
+[data-theme="dark"] .tbtn--neutral {
+  background: var(--bg-surface);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+.dark .tbtn--neutral .tbtn__icon,
+[data-theme="dark"] .tbtn--neutral .tbtn__icon {
+  background: var(--bg-surface-soft);
+  color: var(--text-secondary);
+}
+.dark .tbtn--neutral:hover:not(:disabled),
+[data-theme="dark"] .tbtn--neutral:hover:not(:disabled) {
+  background: var(--bg-surface-soft);
+  border-color: var(--border);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* 5. Panel Cloud Action Button (Gradient Cyan-Indigo) */
+.panel-save-cloud-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(14, 165, 233, 0.15) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.40);
+  color: var(--accent);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.12);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.panel-save-cloud-btn:hover {
+  background: linear-gradient(135deg, #6366f1 0%, #0ea5e9 100%);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 6px 18px -4px rgba(99, 102, 241, 0.50);
+  transform: translateY(-1px);
+}
+.panel-save-cloud-btn:active {
+  transform: translateY(0);
+}
+
+/* 6. Destructive / Bulk Delete Button (Crimson Alert) */
+.bulk-del-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #ef4444;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  font-family: var(--font-ui);
+}
+.bulk-del-btn:hover:not(:disabled) {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 4px 14px -3px rgba(239, 68, 68, 0.55);
+  transform: translateY(-1px);
+}
+.bulk-del-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* 7. Icon Ghost Button (Toolbar Controls) */
+.toolbar__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.toolbar__icon-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  transform: translateY(-1px);
+}
+.toolbar__icon-btn:active {
+  transform: translateY(0);
+}
+
+/* ================================================================
+   Card, Panel & Drawer Design Tokens (.panel)
+   ================================================================ */
+.panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+/* ================================================================
+   Segmented Date & Time Picker (.seg-picker)
+   ================================================================ */
+.seg-picker {
+  background: var(--bg-surface-alt);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  padding: 14px 12px 12px;
+  position: relative;
+}
+
+.seg-picker__fields {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.seg-field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 5px 2px;
+}
+
+.seg-field:focus-within {
+  border-color: var(--accent-light);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
+.seg-field input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.seg-field label {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  font-weight: 600;
+  margin-top: 1px;
+}
+
+/* ================================================================
+   Glassmorphic Modal Backdrop & Card (.bulk-backdrop, .bulk-modal)
+   ================================================================ */
+.bulk-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 9100;
+  transition: opacity 0.25s ease;
+}
+
+.bulk-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  width: 640px;
+  max-width: 95vw;
+  max-height: 88vh;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  z-index: 9101;
+  overflow: hidden;
+  color: var(--text-primary);
+}
+
+/* ================================================================
+   Badges & Status Pills
+   ================================================================ */
+.badge--ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--success-soft);
+  border: 1px solid var(--success-border);
+  color: var(--success);
+}
+
+.badge--warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-soft-bd);
+  color: var(--warn);
+}
+
+.badge--danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-border);
+  color: var(--danger);
+}
+
+.qcloud-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  color: #0284c7;
+}
+.dark .qcloud-pill,
+[data-theme="dark"] .qcloud-pill {
+  color: #38bdf8;
+}
+
+.bulk-queue-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 2px var(--success-soft);
+  display: inline-block;
+  animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+/* ================================================================
+   Keyframe Animations
+   ================================================================ */
 @keyframes toast-slide-in {
   from {
     opacity: 0;
@@ -60,14 +776,21 @@ html, body {
   }
 }
 
+/* Global High-Contrast Text Selection */
+::selection {
+  background-color: #4f46e5 !important;
+  color: #ffffff !important;
+}
+
+::-moz-selection {
+  background-color: #4f46e5 !important;
+  color: #ffffff !important;
+}
+
 .results-table-row {
   transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   will-change: transform, background-color;
-}
-
-.results-table-row:hover {
-  background-color: rgba(241, 245, 249, 0.85);
 }
 
 .results-table-row.copy-flash {
@@ -85,5 +808,79 @@ html, body {
   will-change: transform;
   transform-origin: center center;
   backface-visibility: hidden;
+}
+
+/* ================================================================
+   Segmented Tab Bar Navigation (.segmented-tabs)
+   ================================================================ */
+.segmented-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.segmented-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  cursor: pointer;
+  background: transparent;
+  transition: all 0.16s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.segmented-tab:hover:not(.segmented-tab--active) {
+  color: var(--text-primary);
+  background: var(--bg-surface-soft);
+}
+
+.segmented-tab--active {
+  background: var(--bg-surface);
+  color: var(--accent);
+  border-color: var(--border-light);
+  font-weight: 700;
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.12);
+}
+
+.dark .segmented-tab--active,
+[data-theme="dark"] .segmented-tab--active {
+  color: var(--accent-light);
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.40);
+}
+
+/* High-Density Analytical Table */
+.data-table-container {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.data-table-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg-surface-alt);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+
+.cell-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
 }
 

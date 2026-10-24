@@ -86,10 +86,10 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+    <div className="bulk-backdrop flex items-center justify-center p-3 sm:p-4">
+      <div className="bulk-modal !max-w-4xl !w-full max-h-[92vh] flex flex-col overflow-hidden !p-0">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-200 bg-slate-50 shrink-0">
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-[var(--border)] bg-[var(--bg-surface-alt)] shrink-0">
           <div className="flex items-center gap-3">
             <span
               className={`w-3.5 h-3.5 rounded-full shrink-0 shadow-sm ${
@@ -105,15 +105,15 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
               }`}
             />
             <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
                 <span>{t.modalRowNum}{row.rowIndex} {t.modalInspectionTitle}</span>
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+              <p className="text-xs text-[var(--text-muted)] mt-0.5 flex items-center gap-1.5 flex-wrap">
                 <span>{t.modalMatchKey}</span>
                 <button
                   type="button"
                   onClick={() => copyText(row.matchKey, 'header_key')}
-                  className="font-mono text-emerald-700 font-semibold bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200 transition-colors flex items-center gap-1 group cursor-pointer"
+                  className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 transition-colors flex items-center gap-1 group cursor-pointer"
                   title="Click to copy match key"
                 >
                   <span>{row.matchKey || t.modalNotAvailable}</span>
@@ -129,24 +129,24 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopyEntireRow}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-all shadow-xs cursor-pointer"
+              className="tbtn tbtn--print !h-9 !px-3.5 cursor-pointer"
               title="Copy all row data to clipboard"
             >
               {copiedKey === 'entire_row' ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-                  <span className="text-emerald-700 font-bold">{t.dashCopied || 'Copied!'}</span>
+                  <span className="text-emerald-600 font-bold">{t.dashCopied || 'Copied!'}</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-3.5 h-3.5 text-slate-500" />
+                  <Copy className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                   <span className="hidden sm:inline">Copy Row</span>
                 </>
               )}
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-surface-soft)] transition-colors cursor-pointer"
               title={t.close}
             >
               <X className="w-5 h-5" />
@@ -474,30 +474,27 @@ export const RowDetailModal: React.FC<RowDetailModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
-          <div className="text-xs text-slate-600 font-mono">
-            {t.modalStatus} <span className="text-slate-900 font-bold">{row.isMatched ? t.modalMatched : t.modalUnmatchedNew}</span> · {t.modalLayer} <span className="text-emerald-700 font-bold">{row.decisionLayerName || 'Inspection'}</span>
+        <div className="px-6 py-3.5 border-t border-[var(--border)] bg-[var(--bg-surface-alt)] flex items-center justify-between shrink-0">
+          <div className="text-xs text-[var(--text-muted)] font-mono">
+            {t.modalStatus} <span className="text-[var(--text-primary)] font-bold">{row.isMatched ? t.modalMatched : t.modalUnmatchedNew}</span> · {t.modalLayer} <span className="text-emerald-600 dark:text-emerald-400 font-bold">{row.decisionLayerName || 'Inspection'}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopyEntireRow}
-              className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              className="tbtn tbtn--upload !h-8 !px-3 text-xs"
             >
-              {copiedKey === 'entire_row' ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-                  <span className="text-emerald-700 font-bold">{t.dashCopied || 'Copied!'}</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Copy Row</span>
-                </>
-              )}
+              <span className="tbtn__icon !w-5 !h-5 !rounded-md">
+                {copiedKey === 'entire_row' ? (
+                  <Check className="w-3 h-3 text-emerald-400" />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
+              </span>
+              <span>{copiedKey === 'entire_row' ? (t.dashCopied || 'Copied!') : 'Copy Row'}</span>
             </button>
             <button
               onClick={onClose}
-              className="px-5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-xs cursor-pointer"
+              className="tbtn tbtn--neutral !h-8 !px-4 text-xs"
             >
               {t.close}
             </button>

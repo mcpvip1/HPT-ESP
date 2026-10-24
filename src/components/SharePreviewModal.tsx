@@ -118,19 +118,19 @@ export const SharePreviewModal: React.FC<SharePreviewModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full flex flex-col shadow-2xl overflow-hidden">
+    <div className="bulk-backdrop flex items-center justify-center p-4">
+      <div className="bulk-modal !max-w-lg !w-full flex flex-col overflow-hidden !p-0">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-4">
+        <div className="px-6 py-4 border-b border-[var(--border)] bg-[var(--bg-surface-alt)] flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-xs">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xs">
               <Share2 className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900 tracking-tight">
+              <h3 className="text-base font-bold text-[var(--text-primary)] tracking-tight">
                 {t.shareTitle}
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
                 {t.shareDesc}
               </p>
             </div>
@@ -138,7 +138,7 @@ export const SharePreviewModal: React.FC<SharePreviewModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors"
+            className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] rounded-lg transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -146,14 +146,14 @@ export const SharePreviewModal: React.FC<SharePreviewModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 space-y-5 bg-white">
+        <div className="p-6 space-y-5 bg-[var(--bg-surface)]">
           {/* Feature Highlights */}
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-            <div className="text-xs font-semibold text-slate-800 flex items-center gap-2">
-              <Eye className="w-3.5 h-3.5 text-emerald-600" />
+          <div className="p-3.5 rounded-xl bg-[var(--bg-surface-alt)] border border-[var(--border-light)] space-y-2">
+            <div className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-2">
+              <Eye className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>{t.shareWhatSee}</span>
             </div>
-            <ul className="text-[11px] text-slate-600 space-y-1 list-disc list-inside leading-relaxed">
+            <ul className="text-[11px] text-[var(--text-secondary)] space-y-1 list-disc list-inside leading-relaxed">
               <li>{t.shareBullet1}</li>
               <li>{t.shareBullet2}</li>
               <li>{t.shareBullet3}</li>
@@ -162,19 +162,19 @@ export const SharePreviewModal: React.FC<SharePreviewModalProps> = ({
 
           {/* Filter Sharing Options */}
           <div className="space-y-2.5">
-            <label className="text-xs font-bold text-slate-700">
+            <label className="text-xs font-bold text-[var(--text-primary)]">
               {t.shareFilterConfig}
             </label>
 
             <div className="space-y-2">
-              <label className="flex items-center gap-2.5 p-2.5 rounded-lg bg-slate-50 border border-slate-200 hover:border-slate-300 cursor-pointer transition-colors">
+              <label className="flex items-center gap-2.5 p-2.5 rounded-lg bg-[var(--bg-surface-alt)] border border-[var(--border)] hover:border-emerald-500 cursor-pointer transition-colors">
                 <input
                   type="checkbox"
                   checked={includeFilter}
                   onChange={(e) => setIncludeFilter(e.target.checked)}
-                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  className="rounded border-[var(--border)] text-emerald-600 focus:ring-emerald-500"
                 />
-                <div className="text-xs text-slate-700">
+                <div className="text-xs text-[var(--text-secondary)]">
                   <span>{t.sharePreselectFilter} </span>
                   <span className={filterLabels[activeFilter]?.colorClass}>
                     {filterLabels[activeFilter]?.label}
@@ -183,16 +183,16 @@ export const SharePreviewModal: React.FC<SharePreviewModalProps> = ({
               </label>
 
               {searchTerm.trim() && (
-                <label className="flex items-center gap-2.5 p-2.5 rounded-lg bg-slate-50 border border-slate-200 hover:border-slate-300 cursor-pointer transition-colors">
+                <label className="flex items-center gap-2.5 p-2.5 rounded-lg bg-[var(--bg-surface-alt)] border border-[var(--border)] hover:border-emerald-500 cursor-pointer transition-colors">
                   <input
                     type="checkbox"
                     checked={includeSearch}
                     onChange={(e) => setIncludeSearch(e.target.checked)}
-                    className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                    className="rounded border-[var(--border)] text-emerald-600 focus:ring-emerald-500"
                   />
-                  <div className="text-xs text-slate-700">
+                  <div className="text-xs text-[var(--text-secondary)]">
                     <span>{t.shareIncludeSearch} </span>
-                    <span className="font-mono text-amber-800 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 font-bold">
+                    <span className="font-mono text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1 py-0.5 rounded border border-amber-200 dark:border-amber-800 font-bold">
                       "{searchTerm}"
                     </span>
                   </div>
@@ -204,10 +204,10 @@ export const SharePreviewModal: React.FC<SharePreviewModalProps> = ({
           {/* Link Box */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-700">
+              <label className="text-xs font-bold text-[var(--text-primary)]">
                 {t.shareLinkLabel}
               </label>
-              <span className="text-[10px] text-slate-500 font-mono">
+              <span className="text-[10px] text-[var(--text-muted)] font-mono">
                 {charCount.toLocaleString()} {t.shareChars}
               </span>
             </div>
@@ -218,28 +218,25 @@ export const SharePreviewModal: React.FC<SharePreviewModalProps> = ({
                 readOnly
                 value={url}
                 onFocus={(e) => e.target.select()}
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 font-mono selection:bg-emerald-600 selection:text-white truncate focus:outline-none focus:border-emerald-500 shadow-xs"
+                className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] font-mono selection:bg-emerald-600 selection:text-white truncate focus:outline-none focus:border-emerald-500 shadow-xs"
               />
               <button
                 onClick={handleCopy}
-                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-lg transition-all shrink-0 shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="tbtn tbtn--upload !h-9 !px-3.5 cursor-pointer"
               >
-                {copied ? (
-                  <>
+                <span className="tbtn__icon">
+                  {copied ? (
                     <Check className="w-3.5 h-3.5" />
-                    <span>{t.shareCopied}</span>
-                  </>
-                ) : (
-                  <>
+                  ) : (
                     <Copy className="w-3.5 h-3.5" />
-                    <span>{t.shareCopyLink}</span>
-                  </>
-                )}
+                  )}
+                </span>
+                <span>{copied ? t.shareCopied : t.shareCopyLink}</span>
               </button>
             </div>
 
             <div className="flex items-center justify-between pt-1">
-              <span className="text-[11px] text-slate-500">
+              <span className="text-[11px] text-[var(--text-muted)] font-mono">
                 {t.shareCompressedNote}
               </span>
               <button
@@ -259,7 +256,7 @@ export const SharePreviewModal: React.FC<SharePreviewModalProps> = ({
                   });
                   onShowToast(t.shareHtmlToast, 'success');
                 }}
-                className="flex items-center gap-1.5 text-xs text-emerald-700 hover:text-emerald-800 font-semibold transition-colors"
+                className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 hover:opacity-80 font-semibold transition-colors cursor-pointer"
                 title="Download single-file interactive preview HTML"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -270,19 +267,21 @@ export const SharePreviewModal: React.FC<SharePreviewModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
+        <div className="px-6 py-3.5 border-t border-[var(--border)] bg-[var(--bg-surface-alt)] flex items-center justify-between gap-3">
           <button
             onClick={onClose}
-            className="px-3.5 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            className="tbtn tbtn--neutral !h-9 !px-3.5 cursor-pointer"
           >
             {t.close}
           </button>
 
           <button
             onClick={handleOpenPreview}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-xs"
+            className="tbtn tbtn--primary !h-9 !px-4 cursor-pointer"
           >
-            <ExternalLink className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="tbtn__icon">
+              <ExternalLink className="w-3.5 h-3.5" />
+            </span>
             <span>{t.shareTestNow}</span>
           </button>
         </div>

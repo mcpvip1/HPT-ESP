@@ -11,7 +11,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import type { DocumentReference } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, firebaseConfig } from './firebase';
 import { packCompact, unpackCompact } from '../utils/previewSharing';
 import type { SharedPreviewPayload } from '../utils/previewSharing';
 import type {
@@ -577,10 +577,10 @@ export async function fetchSharedSnapshot(shareId: string): Promise<SharedPrevie
 }
 
 // Direct Firestore REST fetch for the public share slot.
-// Uses the public web API key (same as the Firebase client config).
+// Uses the web API key and database ID from the provisioned Firebase client config.
 const FIRESTORE_REST_BASE =
-  'https://firestore.googleapis.com/v1/projects/hpt-esp/databases/(default)/documents';
-const FIRESTORE_WEB_KEY = 'AIzaSyDdT5hqzx23BZpUyjKvX_gQarpSA9yg2pE';
+  `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${firebaseConfig.firestoreDatabaseId || '(default)'}/documents`;
+const FIRESTORE_WEB_KEY = firebaseConfig.apiKey;
 
 async function fetchSharedSnapshotViaRest(shareId: string): Promise<SharedPreviewPayload | null> {
   const key = FIRESTORE_WEB_KEY;
@@ -874,5 +874,36 @@ export async function fetchResultsState(uid: string): Promise<CloudResultsState 
   } catch (e) {
     console.warn('Cloud sync: failed to parse results state', e);
     return null;
+  }
+}
+
+/** Wipes all cloud workspace state for a user (files, results, rules, column configs, history, preview) */
+export async function wipeCloudWorkspace(uid: string): Promise<boolean> {
+  try {
+    // 1. Delete results chunks & meta
+    await deleteResultsState(uid);
+
+    // 2. Delete workbooks chunks & meta
+    const wbsRef = stateDoc(uid, 'workbooks');
+    try {
+      const wbsChunks = await getDocs(collection(wbsRef, 'chunks'));
+      const batch = writeBatch(db);
+      wbsChunks.forEach((d) => batch.delete(d.ref));
+      batch.delete(wbsRef);
+      await batch.commit();
+    } catch {}
+
+    // 3. Delete rules, columnConfigs, history, preview
+    await Promise.allSettled([
+      deleteDoc(stateDoc(uid, 'rules')),
+      deleteDoc(stateDoc(uid, 'columnConfigs')),
+      deleteDoc(stateDoc(uid, 'history')),
+      deleteDoc(stateDoc(uid, 'preview')),
+      unpublishSharedSnapshot(FIXED_PREVIEW_SHARE_ID),
+    ]);
+    return true;
+  } catch (e) {
+    console.warn('Failed to wipe cloud workspace', e);
+    return false;
   }
 }

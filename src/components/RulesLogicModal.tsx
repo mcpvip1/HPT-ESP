@@ -148,25 +148,25 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white border border-slate-200 rounded-2xl max-w-5xl w-full h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="bulk-backdrop flex items-center justify-center p-3 sm:p-6">
+      <div className="bulk-modal !max-w-5xl !w-full h-[90vh] flex flex-col overflow-hidden !p-0">
         {/* Modal Top Header */}
-        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-4 shrink-0">
+        <div className="px-6 py-4 border-b border-[var(--border)] bg-[var(--bg-surface-alt)] flex items-center justify-between gap-4 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-xs">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xs">
               <SlidersHorizontal className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
               <div className="flex items-center gap-2.5">
-                <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                <h2 className="text-base sm:text-lg font-bold text-[var(--text-primary)] tracking-tight">
                   {t.rulesModalTitle}
                 </h2>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-mono">
                   <Check className="w-3 h-3" />
                   {t.rulesSavedOnce}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5 hidden sm:block">
+              <p className="text-xs text-[var(--text-muted)] mt-0.5 hidden sm:block">
                 {t.rulesModalDesc}
               </p>
             </div>
@@ -175,49 +175,44 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={handleSave}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg border transition-all shadow-xs ${
-                justSaved
-                  ? 'bg-emerald-600 text-white border-emerald-600'
-                  : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-600 shadow-xs'
+              className={`tbtn tbtn--excel !h-9 !px-3.5 cursor-pointer ${
+                justSaved ? 'opacity-90' : ''
               }`}
             >
-              {justSaved ? (
-                <>
+              <span className="tbtn__icon">
+                {justSaved ? (
                   <Check className="w-3.5 h-3.5" />
-                  <span>{t.rulesSavedShort}</span>
-                </>
-              ) : (
-                <>
+                ) : (
                   <Save className="w-3.5 h-3.5" />
-                  <span>{t.rulesSaveSettings}</span>
-                </>
-              )}
+                )}
+              </span>
+              <span>{justSaved ? t.rulesSavedShort : t.rulesSaveSettings}</span>
             </button>
 
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+              className="tbtn tbtn--neutral !h-9 !w-9 !p-0 justify-center"
               aria-label={t.close}
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 text-[var(--text-muted)]" />
             </button>
           </div>
         </div>
 
         {/* Sub-Navigation Tabs */}
-        <div className="px-6 pt-3 pb-2 border-b border-slate-200 bg-white flex items-center justify-between gap-4 shrink-0">
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+        <div className="px-6 pt-3 pb-2 border-b border-[var(--border)] bg-[var(--bg-surface)] flex items-center justify-between gap-4 shrink-0">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[var(--bg-surface-soft)] rounded-xl border border-[var(--border-light)]">
             <button
               onClick={() => setActiveTab('mapping')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 activeTab === 'mapping'
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-xs border border-[var(--border)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <Link2 className="w-3.5 h-3.5 text-emerald-600" />
+              <Link2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>{t.rulesTabMapping}</span>
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
                 {mappings.length}
               </span>
             </button>
@@ -225,20 +220,20 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
             {/* Intelligent Suggestion Engine Tab */}
             <button
               onClick={() => setActiveTab('suggestions')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 activeTab === 'suggestions'
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-xs border border-[var(--border)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>{t.suggestionEngineTitle || 'Suggestion Engine'}</span>
               {unmappedSuggestionsCount > 0 ? (
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-100 text-emerald-800 font-bold border border-emerald-300 animate-pulse">
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold border border-emerald-300 dark:border-emerald-700 animate-pulse">
                   {unmappedSuggestionsCount}
                 </span>
               ) : (
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-200 text-slate-600">
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-[var(--bg-surface-alt)] text-[var(--text-muted)]">
                   0
                 </span>
               )}
@@ -246,28 +241,28 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
 
             <button
               onClick={() => setActiveTab('decision')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 activeTab === 'decision'
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-xs border border-[var(--border)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <Layers className="w-3.5 h-3.5 text-amber-600" />
+              <Layers className="w-3.5 h-3.5 text-amber-500" />
               <span>{t.rulesTabDecision}</span>
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-50 text-amber-700 font-bold border border-amber-200">
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold border border-amber-200 dark:border-amber-800">
                 {layers.length}
               </span>
             </button>
 
             <button
               onClick={() => setActiveTab('hold')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 activeTab === 'hold'
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-xs border border-[var(--border)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <PauseCircle className="w-3.5 h-3.5 text-blue-600" />
+              <PauseCircle className="w-3.5 h-3.5 text-blue-500" />
               <span>{t.rulesTabHold}</span>
               {holdValues.length > 0 && (
                 <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-blue-600 text-white font-bold">
@@ -277,13 +272,13 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
             </button>
           </div>
 
-          <div className="text-[11px] text-slate-400 hidden md:block">
+          <div className="text-[11px] text-[var(--text-muted)] hidden md:block font-mono">
             {t.rulesStorageNote}
           </div>
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-50/60">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-[var(--bg-surface-alt)]">
           {activeTab === 'mapping' ? (
             <div className="space-y-6 animate-in fade-in duration-150">
               <ColumnMappingRules
@@ -455,7 +450,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
                       if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                     }}
                     placeholder={t.dashHoldReasonPlaceholder}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
@@ -464,8 +459,8 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
         </div>
 
         {/* Modal Bottom Action Bar */}
-        <div className="px-6 py-3.5 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-          <div className="text-xs text-slate-500 flex items-center gap-2">
+        <div className="px-6 py-3.5 border-t border-[var(--border)] bg-[var(--bg-surface)] flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+          <div className="text-xs text-[var(--text-muted)] flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
             <span>{t.rulesPersistNote}</span>
           </div>
@@ -473,16 +468,18 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors"
+              className="tbtn tbtn--neutral !h-9 !px-4 cursor-pointer"
             >
               {t.close}
             </button>
 
             <button
               onClick={handleSave}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 transition-colors shadow-xs"
+              className="tbtn tbtn--excel !h-9 !px-4 cursor-pointer"
             >
-              <Save className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="tbtn__icon">
+                <Save className="w-3.5 h-3.5" />
+              </span>
               <span>{t.rulesSaveSettings}</span>
             </button>
 
@@ -490,10 +487,12 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
               <button
                 onClick={handleSaveAndApply}
                 disabled={isProcessing}
-                className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-all hover:translate-x-0.5"
+                className="tbtn tbtn--primary !h-9 !px-5 cursor-pointer disabled:opacity-50"
               >
+                <span className="tbtn__icon">
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </span>
                 <span>{isProcessing ? t.rulesEvaluating : t.rulesSaveShowResults}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             )}
           </div>

@@ -323,26 +323,30 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     }
   });
 
-  // Load custom column order and visibility (priority: preview link -> stored v2 -> default candidate)
+  // Load custom column order and visibility (priority: initialColumnConfigs from cloud -> stored v2 -> default candidate)
   const loadStoredConfigs = (candidateCols: ColumnConfigItem[]): ColumnConfigItem[] => {
-    // In Preview Mode, use the exact frozen snapshot from the shared link
-    if (isPreviewMode && initialColumnConfigs && initialColumnConfigs.length > 0) {
-      return initialColumnConfigs;
+    // Priority 1: initialColumnConfigs from cloud pull or props (works for both preview and studio mode)
+    if (initialColumnConfigs && initialColumnConfigs.length > 0) {
+      const candidateMap = new Map(candidateCols.map((c) => [c.id, c]));
+      const ordered: ColumnConfigItem[] = [];
+      initialColumnConfigs.forEach((c) => {
+        const found = candidateMap.get(c.id);
+        if (found) {
+          ordered.push({
+            ...found,
+            showInTable: c.showInTable,
+            showInExport: c.showInExport,
+          });
+          candidateMap.delete(c.id);
+        }
+      });
+      candidateMap.forEach((found) => ordered.push(found));
+      return ordered;
     }
     try {
       let stored = localStorage.getItem('excelmatch_column_settings_v2');
       if (!stored) {
         stored = localStorage.getItem('emp_column_configs');
-      }
-      if (!stored && initialColumnConfigs && initialColumnConfigs.length > 0) {
-        const fallbackObj = {
-          order: initialColumnConfigs.map((c) => c.id),
-          visibility: {} as Record<string, { table: boolean; export: boolean }>,
-        };
-        initialColumnConfigs.forEach((c) => {
-          fallbackObj.visibility[c.id] = { table: c.showInTable, export: c.showInExport };
-        });
-        stored = JSON.stringify(fallbackObj);
       }
       if (stored) {
         const parsed: {
@@ -396,38 +400,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     setColumnConfigs(loadStoredConfigs(allCandidateColumns));
   }, [allCandidateColumns, initialColumnConfigs]);
 
-  const handleUpdateColumnConfigs = (newConfigs: ColumnConfigItem[]) => {
-    setColumnConfigs(newConfigs);
-    setHasUnsavedColumnChanges(true);
-  };
-
-  // Move column left or right directly from table headers
-  const handleMoveColumn = (colId: string, direction: 'left' | 'right') => {
-    const visibleIdx = visibleTableColumns.findIndex((c) => c.id === colId);
-    if (visibleIdx === -1) return;
-    const targetVisibleIdx = direction === 'left' ? visibleIdx - 1 : visibleIdx + 1;
-    if (targetVisibleIdx < 0 || targetVisibleIdx >= visibleTableColumns.length) return;
-
-    const targetColId = visibleTableColumns[targetVisibleIdx].id;
-    const fromIdx = columnConfigs.findIndex((c) => c.id === colId);
-    const toIdx = columnConfigs.findIndex((c) => c.id === targetColId);
-    if (fromIdx === -1 || toIdx === -1) return;
-
-    const updated = [...columnConfigs];
-    const [moved] = updated.splice(fromIdx, 1);
-    updated.splice(toIdx, 0, moved);
-
-    setColumnConfigs(updated);
-    setHasUnsavedColumnChanges(true);
-  };
-
-  const handleSaveColumnConfigs = (newConfigs: ColumnConfigItem[]) => {
+  const handleSaveColumnConfigs = (newConfigs: ColumnConfigItem[], silent = false) => {
     setColumnConfigs(newConfigs);
     setHasUnsavedColumnChanges(false);
     try {
       const saveObj = {
         order: newConfigs.map((c) => c.id),
         visibility: {} as Record<string, { table: boolean; export: boolean }>,
+        updatedAt: Date.now(),
       };
       newConfigs.forEach((c) => {
         saveObj.visibility[c.id] = { table: c.showInTable, export: c.showInExport };
@@ -443,10 +423,12 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       if (onSaveColumnConfigs) {
         onSaveColumnConfigs(newConfigs);
       }
-      onShowToast(
-        cloudUser ? `${t.dashSaveView} (Synced to Cloud)` : t.dashSaveView,
-        'success'
-      );
+      if (!silent) {
+        onShowToast(
+          cloudUser ? `${t.dashSaveView} (Synced to Cloud)` : t.dashSaveView,
+          'success'
+        );
+      }
 
       // Sync to shared preview cache
       const latestPreview = localStorage.getItem('emp_shared_preview_latest');
@@ -494,6 +476,29 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     onShowToast(t.dashColumnsRestored, 'info');
   };
 
+  const handleUpdateColumnConfigs = (newConfigs: ColumnConfigItem[]) => {
+    handleSaveColumnConfigs(newConfigs, true);
+  };
+
+  // Move column left or right directly from table headers
+  const handleMoveColumn = (colId: string, direction: 'left' | 'right') => {
+    const visibleIdx = visibleTableColumns.findIndex((c) => c.id === colId);
+    if (visibleIdx === -1) return;
+    const targetVisibleIdx = direction === 'left' ? visibleIdx - 1 : visibleIdx + 1;
+    if (targetVisibleIdx < 0 || targetVisibleIdx >= visibleTableColumns.length) return;
+
+    const targetColId = visibleTableColumns[targetVisibleIdx].id;
+    const fromIdx = columnConfigs.findIndex((c) => c.id === colId);
+    const toIdx = columnConfigs.findIndex((c) => c.id === targetColId);
+    if (fromIdx === -1 || toIdx === -1) return;
+
+    const updated = [...columnConfigs];
+    const [moved] = updated.splice(fromIdx, 1);
+    updated.splice(toIdx, 0, moved);
+
+    handleSaveColumnConfigs(updated, true);
+  };
+
   const handleToggleSyncExport = (sync: boolean) => {
     setSyncExportWithTable(sync);
     try {
@@ -533,7 +538,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
   // Live preview snapshot sync status (cloud-id: FIXED_PREVIEW_SHARE_ID = 'latest')
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
-  const [isForceSyncing, setIsForceSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<number>(Date.now());
 
   // Forced synchronization check: immediately pushes the current view state
@@ -636,26 +640,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       pushSnapshotImmediate({ searchTerm: term });
     }, 350)
   ).current;
-
-  // Manual button handler to force synchronization check on demand
-  const handleForceSyncCheck = async () => {
-    setIsForceSyncing(true);
-    setSyncStatus('syncing');
-    try {
-      await pushSnapshotImmediate();
-      onShowToast(
-        t.dashForceSyncSuccess ||
-          'Dashboard view state successfully synced to preview snapshot (cloud-id: latest)',
-        'success'
-      );
-    } catch {
-      onShowToast(t.dashPreviewPublishFailed || 'Failed to update preview snapshot', 'error');
-    } finally {
-      setTimeout(() => {
-        setIsForceSyncing(false);
-      }, 350);
-    }
-  };
 
   // Background debounced synchronization fallback
   const debouncedPublishPreview = useRef(
@@ -1165,18 +1149,18 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     dot: string;
     active: string;
   }[] = [
-    { key: 'all', label: t.filterAll, count: totalResults, dot: 'bg-slate-400', active: 'border-slate-300 bg-slate-50 ring-2 ring-slate-300' },
-    { key: 'green', label: t.filterGreen, count: stats.greenCount ?? 0, dot: 'bg-emerald-500', active: 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-300' },
-    { key: 'yellow', label: t.filterYellow, count: stats.yellowCount ?? 0, dot: 'bg-amber-500', active: 'border-amber-300 bg-amber-50 ring-2 ring-amber-300' },
-    { key: 'red', label: t.filterRed, count: stats.redCount ?? 0, dot: 'bg-rose-500', active: 'border-rose-300 bg-rose-50 ring-2 ring-rose-300' },
-    { key: 'blue', label: t.filterBlue, count: stats.blueCount ?? 0, dot: 'bg-blue-600', active: 'border-blue-300 bg-blue-50 ring-2 ring-blue-300' },
-    { key: 'unmatched', label: t.filterUnmatched, count: stats.unmatchedCount ?? 0, dot: 'bg-violet-500', active: 'border-violet-300 bg-violet-50 ring-2 ring-violet-300' },
+    { key: 'all', label: t.filterAll, count: totalResults, dot: 'bg-slate-400', active: 'border-[var(--accent)] bg-indigo-50/80 dark:bg-[var(--accent-soft)] shadow-xs' },
+    { key: 'green', label: t.filterGreen, count: stats.greenCount ?? 0, dot: 'bg-[var(--success)]', active: 'border-emerald-500 bg-emerald-50/80 dark:bg-[var(--success-soft)] shadow-xs' },
+    { key: 'yellow', label: t.filterYellow, count: stats.yellowCount ?? 0, dot: 'bg-[var(--warn)]', active: 'border-amber-500 bg-amber-50/80 dark:bg-[var(--warn-soft)] shadow-xs' },
+    { key: 'red', label: t.filterRed, count: stats.redCount ?? 0, dot: 'bg-[var(--danger)]', active: 'border-rose-500 bg-rose-50/80 dark:bg-[var(--danger-soft)] shadow-xs' },
+    { key: 'blue', label: t.filterBlue, count: stats.blueCount ?? 0, dot: 'bg-blue-600', active: 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 shadow-xs' },
+    { key: 'unmatched', label: t.filterUnmatched, count: stats.unmatchedCount ?? 0, dot: 'bg-violet-500', active: 'border-violet-500 bg-violet-50/80 dark:bg-violet-950/40 shadow-xs' },
   ];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* 1. Results overview: clickable KPI stat cards (filter the table) */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm space-y-4">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-4 shadow-[var(--shadow-sm)] space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-2.5 md:gap-3">
           {kpiDefs.map((k) => {
             const pct = totalResults > 0 ? Math.round((k.count / totalResults) * 100) : 0;
@@ -1189,22 +1173,22 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   setPage(1);
                   pushSnapshotImmediate({ filter: k.key });
                 }}
-                className={`rounded-xl border p-2 sm:p-3 text-left transition-all ${
-                  isActive ? k.active : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                className={`rounded-xl border p-2 sm:p-3 text-left transition-all cursor-pointer ${
+                  isActive ? k.active : 'border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--accent-light)] hover:shadow-xs'
                 }`}
               >
                 <div className="flex items-center gap-1.5">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${k.dot}`} />
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 leading-tight">
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)] leading-tight font-ui">
                     {k.label}
                   </span>
                 </div>
                 <div className="mt-1.5 flex items-baseline gap-1.5">
-                  <span className="text-xl sm:text-2xl font-extrabold tabular-nums text-slate-900">
+                  <span className="text-xl sm:text-2xl font-extrabold tabular-nums text-[var(--text-primary)] font-mono">
                     {k.count.toLocaleString()}
                   </span>
                   {k.key !== 'all' && (
-                    <span className="text-[11px] font-semibold text-slate-400">{pct}%</span>
+                    <span className="text-[11px] font-semibold text-[var(--text-muted)] font-mono">{pct}%</span>
                   )}
                 </div>
               </button>
@@ -1213,7 +1197,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         </div>
 
         {/* 2. Action toolbar — grouped View / Share / Export actions */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 pt-3 border-t border-slate-100">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 pt-3 border-t border-[var(--border-light)]">
           {/* Left: View & Sync Actions */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             {/* Only Accept toggle */}
@@ -1229,7 +1213,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             >
               <span
                 className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                  hideSupersededPostpone ? 'bg-emerald-600' : 'bg-slate-300'
+                  hideSupersededPostpone ? 'bg-[var(--accent)]' : 'bg-slate-300 dark:bg-slate-700'
                 }`}
               >
                 <span
@@ -1238,137 +1222,86 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   }`}
                 />
               </span>
-              <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 whitespace-nowrap">
+              <span className="text-xs font-semibold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] whitespace-nowrap">
                 {t.dashOnlyAccept}
               </span>
             </button>
 
-            <div className="hidden sm:block h-5 w-px bg-slate-200 shrink-0" />
+            <div className="hidden sm:block h-5 w-px bg-[var(--border-light)] shrink-0" />
 
             {/* Refresh Button */}
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 group select-none cursor-pointer"
+              className="tbtn tbtn--print"
               title={t.dashRefreshTitle}
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 group-hover:rotate-180 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="tbtn__icon">
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform'}`} />
+              </span>
               <span>{t.dashRefresh}</span>
             </button>
-
-            {/* Save Column View & Sync button (Main Results page) */}
-            {!isPreviewMode && (
-              <button
-                onClick={() => handleSaveColumnConfigs(columnConfigs)}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none cursor-pointer ${
-                  hasUnsavedColumnChanges
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-200 shadow-md ring-1 ring-emerald-400 animate-pulse'
-                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
-                }`}
-                title={t.dashSaveViewTitle}
-              >
-                <Save className={`w-3.5 h-3.5 ${hasUnsavedColumnChanges ? 'text-white' : 'text-emerald-600'}`} />
-                <span>{hasUnsavedColumnChanges ? t.dashSaveSyncView : t.dashSaveView}</span>
-              </button>
-            )}
 
             {/* Customize Columns Button */}
             <button
               onClick={() => setShowColumnModal(true)}
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group cursor-pointer"
+              className="tbtn tbtn--png"
               title={t.dashColumnsTitle}
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
+              <span className="tbtn__icon">
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+              </span>
               <span>{t.dashColumns}</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-emerald-700 border border-emerald-200 font-bold">
+              <span className="bulk-queue-pill">
                 {tableVisibleCount}
               </span>
             </button>
 
             {!isPreviewMode && (
               <>
-                <div className="hidden md:block h-5 w-px bg-slate-200 shrink-0" />
+                <div className="hidden md:block h-5 w-px bg-[var(--border-light)] shrink-0" />
                 {/* Copy Share Link Button */}
                 <button
                   onClick={handleCopyShareLink}
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group cursor-pointer"
+                  className="tbtn tbtn--upload"
                   title={t.dashCopyShareLink}
                 >
-                  {shareLinkCopied ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  ) : (
-                    <Link2 className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
-                  )}
+                  <span className="tbtn__icon">
+                    {shareLinkCopied ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    ) : (
+                      <Link2 className="w-3.5 h-3.5 shrink-0" />
+                    )}
+                  </span>
                   <span>{shareLinkCopied ? t.dashCopied : t.dashCopyShareLink}</span>
                 </button>
 
-                {/* Publish to Preview */}
-                <button
-                  onClick={handlePublishPreview}
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none cursor-pointer"
-                  title={t.dashPublishPreview || 'Update the public preview link with these results'}
-                >
-                  <Cloud className="w-3.5 h-3.5 shrink-0" />
-                  <span>{t.dashPublishPreview || 'Update preview'}</span>
-                </button>
-
-                {/* Forced Synchronization Check Button */}
-                <button
-                  onClick={handleForceSyncCheck}
-                  disabled={isForceSyncing}
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all whitespace-nowrap shrink-0 select-none group cursor-pointer"
-                  title={t.dashForceSyncTitle}
-                >
-                  <RefreshCw
-                    className={`w-3.5 h-3.5 text-emerald-600 ${
-                      isForceSyncing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform'
-                    }`}
-                  />
-                  <span>{t.dashForceSyncBtn || 'Force Sync'}</span>
-                </button>
-
-                {/* Live Sync Status indicator */}
-                <div
-                  className="hidden 2xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-mono bg-slate-50 border border-slate-200 text-slate-600 select-none shrink-0"
-                  title={t.dashForceSyncTitle || 'Snapshot preview status (cloud-id: latest)'}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      syncStatus === 'syncing'
-                        ? 'bg-amber-500 animate-ping'
-                        : syncStatus === 'error'
-                        ? 'bg-rose-500'
-                        : 'bg-emerald-500'
-                    }`}
-                  />
-                  <span className="font-sans font-semibold text-[11px]">
-                    {syncStatus === 'syncing'
-                      ? t.dashSyncStatusSyncing || 'Syncing...'
-                      : t.dashSyncStatusSynced || 'Preview Synced'}
-                  </span>
-                </div>
               </>
             )}
           </div>
 
-          {/* Right: Export group (Neatly aligned to the right, cleanly wraps on mobile) */}
+          {/* Right: Export group */}
           {!isPreviewMode && (
             <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 ml-auto">
               <button
                 onClick={handleExportExcel}
-                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none cursor-pointer"
+                className="tbtn tbtn--excel"
                 title={t.dashExportExcelTitle}
               >
-                <FileSpreadsheet className="w-4 h-4 text-emerald-100 shrink-0" />
+                <span className="tbtn__icon">
+                  <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
+                </span>
                 <span>{t.exportExcel}</span>
               </button>
 
               <button
                 onClick={handleExportCsv}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 select-none cursor-pointer"
+                className="tbtn tbtn--print"
                 title={t.dashExportCsvTitle}
               >
-                <Download className="w-3.5 h-3.5 text-slate-200 shrink-0" />
+                <span className="tbtn__icon">
+                  <Download className="w-3.5 h-3.5 shrink-0" />
+                </span>
                 <span>{t.exportCsv}</span>
               </button>
             </div>
@@ -1376,52 +1309,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         </div>
 
 
-        {/* 3. DEDICATED REAL-TIME SEARCH BAR & SCOPE SELECTOR */}
-        <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
-          {/* Left: Search input + Scope Dropdown + Match count */}
+        {/* 3. DEDICATED REAL-TIME SEARCH BAR */}
+        <div className="pt-3 border-t border-[var(--border-light)] flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
+          {/* Left: Search input field searching across all columns */}
           <div className="flex flex-1 items-center gap-2 min-w-[260px] sm:min-w-[320px] max-w-xl">
-            {/* Search Scope Dropdown */}
-            {!isPreviewMode && (
-              <div className="relative shrink-0">
-                <select
-                  value={searchColumn}
-                  onChange={(e) => {
-                    const col = e.target.value;
-                    setSearchColumn(col);
-                    setPage(1);
-                    pushSnapshotImmediate({ searchColumn: col });
-                  }}
-                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 hover:text-slate-900 focus:outline-none focus:border-emerald-500 transition-colors shadow-xs max-w-[150px] sm:max-w-[190px] truncate cursor-pointer"
-                  title={t.dashSearchScopeTitle}
-                >
-                  <option value="all">{t.dashSearchScopeAll}</option>
-                  <option value="outcome">{t.dashSearchScopeOutcome}</option>
-                  <option value="reason">{t.dashSearchScopeReason}</option>
-                  <option value="unmatched">{t.dashSearchScopeUnmatched}</option>
-                  <option value="matchKey">{t.dashSearchScopeMatchKey}</option>
-                  <optgroup label={t.dashOptgroupComparison}>
-                    {compHeaders.map((col) => (
-                      <option key={col} value={col}>
-                        {col}
-                      </option>
-                    ))}
-                  </optgroup>
-                  {refHeaders.length > 0 && (
-                    <optgroup label={t.dashOptgroupReference}>
-                      {refHeaders.map((ref) => (
-                        <option key={ref} value={ref}>
-                          {ref}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-              </div>
-            )}
-
             {/* Real-time Search Input Field */}
             <div className="relative flex-1 min-w-[140px]">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={searchTerm}
@@ -1440,7 +1334,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   pushSnapshotImmediate({ searchTerm });
                 }}
                 placeholder={t.dashSearchPlaceholder}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all font-mono shadow-xs"
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-xl pl-9 pr-8 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all font-mono shadow-xs"
               />
               {searchTerm && (
                 <button
@@ -1577,10 +1471,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
 
       {/* 4. Main Data Table with Dynamic Column Visibility & Real-Time Search Match Highlighting */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-[var(--shadow-sm)] flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-[11px] sm:text-xs border-collapse">
-            <thead className="sticky top-0 z-10 bg-slate-100/90 backdrop-blur-sm border-b border-slate-200 text-slate-700 font-bold select-none shadow-xs">
+            <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-[#1a2436] border-b border-[var(--border)] text-[var(--text-secondary)] font-bold select-none shadow-xs">
               <tr>
                 {visibleTableColumns.map((col, idx) => {
                   const isFirst = idx === 0;
@@ -1604,13 +1498,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   return (
                     <th
                       key={col.id}
-                      className={`py-2 px-2 sm:py-3.5 sm:px-3 border-r border-slate-200 whitespace-nowrap group/th transition-colors ${
+                      className={`py-2 px-2 sm:py-3.5 sm:px-3 border-r border-[var(--border-light)] whitespace-nowrap group/th transition-colors ${
                         isRowIndexCol
-                          ? 'sticky left-0 z-20 bg-slate-100 text-slate-700'
+                          ? 'sticky left-0 z-20 bg-slate-100 dark:bg-[#1a2436] text-[var(--text-primary)]'
                           : `relative ${
                               col.category === 'reference'
-                                ? 'text-blue-800 bg-blue-50/60'
-                                : 'text-slate-700'
+                                ? 'text-blue-700 dark:text-blue-300 bg-blue-500/10'
+                                : 'text-[var(--text-secondary)]'
                             }`
                       }`}
                     >
@@ -1618,23 +1512,23 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         {/* Sortable Header Label */}
                         <div
                           onClick={handleColSort}
-                          className="flex items-center gap-1.5 cursor-pointer font-mono select-none hover:text-emerald-700 transition-colors"
+                          className="flex items-center gap-1.5 cursor-pointer font-mono select-none hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
                           title={t.dashClickToSortBy.replace('{label}', col.label)}
                         >
                           {col.category === 'reference' && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-100 text-blue-700 border border-blue-200 font-sans shadow-xs">
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-200 border border-blue-200 dark:border-blue-800 font-sans shadow-xs">
                               Ref
                             </span>
                           )}
                           <span>{col.label.replace('[Ref] ', '')}</span>
                           {isSorted ? (
                             sortDirection === 'asc' ? (
-                              <ArrowUp className="w-3 h-3 text-emerald-600 shrink-0" />
+                              <ArrowUp className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
                             ) : (
-                              <ArrowDown className="w-3 h-3 text-emerald-600 shrink-0" />
+                              <ArrowDown className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
                             )
                           ) : (
-                            <ArrowUpDown className="w-3 h-3 text-slate-400 shrink-0 opacity-0 group-hover/th:opacity-100 transition-opacity" />
+                            <ArrowUpDown className="w-3 h-3 text-[var(--text-muted)] shrink-0 opacity-0 group-hover/th:opacity-100 transition-opacity" />
                           )}
                         </div>
 
@@ -1652,8 +1546,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                               }}
                               className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded transition-colors ${
                                 isColFiltered
-                                  ? 'text-emerald-700 bg-emerald-100 border border-emerald-300 shadow-xs'
-                                  : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                                  ? 'text-emerald-700 bg-emerald-100 dark:text-emerald-200 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 shadow-xs'
+                                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10'
                               }`}
                               title={t.dashFilterLikeExcelTitle.replace('{label}', col.label)}
                               aria-label={t.dashFilterAria.replace('{label}', col.label)}
@@ -1715,7 +1609,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                   handleMoveColumn(col.id, 'left');
                                 }}
                                 disabled={isFirst}
-                                className="p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+                                className="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
                                 title={t.dashMoveColumnLeft}
                               >
                                 <ChevronLeft className="w-3.5 h-3.5" />
@@ -1727,7 +1621,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                   handleMoveColumn(col.id, 'right');
                                 }}
                                 disabled={isLast}
-                                className="p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+                                className="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
                                 title={t.dashMoveColumnRight}
                               >
                                 <ChevronRight className="w-3.5 h-3.5" />
@@ -1741,34 +1635,34 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 })}
 
                 {/* Actions column — frozen on the right so Inspect stays reachable on mobile */}
-                <th className="py-3 px-2 sm:px-3 text-center w-12 sm:w-16 text-slate-500 whitespace-nowrap sticky right-0 z-20 bg-slate-100 border-l border-slate-200">
+                <th className="py-3 px-2 sm:px-3 text-center w-12 sm:w-16 text-[var(--text-muted)] whitespace-nowrap sticky right-0 z-20 bg-slate-100 dark:bg-[#1a2436] border-l border-[var(--border-light)]">
                   {t.viewDetails}
                 </th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody className="divide-y divide-[var(--border-light)] bg-[var(--bg-surface)]">
               {visibleTableColumns.length === 0 ? (
                 <tr>
-                  <td colSpan={100} className="py-16 text-center text-slate-500 bg-slate-50/60">
+                  <td colSpan={100} className="py-16 text-center text-[var(--text-muted)] bg-[var(--bg-surface-alt)]">
                     <div className="max-w-md mx-auto space-y-3 px-4">
-                      <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-emerald-600 mx-auto">
+                      <div className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border)] flex items-center justify-center text-emerald-600 mx-auto">
                         <SlidersHorizontal className="w-6 h-6" />
                       </div>
-                      <h4 className="text-sm font-bold text-slate-900">{t.dashAllColumnsHidden}</h4>
-                      <p className="text-xs text-slate-500 leading-relaxed">
+                      <h4 className="text-sm font-bold text-[var(--text-primary)]">{t.dashAllColumnsHidden}</h4>
+                      <p className="text-xs text-[var(--text-muted)] leading-relaxed">
                         {t.dashAllColumnsHiddenDesc}
                       </p>
                       <div className="flex justify-center gap-2.5 pt-2">
                         <button
                           onClick={handleResetDefaultColumns}
-                          className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
+                          className="tbtn tbtn--excel !h-9 !px-4"
                         >
                           {t.dashRestoreAllColumns}
                         </button>
                         <button
                           onClick={() => setShowColumnModal(true)}
-                          className="px-4 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition-colors"
+                          className="tbtn tbtn--neutral !h-9 !px-4"
                         >
                           {t.dashChooseColumns}
                         </button>
@@ -1784,14 +1678,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   const isBlue = row.decisionColor === 'blue';
                   // Opaque background for the frozen columns (must cover scrolled content)
                   const frozenBg = isGreen
-                    ? 'bg-emerald-50'
+                    ? 'bg-[#f0fdf4] dark:bg-emerald-950/70 text-emerald-900 dark:text-emerald-200'
                     : isYellow
-                    ? 'bg-amber-50'
+                    ? 'bg-[#fefce8] dark:bg-amber-950/70 text-amber-900 dark:text-amber-200'
                     : isRed
-                    ? 'bg-rose-50'
+                    ? 'bg-[#fff1f2] dark:bg-rose-950/70 text-rose-900 dark:text-rose-200'
                     : isBlue
-                    ? 'bg-blue-50'
-                    : 'bg-white';
+                    ? 'bg-[#eff6ff] dark:bg-blue-950/70 text-blue-900 dark:text-blue-200'
+                    : 'bg-white dark:bg-[#111827] text-[var(--text-primary)]';
 
                   return (
                     <tr
@@ -1799,16 +1693,16 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       id={`row-${row.id}`}
                       data-row-id={row.id}
                       title="Click to copy"
-                      className={`results-table-row group/row transition-colors duration-150 border-b border-slate-100 ${
+                      className={`results-table-row group/row transition-colors duration-150 border-b border-[var(--border-light)] ${
                         isGreen
-                          ? 'bg-emerald-50/30 hover:bg-emerald-100/80 border-l-[4px] border-l-emerald-500 hover:shadow-2xs'
+                          ? 'bg-[#f0fdf4] hover:bg-[#dcfce7] dark:bg-emerald-950/25 dark:hover:bg-emerald-900/40 border-l-[4px] border-l-emerald-500'
                           : isYellow
-                          ? 'bg-amber-50/30 hover:bg-amber-100/80 border-l-[4px] border-l-amber-500 hover:shadow-2xs'
+                          ? 'bg-[#fefce8] hover:bg-[#fef9c3] dark:bg-amber-950/25 dark:hover:bg-amber-900/40 border-l-[4px] border-l-amber-500'
                           : isRed
-                          ? 'bg-rose-50/30 hover:bg-rose-100/80 border-l-[4px] border-l-rose-500 hover:shadow-2xs'
+                          ? 'bg-[#fff1f2] hover:bg-[#ffe4e6] dark:bg-rose-950/25 dark:hover:bg-rose-900/40 border-l-[4px] border-l-rose-500'
                           : isBlue
-                          ? 'bg-blue-50/40 hover:bg-blue-100/90 border-l-[4px] border-l-blue-600 hover:shadow-2xs'
-                          : 'even:bg-slate-50/40 hover:bg-slate-100/90 border-l-[4px] border-l-transparent hover:shadow-2xs'
+                          ? 'bg-[#eff6ff] hover:bg-[#dbeafe] dark:bg-blue-950/25 dark:hover:bg-blue-900/40 border-l-[4px] border-l-blue-600'
+                          : 'bg-white even:bg-slate-50/60 hover:bg-slate-100/70 dark:bg-transparent dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 border-l-[4px] border-l-transparent'
                       }`}
                     >
                       {visibleTableColumns.map((col) => {
@@ -1821,7 +1715,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             <td
                               key={col.id}
                               onClick={() => copyCellText(valStr, cellId, row.id)}
-                              className={`py-1.5 px-2 sm:py-2.5 sm:px-3 border-r border-slate-200 text-center text-slate-600 font-mono tabular-nums text-[11px] font-bold sticky left-0 z-[5] cursor-pointer group/cell hover:bg-slate-200/90 transition-colors ${frozenBg}`}
+                              className={`py-1.5 px-2 sm:py-2.5 sm:px-3 border-r border-[var(--border-light)] text-center font-mono tabular-nums text-[11px] font-bold sticky left-0 z-[5] cursor-pointer group/cell ${frozenBg}`}
                               title="Click to copy"
                             >
                               <div className="flex items-center justify-center gap-1">
@@ -1829,7 +1723,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                 {isCopied ? (
                                   <Check className="w-3 h-3 text-emerald-600 stroke-[3] shrink-0" />
                                 ) : (
-                                  <Copy className="w-2.5 h-2.5 text-slate-400 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
+                                  <Copy className="w-2.5 h-2.5 text-[var(--text-muted)] opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
                                 )}
                               </div>
                             </td>
@@ -1842,7 +1736,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             <td
                               key={col.id}
                               onClick={() => copyCellText(statusStr, cellId, row.id)}
-                              className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap cursor-pointer group/cell hover:bg-slate-100 transition-colors"
+                              className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-[var(--border-light)] whitespace-nowrap cursor-pointer group/cell hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                               title="Click to copy"
                             >
                               <div className="flex items-center gap-1.5">
@@ -1853,7 +1747,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                     <span>Copied</span>
                                   </span>
                                 ) : (
-                                  <Copy className="w-3 h-3 text-slate-400 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
+                                  <Copy className="w-3 h-3 text-[var(--text-muted)] opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
                                 )}
                               </div>
                             </td>
@@ -1869,12 +1763,12 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             <td
                               key={col.id}
                               onClick={() => copyCellText(copyVal, cellId, row.id)}
-                              className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap cursor-pointer group/cell hover:bg-slate-100 transition-colors"
+                              className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-[var(--border-light)] whitespace-nowrap cursor-pointer group/cell hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                               title="Click to copy"
                             >
                               {row.isMatched ? (
                                 <div
-                                  className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-blue-100/70 transition-colors"
+                                  className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-blue-100/70 dark:hover:bg-blue-900/40 transition-colors"
                                   title="Click to copy"
                                 >
                                   <span className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 px-2.5 py-1 rounded-md shadow-xs">
@@ -1887,7 +1781,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                       <span>Copied</span>
                                     </span>
                                   ) : (
-                                    <Copy className="w-3 h-3 text-slate-400 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
+                                    <Copy className="w-3 h-3 text-[var(--text-muted)] opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
                                   )}
                                 </div>
                               ) : (
@@ -1898,21 +1792,21 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                       {t.dashCellUnmatched}
                                     </span>
                                     {row.unmatchedInfo?.matchType === 'partial_mismatch' && (
-                                      <span className="text-[9px] font-bold text-rose-700 bg-rose-100 px-1 py-0.2 rounded border border-rose-200 shrink-0">
+                                      <span className="text-[9px] font-bold text-rose-700 bg-rose-100 dark:text-rose-200 dark:bg-rose-950/60 px-1 py-0.2 rounded border border-rose-200 dark:border-rose-800 shrink-0">
                                         {t.dashCellDiffers}
                                       </span>
                                     )}
                                     <button
                                       type="button"
                                       onClick={() => setSelectedRow(row)}
-                                      className="text-[10px] text-amber-700 hover:text-amber-900 underline font-medium ml-0.5"
+                                      className="text-[10px] text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 underline font-medium ml-0.5"
                                       title="Open full inspection breakdown"
                                     >
                                       Inspect
                                     </button>
                                   </div>
                                   <div
-                                    className="font-mono text-xs font-bold text-amber-900 bg-amber-100/80 hover:bg-amber-200/90 border border-amber-300/80 px-1.5 py-0.5 rounded cursor-pointer truncate max-w-[220px] transition-all flex items-center justify-between gap-1 group/ident shadow-2xs"
+                                    className="font-mono text-xs font-bold text-amber-900 bg-amber-100/90 dark:text-amber-100 dark:bg-amber-900/60 hover:bg-amber-200/90 dark:hover:bg-amber-800/80 border border-amber-300/80 dark:border-amber-700/80 px-1.5 py-0.5 rounded cursor-pointer truncate max-w-[220px] transition-all flex items-center justify-between gap-1 group/ident shadow-2xs"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       copyCellText(copyVal, cellId, row.id);
@@ -1928,14 +1822,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                         <span>Copied</span>
                                       </span>
                                     ) : (
-                                      <span className="inline-flex items-center gap-0.5 text-[9px] text-amber-800 opacity-70 group-hover/ident:opacity-100 transition-opacity shrink-0">
+                                      <span className="inline-flex items-center gap-0.5 text-[9px] text-amber-800 dark:text-amber-200 opacity-70 group-hover/ident:opacity-100 transition-opacity shrink-0">
                                         <Copy className="w-2.5 h-2.5" />
                                         <span className="hidden sm:inline">Copy</span>
                                       </span>
                                     )}
                                   </div>
                                   <span
-                                    className="text-[10px] text-slate-500 truncate max-w-[210px] font-sans"
+                                    className="text-[10px] text-[var(--text-muted)] truncate max-w-[210px] font-sans"
                                     title={row.unmatchedInfo?.reason}
                                   >
                                     {row.unmatchedInfo?.matchType === 'partial_mismatch'
@@ -1954,7 +1848,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             <td
                               key={col.id}
                               onClick={() => copyCellText(valStr, cellId, row.id)}
-                              className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 text-xs text-slate-700 font-medium truncate max-w-xs cursor-pointer group/cell hover:bg-amber-50/90 transition-colors"
+                              className="py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-[var(--border-light)] text-xs text-[var(--text-primary)] font-medium truncate max-w-xs cursor-pointer group/cell hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                               title="Click to copy"
                             >
                               <div className="flex items-center justify-between gap-1.5">
@@ -1967,7 +1861,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                     <span>Copied</span>
                                   </span>
                                 ) : (
-                                  <Copy className="w-3 h-3 text-slate-400 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
+                                  <Copy className="w-3 h-3 text-[var(--text-muted)] opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
                                 )}
                               </div>
                             </td>
@@ -2015,9 +1909,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             <td
                               key={col.id}
                               onClick={() => hasValue && copyCellText(valStr, cellId, row.id)}
-                              className={`py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800 bg-blue-50/20 transition-all ${
+                              className={`py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-[var(--border-light)] whitespace-nowrap font-mono text-xs text-[var(--text-primary)] bg-blue-500/5 dark:bg-blue-500/10 transition-all ${
                                 hasValue
-                                  ? 'cursor-pointer group/cell hover:bg-blue-100/80 hover:text-blue-950'
+                                  ? 'cursor-pointer group/cell hover:bg-blue-500/15 dark:hover:bg-blue-400/20'
                                   : ''
                               }`}
                               title="Click to copy"
@@ -2033,7 +1927,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                       <span>Copied</span>
                                     </span>
                                   ) : (
-                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-blue-700 bg-blue-100/80 px-1 py-0.2 rounded border border-blue-200 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0">
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-blue-700 dark:text-blue-300 bg-blue-100/80 dark:bg-blue-900/60 px-1 py-0.2 rounded border border-blue-200 dark:border-blue-800 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0">
                                       <Copy className="w-2.5 h-2.5" />
                                       <span className="hidden sm:inline">Copy</span>
                                     </span>
@@ -2056,9 +1950,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           <td
                             key={col.id}
                             onClick={() => hasValue && copyCellText(valStr, cellId, row.id)}
-                            className={`py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-slate-200 whitespace-nowrap font-mono text-xs text-slate-800 transition-all ${
+                            className={`py-1.5 px-2 sm:py-2.5 sm:px-4 border-r border-[var(--border-light)] whitespace-nowrap font-mono text-xs text-[var(--text-primary)] transition-all ${
                               hasValue
-                                ? 'cursor-pointer group/cell hover:bg-emerald-100/70 hover:text-emerald-950 shadow-inner'
+                                ? 'cursor-pointer group/cell hover:bg-black/5 dark:hover:bg-white/5'
                                 : ''
                             }`}
                             title="Click to copy"
@@ -2074,7 +1968,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                     <span>Copied</span>
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] text-emerald-800 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0">
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] text-[var(--text-muted)] bg-black/5 dark:bg-white/10 px-1 py-0.2 rounded border border-[var(--border-light)] opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0">
                                     <Copy className="w-2.5 h-2.5" />
                                     <span className="hidden sm:inline">Copy</span>
                                   </span>
@@ -2086,7 +1980,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       })}
 
                       {/* Row Action Buttons: Copy Row + Inspect Detail */}
-                      <td className={`py-1.5 px-2 sm:py-2.5 sm:px-3 text-center whitespace-nowrap sticky right-0 z-[5] border-l border-slate-200 ${frozenBg}`}>
+                      <td className={`py-1.5 px-2 sm:py-2.5 sm:px-3 text-center whitespace-nowrap sticky right-0 z-[5] border-l border-[var(--border-light)] ${frozenBg}`}>
                         <div className="flex items-center justify-center gap-1">
                           {!isPreviewMode && row.isHold && row.holdKey && onReleaseHoldKey && (
                             <button
@@ -2097,7 +1991,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                 setReleaseTarget({ key: row.holdKey as string, count });
                                 setSupervisorConfirmed(false);
                               }}
-                              className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-md transition-colors"
+                              className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-800 rounded-md transition-colors"
                               title={t.dashRemoveFromHoldTitle}
                             >
                               <Check className="w-3 h-3 stroke-[3]" />
@@ -2110,7 +2004,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                               e.stopPropagation();
                               handleCopyRowData(row);
                             }}
-                            className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                            className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10 rounded-md transition-colors"
                             title="Copy entire row to clipboard"
                           >
                             {copiedCellId === `${row.id}_fullRow` ? (
@@ -2125,7 +2019,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                               e.stopPropagation();
                               setSelectedRow(row);
                             }}
-                            className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                            className="min-w-[36px] min-h-[36px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10 rounded-md transition-colors"
                             title={t.dashInspectRowTitle}
                           >
                             <Eye className="w-4 h-4" />

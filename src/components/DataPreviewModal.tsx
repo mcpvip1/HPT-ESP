@@ -64,26 +64,26 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
   if (!isOpen || !workbook) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="bulk-backdrop flex items-center justify-center p-3 sm:p-6">
+      <div className="bulk-modal !max-w-6xl !w-full max-h-[90vh] flex flex-col overflow-hidden !p-0">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[var(--bg-surface-alt)]">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs">
+            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shadow-xs">
               <FileSpreadsheet className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">{title}</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {workbook.name} · {t.dpSheet} <strong className="text-emerald-700 font-bold">{currentSheetName}</strong> ·{' '}
-                <span className="font-mono tabular-nums text-slate-700 font-semibold">{currentSheetData.rows.length.toLocaleString()}</span> {t.dpRows} ·{' '}
-                <span className="font-mono tabular-nums text-slate-700 font-semibold">{currentSheetData.headers.length}</span> {t.dpColumns}
+              <h3 className="text-base font-bold text-[var(--text-primary)]">{title}</h3>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                {workbook.name} · {t.dpSheet} <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{currentSheetName}</strong> ·{' '}
+                <span className="font-mono tabular-nums text-[var(--text-primary)] font-semibold">{currentSheetData.rows.length.toLocaleString()}</span> {t.dpRows} ·{' '}
+                <span className="font-mono tabular-nums text-[var(--text-primary)] font-semibold">{currentSheetData.headers.length}</span> {t.dpColumns}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+            className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-surface-soft)] transition-colors cursor-pointer"
             aria-label={t.close}
           >
             <X className="w-5 h-5" />
@@ -92,8 +92,8 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
 
         {/* Sheet Tabs Bar (if multi-sheet) */}
         {workbook.sheetNames && workbook.sheetNames.length > 1 && (
-          <div className="px-6 py-2 bg-slate-100/70 border-b border-slate-200 flex items-center gap-2 overflow-x-auto scrollbar-thin">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 mr-1">
+          <div className="px-6 py-2 bg-[var(--bg-surface-soft)] border-b border-[var(--border)] flex items-center gap-2 overflow-x-auto scrollbar-thin">
+            <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider shrink-0 mr-1 font-mono">
               {t.dpSelectSheet}
             </span>
             {workbook.sheetNames.map((sName) => {
@@ -109,7 +109,7 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shadow-xs cursor-pointer ${
                     isSelected
                       ? 'bg-emerald-600 text-white font-bold ring-2 ring-emerald-600/30'
-                      : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+                      : 'bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-alt)] text-[var(--text-secondary)] border border-[var(--border)]'
                   }`}
                 >
                   <span>{sName}</span>
@@ -117,7 +117,7 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
                     className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ${
                       isSelected
                         ? 'bg-emerald-700 text-white'
-                        : 'bg-slate-100 text-slate-500'
+                        : 'bg-[var(--bg-surface-alt)] text-[var(--text-muted)] border border-[var(--border-light)]'
                     }`}
                   >
                     {rowCount.toLocaleString()}r · {colCount}c
@@ -129,9 +129,9 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
         )}
 
         {/* Search Bar */}
-        <div className="px-6 py-3 border-b border-slate-200 bg-white flex items-center justify-between gap-4">
+        <div className="px-6 py-3 border-b border-[var(--border)] bg-[var(--bg-surface)] flex items-center justify-between gap-4">
           <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchTerm}
@@ -140,46 +140,46 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
                 setPage(1);
               }}
               placeholder={t.searchDataCells}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-xs"
+              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg pl-9 pr-3 py-1.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-emerald-500 transition-all shadow-xs"
             />
           </div>
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-[var(--text-muted)] font-mono">
             {t.dpShowing.replace('{n}', String(filteredRows.length))}
           </div>
         </div>
 
         {/* Table Viewport */}
-        <div className="flex-1 overflow-auto bg-white">
+        <div className="flex-1 overflow-auto bg-[var(--bg-surface)]">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-sm border-b border-slate-200 text-slate-700 font-bold z-10 select-none shadow-xs">
+            <thead className="sticky top-0 bg-[var(--bg-surface-alt)] backdrop-blur-sm border-b border-[var(--border)] text-[var(--text-primary)] font-bold z-10 select-none shadow-xs font-ui">
               <tr>
-                <th className="py-2.5 px-3 border-r border-slate-200 text-center w-12 font-mono text-slate-500">
+                <th className="py-2.5 px-3 border-r border-[var(--border)] text-center w-12 font-mono text-[var(--text-muted)]">
                   #
                 </th>
                 {currentSheetData.headers.map((header) => (
                   <th
                     key={header}
-                    className="py-2.5 px-4 border-r border-slate-200 whitespace-nowrap text-slate-700 font-bold"
+                    className="py-2.5 px-4 border-r border-[var(--border)] whitespace-nowrap text-[var(--text-primary)] font-bold"
                   >
                     {header}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-mono text-slate-800">
+            <tbody className="divide-y divide-[var(--border-light)] font-mono text-[var(--text-secondary)]">
               {currentPageRows.length > 0 ? (
                 currentPageRows.map((row, rIdx) => (
                   <tr
                     key={rIdx}
-                    className="hover:bg-slate-50 transition-colors"
+                    className="hover:bg-[var(--bg-surface-soft)] transition-colors"
                   >
-                    <td className="py-2 px-3 border-r border-slate-100 text-center text-slate-400 text-[11px] tabular-nums bg-slate-50/50">
+                    <td className="py-2 px-3 border-r border-[var(--border-light)] text-center text-[var(--text-muted)] text-[11px] tabular-nums bg-[var(--bg-surface-alt)]">
                       {(page - 1) * pageSize + rIdx + 1}
                     </td>
                     {currentSheetData.headers.map((header) => (
                       <td
                         key={header}
-                        className="py-2 px-4 border-r border-slate-100 whitespace-nowrap text-slate-800 text-xs"
+                        className="py-2 px-4 border-r border-[var(--border-light)] whitespace-nowrap text-[var(--text-primary)] text-xs"
                       >
                         {String(row[header] ?? '')}
                       </td>
@@ -190,7 +190,7 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
                 <tr>
                   <td
                     colSpan={currentSheetData.headers.length + 1}
-                    className="py-12 text-center text-slate-400"
+                    className="py-12 text-center text-[var(--text-muted)]"
                   >
                     No matching records found.
                   </td>
@@ -201,23 +201,23 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
         </div>
 
         {/* Footer Pagination */}
-        <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-600">
+        <div className="px-6 py-3 border-t border-[var(--border)] bg-[var(--bg-surface-alt)] flex items-center justify-between text-xs text-[var(--text-secondary)]">
           <div>
-            Page <span className="font-mono text-slate-900 font-bold">{page}</span> of{' '}
-            <span className="font-mono text-slate-900 font-bold">{totalPages}</span>
+            Page <span className="font-mono text-[var(--text-primary)] font-bold">{page}</span> of{' '}
+            <span className="font-mono text-[var(--text-primary)] font-bold">{totalPages}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs"
+              className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs"
+              className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs cursor-pointer"
             >
               <ChevronRight className="w-4 h-4" />
             </button>

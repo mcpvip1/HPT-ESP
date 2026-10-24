@@ -1,0 +1,168 @@
+{
+  "entities": {
+    "WorkspaceState": {
+      "title": "WorkspaceState",
+      "description": "User private workspace state including rules, column configs, workbooks meta, results meta, sync history and sharing pointers",
+      "type": "object",
+      "properties": {
+        "updatedAt": {
+          "type": "number",
+          "description": "Timestamp of the last update"
+        },
+        "uploading": {
+          "type": "boolean",
+          "description": "Flag indicating if a multi-chunk upload is currently in progress"
+        },
+        "uploadId": {
+          "type": "string",
+          "description": "Unique session ID for the current chunked upload session"
+        },
+        "uploadStartedAt": {
+          "type": "number",
+          "description": "Timestamp when the upload started"
+        },
+        "chunkCount": {
+          "type": "number",
+          "description": "Number of chunks stored in the subcollection"
+        },
+        "shareId": {
+          "type": "string",
+          "description": "Active public share ID pointer"
+        },
+        "entries": {
+          "type": "array",
+          "description": "Array of sync history log items"
+        },
+        "clearedAt": {
+          "type": "number",
+          "description": "Timestamp when sync history was last cleared"
+        }
+      }
+    },
+    "WorkspaceChunk": {
+      "title": "WorkspaceChunk",
+      "description": "Individual UTF-8 data chunk for chunked workspace state documents",
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "string",
+          "description": "Serialized JSON slice"
+        },
+        "uploadId": {
+          "type": "string",
+          "description": "Upload session token to ensure chunk consistency"
+        }
+      },
+      "required": ["data"]
+    },
+    "SharedPreview": {
+      "title": "SharedPreview",
+      "description": "Public or shared matching preview metadata allowing read access without authentication",
+      "type": "object",
+      "properties": {
+        "updatedAt": {
+          "type": "number",
+          "description": "Timestamp when preview was published"
+        },
+        "ownerUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user who published the preview"
+        },
+        "comparisonWbName": {
+          "type": "string",
+          "description": "Name of the incoming comparison workbook"
+        },
+        "filter": {
+          "type": "string",
+          "description": "Default active filter mode"
+        },
+        "searchTerm": {
+          "type": "string",
+          "description": "Default search term"
+        },
+        "searchColumn": {
+          "type": "string",
+          "description": "Default search column"
+        },
+        "stats": {
+          "type": "object",
+          "description": "High level matching statistics summary"
+        },
+        "columnConfigs": {
+          "type": "array",
+          "description": "Export & table column configuration list"
+        },
+        "chunkCount": {
+          "type": "number",
+          "description": "Total count of payload chunks in the subcollection"
+        },
+        "uploading": {
+          "type": "boolean",
+          "description": "Whether an upload is ongoing"
+        },
+        "uploadId": {
+          "type": "string",
+          "description": "Upload session ID"
+        },
+        "uploadStartedAt": {
+          "type": "number",
+          "description": "Timestamp of upload start"
+        }
+      },
+      "required": ["updatedAt", "chunkCount"]
+    },
+    "SharedPreviewChunk": {
+      "title": "SharedPreviewChunk",
+      "description": "Individual UTF-8 data chunk for shared public preview",
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "string",
+          "description": "Serialized compact preview JSON slice"
+        },
+        "uploadId": {
+          "type": "string",
+          "description": "Upload session token to avoid mixing concurrent uploads"
+        },
+        "ownerUid": {
+          "type": "string",
+          "description": "Auth UID of the owner"
+        }
+      },
+      "required": ["data"]
+    },
+    "TestConnection": {
+      "title": "TestConnection",
+      "description": "Health check document to verify Firestore network connectivity",
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "Connectivity test status indicator"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/workspaces/{userId}/state/{stateDoc}": {
+      "schema": { "$ref": "#/entities/WorkspaceState" },
+      "description": "Stores private user workspace configuration, presets, workbooks metadata, and history"
+    },
+    "/workspaces/{userId}/state/{stateDoc}/chunks/{chunkId}": {
+      "schema": { "$ref": "#/entities/WorkspaceChunk" },
+      "description": "Stores chunks of private workspace payloads"
+    },
+    "/shares/{shareId}": {
+      "schema": { "$ref": "#/entities/SharedPreview" },
+      "description": "Stores publicly accessible preview metadata published by users"
+    },
+    "/shares/{shareId}/chunks/{chunkId}": {
+      "schema": { "$ref": "#/entities/SharedPreviewChunk" },
+      "description": "Stores chunks of publicly readable shared preview payloads"
+    },
+    "/test/{testId}": {
+      "schema": { "$ref": "#/entities/TestConnection" },
+      "description": "Connectivity test ping endpoint"
+    }
+  }
+}

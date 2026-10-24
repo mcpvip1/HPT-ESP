@@ -70,6 +70,7 @@ import {
   fetchSyncHistory,
   FIXED_PREVIEW_SHARE_ID,
   defaultResultFilters,
+  wipeCloudWorkspace,
 } from './lib/cloudSync';
 import type { ResultFilters, StoredColumnSettings } from './lib/cloudSync';
 import {
@@ -83,12 +84,43 @@ import {
   Cloud,
   Loader2,
   RefreshCw,
+  AlertTriangle,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function App() {
   const [isStorageLoading, setIsStorageLoading] = useState(true);
   const [language, setLanguage] = useState<Language>('en');
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  // UI Theme state (Light / Dark mode) with persistence
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'dark' || saved === 'light') return saved;
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return 'dark';
+      }
+    } catch {}
+    return 'light';
+  });
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.classList.add('dark');
+        document.body.classList.add('dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        document.documentElement.classList.remove('dark');
+        document.body.classList.remove('dark');
+      }
+      try { localStorage.setItem('theme', theme); } catch {}
+    }
+  }, [theme]);
 
   // Live Preview Mode State (activated via /preview route, #preview, ?preview, or ?share=)
   const [isPreviewMode, setIsPreviewMode] = useState<boolean>(() => {
@@ -780,6 +812,80 @@ export default function App() {
     }
   };
 
+  const handleRestoreOriginalStage = async () => {
+    setIsRestoring(true);
+    try {
+      // 1. Wipe cloud workspace documents in Firestore if user is signed in
+      if (cloudUser) {
+        await wipeCloudWorkspace(cloudUser.uid);
+      } else {
+        try { await unpublishSharedSnapshot(FIXED_PREVIEW_SHARE_ID); } catch {}
+      }
+
+      // 2. Wipe all IndexedDB keys
+      for (const k of [
+        StorageKeys.REFERENCE_WORKBOOK,
+        StorageKeys.COMPARISON_WORKBOOK,
+        StorageKeys.COLUMN_MAPPINGS,
+        StorageKeys.NORMALIZATION_RULES,
+        StorageKeys.DECISION_LAYERS,
+        StorageKeys.HOLD_COLUMN,
+        StorageKeys.HOLD_VALUES,
+        StorageKeys.HOLD_KEYS,
+        StorageKeys.HOLD_REASON,
+        StorageKeys.RELEASED_ROWS,
+        StorageKeys.RESULTS_STATE,
+        StorageKeys.SYNC_HISTORY,
+        StorageKeys.COLUMN_CONFIGS,
+        StorageKeys.SAVED_MAPPING_PRESETS,
+        StorageKeys.SAVED_DECISION_PRESETS,
+      ]) {
+        try { await deleteFromIDB(k); } catch { /* ignore */ }
+      }
+
+      // 3. Wipe localStorage keys
+      try {
+        const lsKeys = Object.keys(localStorage);
+        for (const k of lsKeys) {
+          if (k.startsWith('excelmatch_') || k.startsWith('emp_')) {
+            localStorage.removeItem(k);
+          }
+        }
+      } catch {}
+
+      // 4. Reset all in-memory React states to empty/defaults
+      setReferenceWb(null);
+      setComparisonWb(null);
+      setResults([]);
+      setStats(null);
+      setMappings([]);
+      setNormalization(defaultNormalizationRules);
+      setLayers(defaultDecisionLayers);
+      setHoldColumn('');
+      setHoldValues([]);
+      setHoldReason('');
+      setReleasedRowIds([]);
+      setStudioColumnConfigs(undefined);
+      setPreviewColumnConfigs(undefined);
+      setResultFilters(defaultResultFilters);
+      syncHistoryRef.current = [];
+      setSyncHistory([]);
+      activeUploadsRef.current = {};
+      setActiveUpload(null);
+      pulledResultsRef.current = null;
+      lastRulesPublishRef.current = '';
+      setStudioSession((n) => n + 1);
+
+      showToast('Restored to original stage. All cloud and local data cleared.', 'success');
+      setIsRestoreModalOpen(false);
+    } catch (err: any) {
+      console.error('Failed to restore original stage', err);
+      showToast('Error restoring original stage: ' + (err?.message || 'Unknown error'), 'error');
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   // Dedicated loader for Live Preview Mode: runs independently of Firebase Auth state
   // to ensure preview snapshots download completely without auth race condition cancellation.
   useEffect(() => {
@@ -1436,28 +1542,30 @@ export default function App() {
   // results sync from the cloud. Public share-preview links stay open.
   if (!isPreviewMode && authResolved && !cloudUser && !guestMode) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-6 font-sans selection:bg-emerald-500 selection:text-white">
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-10 w-full max-w-md shadow-sm text-center space-y-5">
+      <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex flex-col items-center justify-center p-4 sm:p-6 font-sans selection:bg-emerald-500 selection:text-white">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200/90 dark:border-slate-800 rounded-3xl p-8 sm:p-10 w-full max-w-[430px] shadow-[0_12px_36px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.4)] text-center space-y-5 transition-all">
           <img
             src={LOGO_DATA_URL}
             alt="Excellent Medical Technology"
-            className="h-20 w-auto mx-auto"
+            className="h-20 w-auto mx-auto object-contain"
           />
-          <div className="space-y-2">
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t.appName}</h1>
-            <p className="text-[11px] font-medium text-slate-400">
-              Created by <span className="font-bold text-emerald-700">DO2-HPT</span>
+          <div className="space-y-1.5">
+            <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 dark:text-white tracking-tight font-heading">
+              {t.appName}
+            </h1>
+            <p className="text-xs font-medium text-slate-400">
+              Created by <span className="font-bold text-[#00875a] dark:text-emerald-400">DO2-HPT</span>
             </p>
-            <p className="text-sm font-semibold text-slate-700">{t.gateTitle}</p>
-            <p className="text-xs text-slate-500 leading-relaxed">{t.gateDesc}</p>
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-100 pt-2">{t.gateTitle}</p>
+            <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm mx-auto">{t.gateDesc}</p>
           </div>
-          <div className="space-y-2.5">
+          <div className="space-y-2.5 pt-1">
             <RippleButton
               onClick={handleCloudSignIn}
               rippleColor="rgba(255, 255, 255, 0.45)"
               enableScaleHover={true}
               title={t.gateSignIn}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="w-full flex items-center justify-center gap-3 px-5 py-3 text-sm font-bold text-white bg-[#00875a] hover:bg-[#00704a] active:bg-[#005e3e] rounded-xl shadow-[0_2px_8px_rgba(0,135,90,0.25)] hover:shadow-[0_4px_14px_rgba(0,135,90,0.35)] transition-all duration-200 transform hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
             >
               <GoogleIcon className="w-5 h-5 shrink-0" />
               <span>{t.gateSignIn}</span>
@@ -1469,39 +1577,42 @@ export default function App() {
               }}
               rippleColor="rgba(0, 0, 0, 0.08)"
               enableScaleHover={true}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all duration-200 border border-slate-200 cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/80 rounded-xl transition-all duration-200 border border-slate-200/90 dark:border-slate-700 shadow-2xs cursor-pointer"
             >
               {t.gateGuest}
             </RippleButton>
           </div>
-          <div className="pt-3 mt-1 border-t border-slate-100 flex items-center justify-center gap-1.5 sm:gap-2 flex-nowrap">
-            <span className="text-[11px] font-medium text-slate-400 shrink-0 mr-0.5">{t.headerSelectLanguage}:</span>
-            {(['en', 'my', 'th', 'zh'] as Language[]).map((l) => {
-              const countryTitles: Record<Language, string> = {
-                en: 'United States (English)',
-                my: 'မြန်မာ (Myanmar)',
-                th: 'ไทย (Thailand)',
-                zh: '中文 (China)',
-              };
-              return (
-                <RippleButton
-                  key={l}
-                  onClick={() => handleLanguageChange(l)}
-                  rippleColor={language === l ? 'rgba(16, 185, 129, 0.35)' : 'rgba(0, 0, 0, 0.12)'}
-                  enableScaleHover={true}
-                  title={countryTitles[l]}
-                  aria-label={countryTitles[l]}
-                  className={`group relative flex items-center justify-center gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border text-xs font-semibold shadow-2xs transition-all duration-200 transform hover:scale-105 active:scale-95 cursor-pointer shrink-0 ${
-                    language === l
-                      ? 'bg-emerald-50 border-emerald-400 text-emerald-900 ring-2 ring-emerald-500/30 shadow-xs font-bold'
-                      : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300 hover:bg-slate-50'
-                  }`}
-                >
-                  <CountryFlag language={l} className="w-4.5 h-3 sm:w-5 sm:h-3.5 shadow-2xs" />
-                  <span className="text-[11px] font-bold tracking-wide">{l.toUpperCase()}</span>
-                </RippleButton>
-              );
-            })}
+          <div className="pt-4 mt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-1.5 flex-nowrap">
+            <span className="text-[11px] sm:text-xs font-medium text-slate-400 shrink-0">{t.headerSelectLanguage}:</span>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {(['en', 'my', 'th', 'zh'] as Language[]).map((l) => {
+                const countryTitles: Record<Language, string> = {
+                  en: 'United States (English)',
+                  my: 'မြန်မာ (Myanmar)',
+                  th: 'ไทย (Thailand)',
+                  zh: '中文 (China)',
+                };
+                const isSelected = language === l;
+                return (
+                  <RippleButton
+                    key={l}
+                    onClick={() => handleLanguageChange(l)}
+                    rippleColor={isSelected ? 'rgba(16, 185, 129, 0.35)' : 'rgba(0, 0, 0, 0.12)'}
+                    enableScaleHover={true}
+                    title={countryTitles[l]}
+                    aria-label={countryTitles[l]}
+                    className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all duration-200 transform hover:scale-105 active:scale-95 cursor-pointer shrink-0 ${
+                      isSelected
+                        ? 'bg-white dark:bg-emerald-950/40 border-2 border-emerald-400 dark:border-emerald-500 text-emerald-800 dark:text-emerald-300 shadow-xs'
+                        : 'bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <CountryFlag language={l} className="w-4.5 h-3 sm:w-5 sm:h-3.5 rounded-2xs shadow-2xs object-cover" />
+                    <span className="text-[11px] font-bold tracking-wide">{l.toUpperCase()}</span>
+                  </RippleButton>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -1526,7 +1637,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex flex-col font-ui transition-colors duration-200">
       {cloudPullOverlay}
       {/* 1. Header (Adapts cleanly to Studio or Preview mode) */}
       <Header
@@ -1538,6 +1649,9 @@ export default function App() {
         activeUpload={activeUpload}
         onOpenSyncPanel={() => setIsSyncPanelOpen(true)}
         onOpenRulesSetting={() => setIsRulesModalOpen(true)}
+        onOpenRestoreConfirm={() => setIsRestoreModalOpen(true)}
+        theme={theme}
+        onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
         hasRefFile={!!referenceWb}
         hasCompFile={!!comparisonWb}
         hasResults={results.length > 0}
@@ -1645,7 +1759,7 @@ export default function App() {
 
             {/* Filtered Results & Table Section (Immediately shown below after import) */}
             {results.length > 0 && stats && (
-              <div className="pt-2 border-t border-slate-200">
+              <div className="pt-2 border-t border-[var(--border)]">
                 <ResultsDashboard
                   key={`studio-${studioSession}`}
                   results={results}
@@ -1723,6 +1837,56 @@ export default function App() {
           }
         }}
       />
+
+      {/* Restore Original Stage Confirmation Modal */}
+      {isRestoreModalOpen && (
+        <div className="bulk-backdrop flex items-center justify-center p-4">
+          <div className="bulk-modal !max-w-md p-6 space-y-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-[var(--danger-soft)] border border-[var(--danger-border)] flex items-center justify-center text-[var(--danger)] shrink-0 shadow-xs">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-[var(--text-primary)] font-ui">
+                  Restore Original Stage
+                </h3>
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-ui">
+                  Are you sure you want to restore? This will clear all history, files, and data from both cloud and local database.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[var(--border-light)]">
+              <button
+                type="button"
+                disabled={isRestoring}
+                onClick={() => setIsRestoreModalOpen(false)}
+                className="tbtn tbtn--neutral !h-9 !px-4"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isRestoring}
+                onClick={handleRestoreOriginalStage}
+                className="bulk-del-btn !h-9 !px-4 flex items-center gap-2"
+              >
+                {isRestoring ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Restoring...</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Confirm Restore</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notifications */}
       <Toast toasts={toasts} onDismiss={dismissToast} language={language} />

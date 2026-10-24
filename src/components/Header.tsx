@@ -1,5 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Globe, SlidersHorizontal, Cloud, CloudUpload, LogOut } from 'lucide-react';
+import {
+  Globe,
+  SlidersHorizontal,
+  Cloud,
+  CloudUpload,
+  LogOut,
+  RotateCcw,
+  Sun,
+  Moon,
+  ShieldAlert,
+} from 'lucide-react';
 import { LOGO_DATA_URL } from '../assets/logo';
 import { ProgressRing } from './ProgressRing';
 import { CountryFlag, GoogleIcon } from './CountryFlag';
@@ -14,6 +24,7 @@ interface HeaderProps {
   language: Language;
   onLanguageChange: (lang: Language) => void;
   onOpenRulesSetting: () => void;
+  onOpenRestoreConfirm?: () => void;
   hasRefFile: boolean;
   hasCompFile: boolean;
   hasResults: boolean;
@@ -24,6 +35,8 @@ interface HeaderProps {
   onCloudSignOut?: () => void;
   activeUpload?: ActiveUpload | null;
   onOpenSyncPanel?: () => void;
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -32,6 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
   language,
   onLanguageChange,
   onOpenRulesSetting,
+  onOpenRestoreConfirm,
   hasRefFile,
   hasResults,
   isPreviewMode,
@@ -41,6 +55,8 @@ export const Header: React.FC<HeaderProps> = ({
   onCloudSignOut,
   activeUpload,
   onOpenSyncPanel,
+  theme = 'light',
+  onToggleTheme,
 }) => {
   const t = translations[language];
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -64,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+    <header className="sticky top-0 z-40 bg-[var(--bg-surface)]/95 backdrop-blur-md border-b border-[var(--border)] shadow-xs transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-3 sm:gap-6 h-16">
           {/* Brand: Excellent Medical Technology logo + name + creator */}
@@ -73,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => {
                 if (!isPreviewMode && onSelectStep) onSelectStep(1);
               }}
-              className="flex items-center gap-2 sm:gap-2.5 min-w-0 focus:outline-none group"
+              className="flex items-center gap-2 sm:gap-2.5 min-w-0 focus:outline-none group cursor-pointer text-left"
               title="Excellent Medical Technology ESP"
             >
               <img
@@ -82,11 +98,11 @@ export const Header: React.FC<HeaderProps> = ({
                 className="h-9 sm:h-10 w-auto shrink-0"
               />
               <span className="hidden md:flex flex-col items-start leading-tight min-w-0">
-                <span className="text-[13px] font-bold tracking-tight text-slate-900 group-hover:text-emerald-600 transition-colors truncate">
-                  Excellent Medical Technology <span className="text-emerald-600">ESP</span>
+                <span className="text-[13px] font-bold tracking-tight text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors truncate">
+                  Excellent Medical Technology <span className="text-[var(--accent)]">ESP</span>
                 </span>
-                <span className="text-[10px] font-medium text-slate-400 tracking-wide">
-                  Created by <span className="font-bold text-emerald-700">DO2-HPT</span>
+                <span className="text-[10px] font-medium text-[var(--text-muted)] tracking-wide">
+                  Created by <span className="font-bold text-[var(--accent)]">DO2-HPT</span>
                 </span>
               </span>
             </button>
@@ -94,80 +110,120 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Mode Tag if in Preview */}
           {isPreviewMode && (
-            <div className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 min-w-0">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1 rounded-lg bg-[var(--success-soft)] border border-[var(--success-border)] text-xs font-semibold text-[var(--success)] min-w-0">
+              <span className="pulse-dot shrink-0" />
               <span className="hidden min-[420px]:inline truncate">{t.headerResultPreview}</span>
-              <span className="hidden sm:inline text-slate-500 font-normal">
+              <span className="hidden sm:inline text-[var(--text-muted)] font-normal">
                 {t.headerLiveTable}
               </span>
             </div>
           )}
 
-          {/* Language Selector & Actions */}
+          {/* Language Selector, Theme Switcher & Actions */}
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {/* Theme Toggle Button */}
+            {onToggleTheme && (
+              <button
+                onClick={onToggleTheme}
+                title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                className="tbtn tbtn--neutral !h-9 !px-2.5"
+                aria-label="Toggle theme"
+              >
+                <span className="tbtn__icon">
+                  {theme === 'dark' ? (
+                    <Sun className="w-3.5 h-3.5 text-amber-400" />
+                  ) : (
+                    <Moon className="w-3.5 h-3.5 text-indigo-500" />
+                  )}
+                </span>
+                <span className="hidden md:inline text-xs font-semibold">
+                  {theme === 'dark' ? 'Dark' : 'Light'}
+                </span>
+              </button>
+            )}
+
+            {/* Restore Original Stage Button */}
+            {!isPreviewMode && onOpenRestoreConfirm && (
+              <button
+                onClick={onOpenRestoreConfirm}
+                title="Restore original stage - Clears all history, files, and data from cloud and local database"
+                className="tbtn tbtn--neutral hover:!border-rose-300 hover:!text-rose-600 !h-9 !px-3"
+              >
+                <span className="tbtn__icon">
+                  <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                </span>
+                <span className="hidden sm:inline">Restore Stage</span>
+                <span className="sm:hidden">Restore</span>
+              </button>
+            )}
+
             {/* Cloud sync upload status: animated arrow while uploading, opens status & history */}
             {cloudUser && onOpenSyncPanel && (
               <button
                 onClick={onOpenSyncPanel}
                 title={t.syncPanelTitle}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-lg border border-sky-200 transition-colors whitespace-nowrap shrink-0 shadow-xs"
+                className="tbtn tbtn--upload !h-9 !px-3"
               >
-                {activeUpload ? (
-                  <>
+                <span className="tbtn__icon">
+                  {activeUpload ? (
                     <ProgressRing
                       pct={activeUpload.total > 0 ? Math.round((activeUpload.done / activeUpload.total) * 100) : null}
-                      size={20}
+                      size={18}
                     />
-                    <span className="font-bold tabular-nums">
-                      {activeUpload.total > 0 ? `${Math.round((activeUpload.done / activeUpload.total) * 100)}%` : '…'}
-                    </span>
-                    <span className="hidden lg:inline max-w-[160px] truncate text-sky-600/80 font-normal">
-                      {activeUpload.fileName}
-                    </span>
-                  </>
-                ) : (
-                  <>
+                  ) : (
                     <CloudUpload className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">{t.syncAllSynced}</span>
-                  </>
+                  )}
+                </span>
+                {activeUpload ? (
+                  <span className="font-mono text-xs font-bold tabular-nums">
+                    {activeUpload.total > 0 ? `${Math.round((activeUpload.done / activeUpload.total) * 100)}%` : '…'}
+                  </span>
+                ) : (
+                  <span className="hidden sm:inline text-xs">{t.syncAllSynced}</span>
                 )}
               </button>
             )}
+
             {/* Cloud sync: sign in with Google to share rules & live preview across devices */}
             {cloudUser ? (
               <button
                 onClick={onCloudSignOut}
                 title={t.headerSignedInTitle.replace('{email}', cloudUser.email || t.headerGoogleUser)}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors whitespace-nowrap shrink-0 shadow-xs"
+                className="tbtn tbtn--excel !h-9 !px-3"
               >
-                <Cloud className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{t.headerSynced}</span>
-                <LogOut className="w-3 h-3 opacity-60" />
+                <span className="tbtn__icon">
+                  <Cloud className="w-3.5 h-3.5" />
+                </span>
+                <span className="hidden sm:inline text-xs">{t.headerSynced}</span>
+                <LogOut className="w-3 h-3 opacity-60 ml-0.5" />
               </button>
             ) : (
               <button
                 onClick={onCloudSignIn}
                 title={t.headerSignInTitle}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 active:bg-slate-100 rounded-lg border border-slate-200 hover:border-slate-300 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap shrink-0 shadow-2xs"
+                className="tbtn tbtn--print !h-9 !px-3"
               >
-                <GoogleIcon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{t.headerSync}</span>
+                <span className="tbtn__icon">
+                  <GoogleIcon className="w-3.5 h-3.5" />
+                </span>
+                <span className="hidden sm:inline text-xs">{t.headerSync}</span>
               </button>
             )}
+
             {/* Language Switcher Dropdown with Country Flag */}
             <div className="relative" ref={langRef}>
               <button
                 onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 active:bg-slate-100 rounded-lg border border-slate-200 hover:border-slate-300 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap shrink-0 shadow-2xs"
+                className="tbtn tbtn--neutral !h-9 !px-2.5"
                 aria-label={t.headerSelectLanguage}
               >
                 <CountryFlag language={language} className="w-4 h-3 rounded-xs shadow-2xs" />
-                <span className="hidden sm:inline">{languageLabels[language].native}</span>
-                <span className="sm:hidden">{languageLabels[language].code}</span>
+                <span className="hidden sm:inline text-xs font-semibold">{languageLabels[language].native}</span>
+                <span className="sm:hidden text-xs font-mono font-bold">{languageLabels[language].code}</span>
               </button>
 
               {langDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white border border-slate-200 shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute right-0 mt-2 w-44 rounded-xl bg-[var(--bg-surface)] border border-[var(--border)] shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
                   {(Object.keys(languageLabels) as Language[]).map((langKey) => (
                     <button
                       key={langKey}
@@ -175,17 +231,17 @@ export const Header: React.FC<HeaderProps> = ({
                         onLanguageChange(langKey);
                         setLangDropdownOpen(false);
                       }}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors ${
+                      className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors cursor-pointer ${
                         language === langKey
-                          ? 'bg-emerald-50 text-emerald-800 font-bold'
-                          : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                          ? 'bg-[var(--accent-soft)] text-[var(--accent-soft-tx)] font-bold'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-soft)] hover:text-[var(--text-primary)]'
                       }`}
                     >
                       <span className="flex items-center gap-2">
                         <CountryFlag language={langKey} className="w-4 h-3 rounded-xs shadow-2xs" />
                         <span>{languageLabels[langKey].native}</span>
                       </span>
-                      <span className="text-slate-400 text-[10px] uppercase font-mono font-bold">
+                      <span className="text-[var(--text-muted)] text-[10px] uppercase font-mono font-bold">
                         {languageLabels[langKey].code}
                       </span>
                     </button>
@@ -198,12 +254,14 @@ export const Header: React.FC<HeaderProps> = ({
             {!isPreviewMode && (
               <button
                 onClick={onOpenRulesSetting}
-                className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 active:bg-slate-950 rounded-lg shadow-sm transition-all whitespace-nowrap shrink-0 group focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                className="tbtn tbtn--primary !h-9 !px-3.5"
                 title={t.headerRulesTitle}
               >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-12 transition-transform" />
-                <span className="hidden sm:inline">{t.rulesLogicSetting}</span>
-                <span className="sm:hidden">{t.headerRulesShort}</span>
+                <span className="tbtn__icon">
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                </span>
+                <span className="hidden sm:inline text-xs">{t.rulesLogicSetting}</span>
+                <span className="sm:hidden text-xs">{t.headerRulesShort}</span>
               </button>
             )}
           </div>
