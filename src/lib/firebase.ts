@@ -74,7 +74,11 @@ export async function testConnection(): Promise<void> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
+    const msg = error instanceof Error ? error.message : String(error);
+    const code = (error as any)?.code;
+    if (code === 'resource-exhausted' || msg.includes('resource-exhausted') || msg.includes('Quota')) {
+      console.warn('Firestore connection check: free daily quota limit reached.');
+    } else if (msg.includes('the client is offline')) {
       console.warn('Firestore connection check: client appears offline.');
     }
   }

@@ -10,6 +10,7 @@ import {
   Moon,
   ShieldAlert,
   Sparkles,
+  AlertTriangle,
 } from 'lucide-react';
 import { LOGO_DATA_URL } from '../assets/logo';
 import { ProgressRing } from './ProgressRing';
@@ -40,6 +41,7 @@ interface HeaderProps {
   onToggleTheme?: () => void;
   onCheckForUpdates?: () => void;
   installedVersion?: string;
+  isQuotaExceeded?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -62,6 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTheme,
   onCheckForUpdates,
   installedVersion,
+  isQuotaExceeded,
 }) => {
   const t = translations[language];
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -176,8 +179,20 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
+            {/* If Quota Exceeded, show clear status pill */}
+            {isQuotaExceeded && (
+              <div
+                title="Firestore daily write quota reached — operating safely in local IndexedDB mode"
+                className="flex items-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-xl text-xs font-semibold text-amber-800 dark:text-amber-200 bg-amber-100/90 dark:bg-amber-950/70 border border-amber-300 dark:border-amber-800 shadow-2xs shrink-0"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span className="hidden sm:inline">Local Mode</span>
+                <span className="sm:hidden">Local</span>
+              </div>
+            )}
+
             {/* Cloud sync upload status: animated arrow while uploading, opens status & history */}
-            {cloudUser && onOpenSyncPanel && (
+            {cloudUser && onOpenSyncPanel && !isQuotaExceeded && (
               <button
                 onClick={onOpenSyncPanel}
                 title={t.syncPanelTitle}

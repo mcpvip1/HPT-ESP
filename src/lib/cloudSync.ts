@@ -86,16 +86,64 @@ export interface CloudRulesState {
   updatedAt: number;
 }
 
+// ---------------------------------------------------------------------------
+// Firestore Quota Circuit Breaker: prevents infinite backoff retry loops and
+// background write thrashing when the free daily quota is exceeded.
+// ---------------------------------------------------------------------------
+let quotaExceededState = typeof window !== 'undefined' && sessionStorage.getItem('emp_firestore_quota_exceeded') === 'true';
+const quotaListeners = new Set<(exceeded: boolean) => void>();
+
+export function isQuotaExceededError(error: unknown): boolean {
+  if (!error) return false;
+  const msg = error instanceof Error ? error.message : String(error);
+  const code = (error as any)?.code;
+  return (
+    code === 'resource-exhausted' ||
+    msg.includes('resource-exhausted') ||
+    msg.includes('Quota limit exceeded') ||
+    msg.includes('Quota exceeded')
+  );
+}
+
+export function getIsQuotaExceeded(): boolean {
+  return quotaExceededState;
+}
+
+export function setQuotaExceeded(exceeded: boolean): void {
+  if (quotaExceededState !== exceeded) {
+    quotaExceededState = exceeded;
+    try {
+      if (exceeded) sessionStorage.setItem('emp_firestore_quota_exceeded', 'true');
+      else sessionStorage.removeItem('emp_firestore_quota_exceeded');
+    } catch {}
+    quotaListeners.forEach((fn) => {
+      try { fn(exceeded); } catch {}
+    });
+  }
+}
+
+export function resetQuotaCircuitBreaker(): void {
+  setQuotaExceeded(false);
+}
+
+export function subscribeQuotaExceeded(fn: (exceeded: boolean) => void): () => void {
+  quotaListeners.add(fn);
+  fn(quotaExceededState);
+  return () => quotaListeners.delete(fn);
+}
+
 const stateDoc = (uid: string, name: string) => doc(db, 'workspaces', uid, 'state', name);
 
 export async function publishRulesState(
   uid: string,
   state: Partial<Omit<CloudRulesState, 'updatedAt'>>
 ): Promise<boolean> {
+  if (getIsQuotaExceeded()) return false;
   try {
     await setDoc(stateDoc(uid, 'rules'), { ...state, updatedAt: Date.now() }, { merge: true });
     return true;
   } catch (e) {
+    if (isQuotaExceededError(e)) setQuotaExceeded(true);
     console.warn('Cloud sync: failed to publish rules', e);
     return false;
   }
@@ -107,6 +155,7 @@ export async function fetchRulesState(uid: string): Promise<CloudRulesState | nu
     if (!snap.exists()) return null;
     return snap.data() as CloudRulesState;
   } catch (e) {
+    if (isQuotaExceededError(e)) setQuotaExceeded(true);
     console.warn('Cloud sync: failed to fetch rules', e);
     return null;
   }
@@ -116,6 +165,7 @@ export async function publishColumnConfigs(
   uid: string,
   settings: StoredColumnSettings
 ): Promise<boolean> {
+  if (getIsQuotaExceeded()) return false;
   try {
     await Promise.all([
       setDoc(stateDoc(uid, 'columnConfigs'), { ...settings, updatedAt: Date.now() }, { merge: true }),
@@ -123,6 +173,7 @@ export async function publishColumnConfigs(
     ]);
     return true;
   } catch (e) {
+    if (isQuotaExceededError(e)) setQuotaExceeded(true);
     console.warn('Cloud sync: failed to publish columnConfigs', e);
     return false;
   }
@@ -257,6 +308,7 @@ async function publishChunkedDoc(
   chunkFields: Record<string, unknown> = {},
   opts: ChunkedPublishOptions = {}
 ): Promise<boolean> {
+  if (getIsQuotaExceeded()) return false;
   const chunks = splitIntoByteChunks(json, CHUNK_BYTES);
   const chunksCol = collection(metaRef, 'chunks');
 
@@ -295,6 +347,7 @@ async function publishChunkedDoc(
       opts.onProgress?.(total, Math.max(total, 1));
       return true;
     } catch (e) {
+      if (isQuotaExceededError(e)) setQuotaExceeded(true);
       console.warn('Cloud sync: failed to publish atomic/single chunked doc', e);
       return false;
     }
@@ -346,11 +399,14 @@ async function publishChunkedDoc(
     opts.onProgress?.(total, total);
     return true;
   } catch (e) {
+    if (isQuotaExceededError(e)) setQuotaExceeded(true);
     console.warn('Cloud sync: failed to publish chunked doc', e);
-    // Best effort: clear the marker so readers don't wait on a dead upload
-    try {
-      await setDoc(metaRef, { uploading: false }, { merge: true });
-    } catch { /* ignore */ }
+    // Best effort: clear the marker only if not a quota error
+    if (!isQuotaExceededError(e)) {
+      try {
+        await setDoc(metaRef, { uploading: false }, { merge: true });
+      } catch { /* ignore */ }
+    }
     return false;
   }
 }
@@ -783,6 +839,7 @@ export async function publishResultFilters(
   uid: string,
   filters: ResultFilters
 ): Promise<boolean> {
+  if (getIsQuotaExceeded()) return false;
   try {
     await setDoc(
       stateDoc(uid, 'results'),
@@ -791,6 +848,7 @@ export async function publishResultFilters(
     );
     return true;
   } catch (e) {
+    if (isQuotaExceededError(e)) setQuotaExceeded(true);
     console.warn('Cloud sync: failed to publish result filters', e);
     return false;
   }
@@ -813,6 +871,7 @@ export async function publishSyncHistory(
   history: SyncHistoryEntry[],
   clearedAt?: number
 ): Promise<boolean> {
+  if (getIsQuotaExceeded()) return false;
   try {
     await setDoc(stateDoc(uid, 'history'), {
       entries: history.slice(0, 50),
@@ -821,6 +880,7 @@ export async function publishSyncHistory(
     });
     return true;
   } catch (e) {
+    if (isQuotaExceededError(e)) setQuotaExceeded(true);
     console.warn('Cloud sync: failed to publish history', e);
     return false;
   }

@@ -39,6 +39,7 @@ import { CountryFlag, GoogleIcon } from './components/CountryFlag';
 import { RippleButton } from './components/RippleButton';
 import { SplashScreen } from './components/SplashScreen';
 import { UpdateModal } from './components/UpdateModal';
+import { FirestoreQuotaBanner } from './components/FirestoreQuotaBanner';
 import {
   CURRENT_LATEST_VERSION,
   getInstalledVersion,
@@ -78,6 +79,10 @@ import {
   FIXED_PREVIEW_SHARE_ID,
   defaultResultFilters,
   wipeCloudWorkspace,
+  subscribeQuotaExceeded,
+  getIsQuotaExceeded,
+  isQuotaExceededError,
+  setQuotaExceeded,
 } from './lib/cloudSync';
 import type { ResultFilters, StoredColumnSettings } from './lib/cloudSync';
 import {
@@ -108,6 +113,13 @@ export default function App() {
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState<AppVersionInfo | null>(null);
   const [installedVersion, setInstalledVersion] = useState<string>(() => getInstalledVersion());
+
+  // Firestore Quota Circuit Breaker state
+  const [isQuotaExceeded, setIsQuotaExceeded] = useState(() => getIsQuotaExceeded());
+
+  useEffect(() => {
+    return subscribeQuotaExceeded(setIsQuotaExceeded);
+  }, []);
 
   // UI Theme state (Light / Dark mode) with persistence
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -333,6 +345,9 @@ export default function App() {
   useEffect(() => {
     if (!cloudUser || !localReady || isPreviewMode || didCloudPullRef.current) return;
     didCloudPullRef.current = true;
+    if (getIsQuotaExceeded()) {
+      return;
+    }
     setIsCloudPulling(true);
     const pullSafety = setTimeout(() => setIsCloudPulling(false), 30000);
     (async () => {
@@ -561,6 +576,9 @@ export default function App() {
           await deleteFromIDB(StorageKeys.RESULTS_STATE);
         }
       } catch (e) {
+        if (isQuotaExceededError(e)) {
+          setQuotaExceeded(true);
+        }
         console.warn('Cloud workspace pull failed', e);
       } finally {
         clearTimeout(pullSafety);
@@ -638,6 +656,7 @@ export default function App() {
   // Publish rule settings to the cloud whenever they change (optimized debounce).
   const debouncedPublishRules = useRef(
     debounce((uid: string, st: { normalization: NormalizationRules; layers: DecisionLayer[]; mappings: ColumnMapping[]; holdColumn: string; holdValues: string[]; holdReason: string; releasedRowIds: string[] }, reason: string) => {
+      if (getIsQuotaExceeded()) return;
       const key = JSON.stringify({ n: st.normalization, l: st.layers, m: st.mappings, hc: st.holdColumn, h: st.holdValues, hr: st.holdReason, rr: st.releasedRowIds });
       if (key === lastRulesPublishRef.current) return;
       lastRulesPublishRef.current = key;
@@ -646,13 +665,13 @@ export default function App() {
       publishRulesState(uid, st).then((ok) => {
         endUpload({ kind: 'settings', title: reason, status: ok ? 'done' : 'failed' });
         if (ok) showToast(tt.toastCloudSettingsUploaded, 'success');
-        else showToast(tt.toastCloudSettingsSyncFailed, 'error');
+        else if (!getIsQuotaExceeded()) showToast(tt.toastCloudSettingsSyncFailed, 'error');
       });
     }, 500)
   ).current;
 
   useEffect(() => {
-    if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current) return;
+    if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current || isQuotaExceeded) return;
     const cur = rulesStateRef.current;
     const reason = describeRulesChange(lastRulesPublishRef.current, {
       n: cur.normalization, l: cur.layers, m: cur.mappings,
@@ -660,7 +679,7 @@ export default function App() {
     });
     debouncedPublishRules(cloudUser.uid, cur, reason);
     return () => debouncedPublishRules.cancel();
-  }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds, debouncedPublishRules, describeRulesChange]);
+  }, [cloudUser, isPreviewMode, localReady, normalization, layers, mappings, holdColumn, holdValues, holdReason, releasedRowIds, debouncedPublishRules, describeRulesChange, isQuotaExceeded]);
 
   // Publish evaluated results to the cloud whenever matching is executed.
   // Pull-applied results are skipped via pulledResultsRef (no echo).
@@ -668,7 +687,7 @@ export default function App() {
   const resultsPublishGenRef = useRef(0);
   const debouncedPublishResults = useRef(
     debounce((uid: string, state: { results: MatchedRow[]; stats: MatchingStats; filters: ResultFilters }, gen: number) => {
-      if (gen !== resultsPublishGenRef.current) return;
+      if (gen !== resultsPublishGenRef.current || getIsQuotaExceeded()) return;
       const tt = tRef.current;
       beginUpload('results', tt.syncResultsLabel, `${state.results.length}`);
       publishResultsState(uid, state, (done, total) =>
@@ -676,7 +695,7 @@ export default function App() {
       ).then((ok) => {
         endUpload({ kind: 'results', title: `${tt.syncResultsLabel} (${state.results.length})`, status: ok ? 'done' : 'failed' });
         if (ok) showToast(tt.toastCloudResultsUploaded, 'success');
-        else showToast(tt.toastCloudResultsSyncFailed, 'error');
+        else if (!getIsQuotaExceeded()) showToast(tt.toastCloudResultsSyncFailed, 'error');
       });
       // Keep the local instant-paint cache in step
       saveToIDB(StorageKeys.RESULTS_STATE, state).catch(() => {});
@@ -686,13 +705,14 @@ export default function App() {
   // Dedicated lightweight filter updater: updates metadata only, never re-uploads whole dataset
   const debouncedPublishResultFilters = useRef(
     debounce((uid: string, filters: ResultFilters) => {
+      if (getIsQuotaExceeded()) return;
       publishResultFilters(uid, filters);
     }, 400)
   ).current;
 
   // Trigger full chunked upload ONLY when results or stats actually change
   useEffect(() => {
-    if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current) return;
+    if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current || isQuotaExceeded) return;
     if (results.length === 0 || !stats) return;
     if (pulledResultsRef.current === results) {
       return;
@@ -700,15 +720,15 @@ export default function App() {
     pulledResultsRef.current = null;
     debouncedPublishResults.current(cloudUser.uid, { results, stats, filters: resultFilters }, resultsPublishGenRef.current);
     return () => debouncedPublishResults.current.cancel();
-  }, [cloudUser, isPreviewMode, localReady, results, stats, debouncedPublishResults]);
+  }, [cloudUser, isPreviewMode, localReady, results, stats, debouncedPublishResults, isQuotaExceeded]);
 
   // When only view filters change, publish lightweight filter metadata (super fast, no re-chunking)
   useEffect(() => {
-    if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current) return;
+    if (!cloudUser || isPreviewMode || !localReady || !didCloudPullRef.current || isQuotaExceeded) return;
     if (results.length === 0 || !stats) return;
     debouncedPublishResultFilters(cloudUser.uid, resultFilters);
     return () => debouncedPublishResultFilters.cancel();
-  }, [cloudUser, isPreviewMode, localReady, resultFilters, debouncedPublishResultFilters]);
+  }, [cloudUser, isPreviewMode, localReady, resultFilters, debouncedPublishResultFilters, isQuotaExceeded]);
 
   const VALID_FILTERS = ['all', 'green', 'yellow', 'red', 'blue', 'unmatched'] as const;
   const isValidFilter = (f: string): f is typeof VALID_FILTERS[number] =>
@@ -728,6 +748,7 @@ export default function App() {
 
   const debouncedPublishWorkbooks = useRef(
     debounce((uid: string, wbs: { reference: WorkbookData | null; comparison: WorkbookData | null }) => {
+      if (getIsQuotaExceeded()) return;
       const tt = tRef.current;
       const names = [wbs.reference?.name, wbs.comparison?.name].filter(Boolean).join(' + ') || tt.syncFilesLabel;
       beginUpload('file', tt.syncFilesLabel, names);
@@ -1584,8 +1605,15 @@ export default function App() {
   // results sync from the cloud. Public share-preview links stay open.
   if (!isPreviewMode && authResolved && !cloudUser && !guestMode) {
     return (
-      <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex flex-col items-center justify-center p-4 sm:p-6 font-sans selection:bg-emerald-500 selection:text-white">
-        <div className="bg-white dark:bg-[#111827] border border-slate-200/90 dark:border-slate-800 rounded-3xl p-8 sm:p-10 w-full max-w-[430px] shadow-[0_12px_36px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.4)] text-center space-y-5 transition-all">
+      <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+        {isQuotaExceeded && (
+          <FirestoreQuotaBanner
+            language={language}
+            onRetry={() => setStudioSession((s) => s + 1)}
+          />
+        )}
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200/90 dark:border-slate-800 rounded-3xl p-8 sm:p-10 w-full max-w-[430px] shadow-[0_12px_36px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.4)] text-center space-y-5 transition-all">
           <img
             src={LOGO_DATA_URL}
             alt="Excellent Medical Technology"
@@ -1683,6 +1711,7 @@ export default function App() {
             </button>
           </div>
         </div>
+      </div>
 
         {/* Update Modal if found during splash */}
         <UpdateModal
@@ -1739,7 +1768,18 @@ export default function App() {
         onExitPreview={handleExitPreview}
         onCheckForUpdates={handleManualCheckUpdates}
         installedVersion={installedVersion}
+        isQuotaExceeded={isQuotaExceeded}
       />
+
+      {/* Quota Exceeded Banner (when free daily write units limit is reached) */}
+      {isQuotaExceeded && (
+        <FirestoreQuotaBanner
+          language={language}
+          onRetry={() => {
+            setStudioSession((s) => s + 1);
+          }}
+        />
+      )}
 
       {/* 2. Main Content Viewport */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
