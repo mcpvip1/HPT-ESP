@@ -1547,29 +1547,40 @@ export default function App() {
           <img
             src={LOGO_DATA_URL}
             alt="Excellent Medical Technology"
-            className="h-20 w-auto mx-auto object-contain"
+            className="h-14 sm:h-16 w-auto mx-auto object-contain opacity-95"
           />
-          <div className="space-y-1.5">
-            <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 dark:text-white tracking-tight font-heading">
+          <div className="space-y-1">
+            <h1 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight font-heading">
               {t.appName}
             </h1>
-            <p className="text-xs font-medium text-slate-400">
-              Created by <span className="font-bold text-[#00875a] dark:text-emerald-400">DO2-HPT</span>
+            <p className="text-[11px] font-medium text-slate-400">
+              Created by <span className="font-semibold text-emerald-600 dark:text-emerald-400">DO2-HPT</span>
             </p>
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-100 pt-2">{t.gateTitle}</p>
-            <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm mx-auto">{t.gateDesc}</p>
+            <p className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 pt-1.5">{t.gateTitle}</p>
+            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">{t.gateDesc}</p>
           </div>
-          <div className="space-y-2.5 pt-1">
+          <div className="space-y-2.5 pt-1.5">
+            {/* 1. Primary Sign-In with Refined Clean Emerald Styling */}
             <RippleButton
               onClick={handleCloudSignIn}
-              rippleColor="rgba(255, 255, 255, 0.45)"
+              rippleColor="rgba(255, 255, 255, 0.35)"
               enableScaleHover={true}
               title={t.gateSignIn}
-              className="w-full flex items-center justify-center gap-3 px-5 py-3 text-sm font-bold text-white bg-[#00875a] hover:bg-[#00704a] active:bg-[#005e3e] rounded-xl shadow-[0_2px_8px_rgba(0,135,90,0.25)] hover:shadow-[0_4px_14px_rgba(0,135,90,0.35)] transition-all duration-200 transform hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+              className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl border border-emerald-500/40 shadow-sm hover:shadow-md transition-all duration-150 transform hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
             >
-              <GoogleIcon className="w-5 h-5 shrink-0" />
+              <GoogleIcon className="w-4 h-4 shrink-0 text-white" monochrome={true} />
               <span>{t.gateSignIn}</span>
             </RippleButton>
+
+            {/* Layout divider */}
+            <div className="relative flex items-center justify-center my-1">
+              <div className="w-full border-t border-slate-200/80 dark:border-slate-800" />
+              <span className="absolute px-2.5 bg-white dark:bg-[#111827] text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+                or
+              </span>
+            </div>
+
+            {/* 2. Secondary Continue as Guest with Subtle Neutral Tone */}
             <RippleButton
               onClick={() => {
                 setGuestMode(true);
@@ -1577,9 +1588,9 @@ export default function App() {
               }}
               rippleColor="rgba(0, 0, 0, 0.08)"
               enableScaleHover={true}
-              className="w-full flex items-center justify-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/80 rounded-xl transition-all duration-200 border border-slate-200/90 dark:border-slate-700 shadow-2xs cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-2xs hover:shadow-xs transition-all duration-150 transform hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
             >
-              {t.gateGuest}
+              <span>{t.gateGuest}</span>
             </RippleButton>
           </div>
           <div className="pt-4 mt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-1.5 flex-nowrap">
