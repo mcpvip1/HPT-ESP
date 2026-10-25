@@ -37,6 +37,13 @@ import { SyncHistoryModal } from './components/SyncHistoryModal';
 import { GlobalLoadingSkeleton } from './components/GlobalLoadingSkeleton';
 import { CountryFlag, GoogleIcon } from './components/CountryFlag';
 import { RippleButton } from './components/RippleButton';
+import { SplashScreen } from './components/SplashScreen';
+import { UpdateModal } from './components/UpdateModal';
+import {
+  CURRENT_LATEST_VERSION,
+  getInstalledVersion,
+  AppVersionInfo,
+} from './utils/versionManager';
 import { translations } from './translations';
 import {
   parsePreviewFromUrl,
@@ -86,6 +93,7 @@ import {
   RefreshCw,
   AlertTriangle,
   RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 
 export default function App() {
@@ -94,6 +102,12 @@ export default function App() {
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+
+  // Auto-Update & Animated Splash Screen State
+  const [isSplashVisible, setIsSplashVisible] = useState(true);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [availableUpdate, setAvailableUpdate] = useState<AppVersionInfo | null>(null);
+  const [installedVersion, setInstalledVersion] = useState<string>(() => getInstalledVersion());
 
   // UI Theme state (Light / Dark mode) with persistence
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -234,6 +248,24 @@ export default function App() {
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((item) => item.id !== id));
   }, []);
+
+  // Handlers for Splash Screen and Auto Update
+  const handleSplashFinish = useCallback((hasUpdate: boolean, updateInfo: AppVersionInfo) => {
+    setIsSplashVisible(false);
+    if (hasUpdate) {
+      setAvailableUpdate(updateInfo);
+      setIsUpdateModalOpen(true);
+    }
+  }, []);
+
+  const handleManualCheckUpdates = useCallback(() => {
+    setIsSplashVisible(true);
+  }, []);
+
+  const handleUpdateCompleted = useCallback(() => {
+    setInstalledVersion(CURRENT_LATEST_VERSION.version);
+    showToast(`System updated to ${CURRENT_LATEST_VERSION.version}`, 'success');
+  }, [showToast]);
 
   const checkAndApplyPreview = useCallback((pData: SharedPreviewPayload | null) => {
     if (pData && pData.results && pData.stats) {
@@ -1538,6 +1570,16 @@ export default function App() {
     }, 150);
   };
 
+  // 1. Initial Animated Splash Screen with Update Verification
+  if (isSplashVisible) {
+    return (
+      <SplashScreen
+        language={language}
+        onFinish={handleSplashFinish}
+      />
+    );
+  }
+
   // Login-first: the studio requires a signed-in user so files, settings and
   // results sync from the cloud. Public share-preview links stay open.
   if (!isPreviewMode && authResolved && !cloudUser && !guestMode) {
@@ -1593,6 +1635,8 @@ export default function App() {
               <span>{t.gateGuest}</span>
             </RippleButton>
           </div>
+
+          {/* Language selector buttons */}
           <div className="pt-4 mt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-1.5 flex-nowrap">
             <span className="text-[11px] sm:text-xs font-medium text-slate-400 shrink-0">{t.headerSelectLanguage}:</span>
             <div className="flex items-center gap-1.5 sm:gap-2">
@@ -1625,7 +1669,32 @@ export default function App() {
               })}
             </div>
           </div>
+
+          {/* Version badge & manual check updates trigger */}
+          <div className="pt-3 mt-1 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500">
+            <span className="font-mono">Build: {installedVersion}</span>
+            <button
+              type="button"
+              onClick={handleManualCheckUpdates}
+              className="hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+            >
+              <Sparkles className="w-3 h-3 text-emerald-500" />
+              Check Updates
+            </button>
+          </div>
         </div>
+
+        {/* Update Modal if found during splash */}
+        <UpdateModal
+          isOpen={isUpdateModalOpen}
+          onClose={() => setIsUpdateModalOpen(false)}
+          updateInfo={availableUpdate || CURRENT_LATEST_VERSION}
+          language={language}
+          onUpdateCompleted={handleUpdateCompleted}
+        />
+
+        {/* Toast Notifications */}
+        <Toast toasts={toasts} onDismiss={dismissToast} language={language} />
       </div>
     );
   }
@@ -1668,6 +1737,8 @@ export default function App() {
         hasResults={results.length > 0}
         isPreviewMode={isPreviewMode}
         onExitPreview={handleExitPreview}
+        onCheckForUpdates={handleManualCheckUpdates}
+        installedVersion={installedVersion}
       />
 
       {/* 2. Main Content Viewport */}
@@ -1898,6 +1969,15 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* System Update Modal */}
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        updateInfo={availableUpdate || CURRENT_LATEST_VERSION}
+        language={language}
+        onUpdateCompleted={handleUpdateCompleted}
+      />
 
       {/* Toast Notifications */}
       <Toast toasts={toasts} onDismiss={dismissToast} language={language} />

@@ -9,6 +9,7 @@ import {
   Sun,
   Moon,
   ShieldAlert,
+  Sparkles,
 } from 'lucide-react';
 import { LOGO_DATA_URL } from '../assets/logo';
 import { ProgressRing } from './ProgressRing';
@@ -37,6 +38,8 @@ interface HeaderProps {
   onOpenSyncPanel?: () => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
+  onCheckForUpdates?: () => void;
+  installedVersion?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -57,6 +60,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSyncPanel,
   theme = 'light',
   onToggleTheme,
+  onCheckForUpdates,
+  installedVersion,
 }) => {
   const t = translations[language];
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -139,6 +144,20 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="hidden md:inline text-xs font-semibold">
                   {theme === 'dark' ? 'Dark' : 'Light'}
                 </span>
+              </button>
+            )}
+
+            {/* Check for Updates Button */}
+            {onCheckForUpdates && (
+              <button
+                onClick={onCheckForUpdates}
+                title={`System Updates (Current: ${installedVersion || 'v2.4.2'})`}
+                className="tbtn tbtn--neutral hover:!border-emerald-300 hover:!text-emerald-600 !h-9 !px-2.5 sm:!px-3"
+              >
+                <span className="tbtn__icon">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                </span>
+                <span className="hidden sm:inline">Updates</span>
               </button>
             )}
 
