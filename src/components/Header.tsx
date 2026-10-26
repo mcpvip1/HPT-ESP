@@ -119,6 +119,16 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="text-[10px] font-medium text-[var(--text-muted)] tracking-wide">
                   Created by <span className="font-bold text-[var(--accent)]">DO2-HPT</span>
                 </span>
+                <span
+                  className="text-[10px] font-mono font-medium text-[var(--text-muted)] tracking-wide"
+                  title={
+                    currentBuildTime
+                      ? `Build ${currentVersion || 'dev'} · ${currentBuildTime}`
+                      : `Build ${currentVersion || 'dev'}`
+                  }
+                >
+                  Build: {currentVersion || 'dev'}
+                </span>
               </span>
             </button>
           </div>
@@ -145,18 +155,6 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
               </button>
             )}
-
-            {/* Current build number (release version, e.g. V2.1.4) */}
-            <span
-              className="px-2 py-1 rounded-lg text-[11px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 shrink-0"
-              title={
-                currentBuildTime
-                  ? `Build ${currentVersion || 'dev'} · ${currentBuildTime}`
-                  : `Build ${currentVersion || 'dev'}`
-              }
-            >
-              {currentVersion || 'dev'}
-            </span>
 
             {/* Check for Updates Button */}
             {onCheckForUpdates && (
