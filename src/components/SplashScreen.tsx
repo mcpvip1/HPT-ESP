@@ -7,7 +7,7 @@ import { Sparkles, ShieldCheck } from 'lucide-react';
 
 interface SplashScreenProps {
   language: Language;
-  onFinish: (hasUpdate: boolean, updateInfo: AppVersionInfo) => void;
+  onFinish: (hasUpdate: boolean, updateInfo: AppVersionInfo | null) => void;
   minDurationMs?: number;
 }
 
@@ -70,8 +70,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       }
     }, 60);
 
-    // Parallel check update
-    const checkPromise = checkAppUpdate(1400);
+    // Parallel real update check (fetches version.json; no fake delay).
+    const checkPromise = checkAppUpdate();
 
     Promise.all([
       checkPromise,
@@ -88,7 +88,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         setIsFadingOut(true);
         setTimeout(() => {
           if (!isCancelled) {
-            onFinish(result.hasUpdate, result.latestVersion);
+            onFinish(result.hasUpdate, result.latest);
           }
         }, 400);
       }, 300);

@@ -28,6 +28,33 @@ export default defineConfig(({command}) => {
           }
         },
       },
+      {
+        // Writes dist/version.json so the app can tell a real new deploy
+        // apart from the bundle it is currently running (see versionManager).
+        // Never fails the build: without version.json the app simply shows
+        // no update prompt instead of a fake one.
+        name: 'write-version-json',
+        closeBundle() {
+          try {
+            const distDir = path.resolve(__dirname, 'dist');
+            const indexPath = path.join(distDir, 'index.html');
+            if (!fs.existsSync(indexPath)) return;
+            const html = fs.readFileSync(indexPath, 'utf-8');
+            const match = html.match(/\/assets\/(index-([A-Za-z0-9_-]+)\.js)/);
+            if (!match) {
+              console.warn('[write-version-json] no hashed bundle found in index.html');
+              return;
+            }
+            const [, js, hash] = match;
+            fs.writeFileSync(
+              path.join(distDir, 'version.json'),
+              JSON.stringify({ js, hash, builtAt: new Date().toISOString() }, null, 2)
+            );
+          } catch (err) {
+            console.warn('[write-version-json] failed:', err);
+          }
+        },
+      },
     ],
     resolve: {
       alias: {

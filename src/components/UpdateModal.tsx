@@ -11,7 +11,14 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react';
-import { AppVersionInfo, applyAppUpdate, resetVersionForTesting } from '../utils/versionManager';
+import {
+  AppVersionInfo,
+  UpdateHistoryEntry,
+  recordUpdateApplied,
+  clearDismissedVersion,
+  getUpdateHistory,
+  getRunningVersionInfo,
+} from '../utils/versionManager';
 import { Language } from '../types';
 import { RippleButton } from './RippleButton';
 
@@ -20,7 +27,6 @@ interface UpdateModalProps {
   onClose: () => void;
   updateInfo: AppVersionInfo;
   language: Language;
-  onUpdateCompleted?: () => void;
 }
 
 type UpdatePhase = 'prompt' | 'updating' | 'completed';
@@ -30,11 +36,11 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   onClose,
   updateInfo,
   language,
-  onUpdateCompleted,
 }) => {
   const [phase, setPhase] = useState<UpdatePhase>('prompt');
   const [progress, setProgress] = useState(0);
-  const [stepMessage, setStepMessage] = useState('Downloading update package...');
+  const [stepMessage, setStepMessage] = useState('Preparing the new version…');
+  const [history, setHistory] = useState<UpdateHistoryEntry[]>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -54,15 +60,18 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
       remindLater: 'Remind Me Later',
       featuresTitle: "What's New in this Release:",
       updatingTitle: 'Installing System Update',
-      updatingSubtitle: 'Applying latest engine optimizations and security patches...',
-      completeTitle: 'Update Completed Successfully!',
-      completeSubtitle: 'Your application has been updated to the latest build.',
+      updatingSubtitle: 'Preparing the new version — the app will reload to load it.',
+      completeTitle: 'New Version Ready!',
+      completeSubtitle: 'The new version is ready — launch it to start using it.',
       versionLabel: 'Latest Version Number',
       dateLabel: 'Release Date',
       timeLabel: 'Release Time',
       launchApp: 'Launch Updated Version',
-      statusReady: 'System is up to date & running smoothly',
-      testAgain: 'Re-test update flow',
+      statusReady: 'New version ready to launch',
+      currentBuildLabel: 'Current Build',
+      genericNote: 'Includes the latest fixes and improvements.',
+      historyTitle: 'Update History',
+      reloadStep: 'Loading the new version…',
     },
     zh: {
       promptTitle: '发现系统新版本',
@@ -71,15 +80,18 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
       remindLater: '稍后提醒',
       featuresTitle: '新版本核心特性：',
       updatingTitle: '正在安装系统更新',
-      updatingSubtitle: '正在应用最新的比对引擎优化与安全补丁...',
-      completeTitle: '系统更新完成！',
-      completeSubtitle: '已成功升级至最新版本，数据及配置已完整保留。',
+      updatingSubtitle: '正在准备新版本，应用将重新加载以完成更新。',
+      completeTitle: '新版本已就绪！',
+      completeSubtitle: '新版本已就绪，点击进入即可开始使用。',
       versionLabel: '最新版本号',
       dateLabel: '发布日期',
       timeLabel: '发布时间',
       launchApp: '进入更新后系统',
-      statusReady: '系统当前处于最新稳定状态',
-      testAgain: '重新测试更新流程',
+      statusReady: '新版本已就绪',
+      currentBuildLabel: '当前版本',
+      genericNote: '包含最新修复与改进。',
+      historyTitle: '更新记录',
+      reloadStep: '正在加载新版本…',
     },
     th: {
       promptTitle: 'พบการอัปเดตระบบเวอร์ชันใหม่',
@@ -88,15 +100,18 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
       remindLater: 'เตือนฉันภายหลัง',
       featuresTitle: 'คุณสมบัติใหม่ในเวอร์ชันนี้:',
       updatingTitle: 'กำลังติดตั้งการอัปเดตระบบ',
-      updatingSubtitle: 'กำลังปรับปรุงเครื่องมือจับคู่ข้อมูลและความปลอดภัย...',
-      completeTitle: 'อัปเดตระบบเสร็จสมบูรณ์!',
-      completeSubtitle: 'แอปพลิเคชันได้รับการอัปเดตเป็นเวอร์ชันล่าสุดเรียบร้อยแล้ว',
+      updatingSubtitle: 'กำลังเตรียมเวอร์ชันใหม่ แอปจะรีโหลดเพื่อโหลดเวอร์ชันใหม่',
+      completeTitle: 'เวอร์ชันใหม่พร้อมแล้ว!',
+      completeSubtitle: 'เวอร์ชันใหม่พร้อมแล้ว กดเริ่มใช้งานเพื่อเปิดเวอร์ชันใหม่',
       versionLabel: 'หมายเลขเวอร์ชันล่าสุด',
       dateLabel: 'วันที่เผยแพร่',
       timeLabel: 'เวลาเผยแพร่',
       launchApp: 'เริ่มใช้งานเวอร์ชันล่าสุด',
-      statusReady: 'ระบบเป็นเวอร์ชันล่าสุดและพร้อมใช้งาน',
-      testAgain: 'ทดสอบขั้นตอนอัปเดตอีกครั้ง',
+      statusReady: 'เวอร์ชันใหม่พร้อมใช้งาน',
+      currentBuildLabel: 'เวอร์ชันปัจจุบัน',
+      genericNote: 'รวมการแก้ไขและปรับปรุงล่าสุด',
+      historyTitle: 'ประวัติการอัปเดต',
+      reloadStep: 'กำลังโหลดเวอร์ชันใหม่…',
     },
     my: {
       promptTitle: 'စနစ်ဗားရှင်းအသစ် ရရှိနေပါပြီ',
@@ -105,15 +120,18 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
       remindLater: 'နောက်မှ သတိပေးပါ',
       featuresTitle: 'ယခုဗားရှင်းတွင် ပါဝင်သော အသစ်များ:',
       updatingTitle: 'စနစ်အား အဆင့်မြှင့်တင်နေပါသည်',
-      updatingSubtitle: 'ဒေတာစစ်ဆေးမှု အင်ဂျင်နှင့် လုံခြုံရေးများ ပြင်ဆင်နေပါသည်...',
-      completeTitle: 'စနစ် အဆင့်မြှင့်တင်မှု အောင်မြင်ပါသည်!',
-      completeSubtitle: 'သင့်စနစ်သည် နောက်ဆုံးဗားရှင်းသို့ အောင်မြင်စွာ ပြောင်းလဲပြီးပါပြီ။',
+      updatingSubtitle: 'ဗားရှင်းအသစ်ကို ပြင်ဆင်နေသည် — အက်ပ်ကို ပြန်ဖွင့်ပြီး ဗားရှင်းအသစ်ကို ယူမည်။',
+      completeTitle: 'ဗားရှင်းအသစ် အသင့်ဖြစ်နေပါပြီ!',
+      completeSubtitle: 'ဗားရှင်းအသစ်အသင့်ဖြစ်နေပါပြီ — စတင်အသုံးပြုရန် နှိပ်ပါ။',
       versionLabel: 'နောက်ဆုံး ဗားရှင်းနံပါတ်',
       dateLabel: 'ထုတ်ဝေသည့် နေ့စွဲ',
       timeLabel: 'ထုတ်ဝေသည့် အချိန်',
       launchApp: 'စနစ်အသစ် စတင်အသုံးပြုမည်',
-      statusReady: 'စနစ်သည် နောက်ဆုံးဗားရှင်းဖြင့် အဆင်သင့်ရှိပါသည်',
-      testAgain: 'စနစ်အဆင့်မြှင့်မှု ပြန်လည်စမ်းသပ်မည်',
+      statusReady: 'ဗားရှင်းအသစ် စတင်အသုံးပြုရန် အသင့်ဖြစ်နေပါပြီ',
+      currentBuildLabel: 'လက်ရှိဗားရှင်း',
+      genericNote: 'နောက်ဆုံးပြင်ဆင်မှုများနှင့် တိုးတက်မှုများ ပါဝင်သည်။',
+      historyTitle: 'အဆင့်မြှင့်မှတ်တမ်း',
+      reloadStep: 'ဗားရှင်းအသစ်ကို ဖွင့်လှစ်နေသည်…',
     },
   }[language] || {
     promptTitle: 'System Update Available',
@@ -122,66 +140,44 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     remindLater: 'Remind Me Later',
     featuresTitle: "What's New in this Release:",
     updatingTitle: 'Installing System Update',
-    updatingSubtitle: 'Applying latest engine optimizations and security patches...',
-    completeTitle: 'Update Completed Successfully!',
-    completeSubtitle: 'Your application has been updated to the latest build.',
+    updatingSubtitle: 'Preparing the new version — the app will reload to load it.',
+    completeTitle: 'New Version Ready!',
+    completeSubtitle: 'The new version is ready — launch it to start using it.',
     versionLabel: 'Latest Version Number',
     dateLabel: 'Release Date',
     timeLabel: 'Release Time',
     launchApp: 'Launch Updated Version',
-    statusReady: 'System is up to date & running smoothly',
-    testAgain: 'Re-test update flow',
+    statusReady: 'New version ready to launch',
+    currentBuildLabel: 'Current Build',
+    genericNote: 'Includes the latest fixes and improvements.',
+    historyTitle: 'Update History',
+    reloadStep: 'Loading the new version…',
   };
 
   const highlights =
-    updateInfo.highlights[language] || updateInfo.highlights.en || [];
+    updateInfo.highlights?.[language] || updateInfo.highlights?.en || [];
 
   const handleStartUpdate = () => {
+    // Honest update: nothing is downloaded by this modal itself. The new
+    // bundle is already deployed; choosing this build records the update
+    // and clears any dismissal, then the launch button reloads the page —
+    // that reload is what actually loads the new code. If the reload still
+    // serves the old bundle (cached index.html), the prompt correctly
+    // reappears instead of pretending the update happened.
     setPhase('updating');
-    setProgress(5);
-
-    const steps = [
-      { at: 20, msg: 'Downloading package update...' },
-      { at: 50, msg: 'Verifying cryptographic integrity...' },
-      { at: 75, msg: 'Migrating local storage schemas & cache...' },
-      { at: 95, msg: 'Applying system patches...' },
-      { at: 100, msg: 'Update finalized!' },
-    ];
-
-    let currentProgress = 5;
-    const interval = setInterval(() => {
-      currentProgress += Math.floor(Math.random() * 8) + 6;
-      if (currentProgress >= 100) {
-        currentProgress = 100;
-        clearInterval(interval);
-        setProgress(100);
-        setStepMessage(steps[4].msg);
-
-        // Apply update to localStorage
-        applyAppUpdate().then(() => {
-          setTimeout(() => {
-            setPhase('completed');
-          }, 400);
-        });
-      } else {
-        setProgress(currentProgress);
-        const match = [...steps].reverse().find((s) => currentProgress >= s.at);
-        if (match) setStepMessage(match.msg);
-      }
-    }, 120);
+    setProgress(60);
+    setStepMessage(localizedContent.reloadStep);
+    recordUpdateApplied(updateInfo);
+    clearDismissedVersion();
+    setHistory(getUpdateHistory());
+    setTimeout(() => {
+      setProgress(100);
+      setPhase('completed');
+    }, 700);
   };
 
   const handleFinish = () => {
-    if (onUpdateCompleted) {
-      onUpdateCompleted();
-    }
-    onClose();
-  };
-
-  const handleResetForTesting = () => {
-    resetVersionForTesting();
-    setPhase('prompt');
-    setProgress(0);
+    window.location.reload();
   };
 
   return (
@@ -267,22 +263,35 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
               </div>
             </div>
 
+            <p className="text-[11px] text-slate-400 dark:text-slate-500">
+              {localizedContent.currentBuildLabel}:{' '}
+              <span className="font-mono font-semibold text-slate-600 dark:text-slate-300">
+                {getRunningVersionInfo().version}
+              </span>
+            </p>
+
             {/* Highlights List */}
             <div className="space-y-2">
               <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                 {localizedContent.featuresTitle}
               </h4>
-              <ul className="space-y-2">
-                {highlights.map((feat, idx) => (
-                  <li
-                    key={idx}
-                    className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                    <span>{feat}</span>
-                  </li>
-                ))}
-              </ul>
+              {highlights.length > 0 ? (
+                <ul className="space-y-2">
+                  {highlights.map((feat, idx) => (
+                    <li
+                      key={idx}
+                      className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-slate-600 dark:text-slate-300">
+                  {localizedContent.genericNote}
+                </p>
+              )}
             </div>
 
             {/* Action Buttons */}
@@ -357,7 +366,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                   {localizedContent.statusReady}
                 </p>
                 <p className="text-[11px] text-emerald-700/90 dark:text-emerald-400">
-                  All local workspaces, custom rules, and cloud snapshots are verified.
+                  Your files, rules, and cloud data are untouched — only the app code reloads.
                 </p>
               </div>
             </div>
@@ -395,7 +404,29 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
               </div>
             </div>
 
-            {/* Launch Action */}
+            {/* Update History (actually recorded, unlike the old static card) */}
+            {history.length > 0 && (
+              <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-4 space-y-2 shadow-xs">
+                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  {localizedContent.historyTitle}
+                </h4>
+                <ul className="space-y-1.5">
+                  {history.map((entry) => (
+                    <li
+                      key={`${entry.version}-${entry.appliedAt}`}
+                      className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300"
+                    >
+                      <span className="font-mono font-semibold">{entry.version}</span>
+                      <span className="text-slate-400 dark:text-slate-500">
+                        {new Date(entry.appliedAt).toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Launch Action — this reload is what actually loads the new build */}
             <div className="space-y-2 pt-1">
               <RippleButton
                 onClick={handleFinish}
@@ -407,18 +438,11 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 <ArrowRight className="w-4 h-4" />
               </RippleButton>
 
-              <div className="flex items-center justify-between px-1 text-[11px] text-slate-400 dark:text-slate-500">
+              <div className="flex items-center px-1 text-[11px] text-slate-400 dark:text-slate-500">
                 <span className="flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                   Signed by DO2-HPT
                 </span>
-                <button
-                  type="button"
-                  onClick={handleResetForTesting}
-                  className="hover:underline hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
-                >
-                  {localizedContent.testAgain}
-                </button>
               </div>
             </div>
           </div>

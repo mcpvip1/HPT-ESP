@@ -1,103 +1,219 @@
+/**
+ * Real build-based update checking.
+ *
+ * The previous implementation hardcoded a "latest version" (v2.4.2) in
+ * source and faked the update with a timed animation: it downloaded
+ * nothing, reloaded nothing, and only flipped a localStorage flag. So the
+ * displayed version never changed on real deploys, and dismissing the
+ * prompt meant being nagged again on every open.
+ *
+ * Now the version is the Vite bundle's own content hash:
+ * - At build time, a Vite plugin writes `dist/version.json` with the
+ *   current bundle's hash and build timestamp.
+ * - At runtime, the running bundle's hash is parsed from its own
+ *   `import.meta.url`, and the latest hash is fetched fresh (no-store)
+ *   from `version.json`.
+ * - An update is offered only when the fetched hash differs from the
+ *   running hash AND the user has not dismissed that exact hash.
+ * - "Update" records the update in history and reloads the page, which is
+ *   what actually loads the new bundle. If the reload still serves stale
+ *   code (cached index.html), the prompt correctly reappears.
+ * - When version.json cannot be fetched (offline, dev mode, or a deploy
+ *   predating version.json), no prompt is shown: an unknown state must
+ *   never be presented as an available update.
+ */
+
 export interface AppVersionInfo {
+  /** Short build hash, e.g. 'B9OvoesV' — this IS the version now. */
   version: string;
+  buildHash: string;
+  jsFile: string;
   releaseDate: string;
   releaseTime: string;
-  buildNumber: string;
-  highlights: Record<string, string[]>;
+  /** ISO build timestamp from version.json ('' for the running-build fallback). */
+  builtAt: string;
+  highlights?: Record<string, string[]>;
 }
 
-export const CURRENT_LATEST_VERSION: AppVersionInfo = {
-  version: 'v2.4.2',
-  releaseDate: 'October 25, 2026',
-  releaseTime: '07:15 AM',
-  buildNumber: '2026.10.25-0715',
-  highlights: {
-    en: [
-      'High-performance Excel multi-sheet data auto-matching engine',
-      'Instant cloud workspace synchronization & real-time preview',
-      'Refined light & dark mode interface with enhanced contrast',
-      'Automated background integrity verification & update manager',
-    ],
-    my: [
-      'Excel ဖိုင်များစွာ စစ်ဆေးမှုနှင့် ဒေတာ တိုက်ဆိုင်စစ်ဆေးသည့်စနစ်',
-      'Cloud Workspace အချိန်နှင့်တပြေးညီ ချိတ်ဆက်မှုစနစ်',
-      'Light & Dark Mode အလင်းအမှောင် ရွေးချယ်မှုအဆင့်မြှင့်တင်ထားခြင်း',
-      'စနစ်ပိုင်းဆိုင်ရာ နောက်ဆုံးဗားရှင်းသို့ အလိုအလျောက် အဆင့်မြှင့်ခြင်း',
-    ],
-    th: [
-      'เครื่องมือจับคู่ข้อมูล Excel หลายชีตความเร็วสูงที่แม่นยำ',
-      'การซิงค์ข้อมูลบน Cloud Workspace และแสดงตัวอย่างแบบเรียลไทม์',
-      'ปรับปรุงชุดสีโหมดสว่างและมืดให้อ่านง่าย สบายตายิ่งขึ้น',
-      'ระบบตรวจสอบและอัปเดตเวอร์ชันอัตโนมัติพร้อมการตรวจสอบความสมบูรณ์',
-    ],
-    zh: [
-      '高性能多工作表 Excel 智能比对与决策匹配引擎',
-      '即时云端工作区同步与实时共享预览体验',
-      '优化明暗双主题企业级视觉色彩与高对比度界面',
-      '自动后台数据完整性校验与最新系统更新管理器',
-    ],
-  },
-};
+export interface UpdateHistoryEntry {
+  version: string;
+  builtAt: string;
+  appliedAt: string;
+}
 
-export const STORAGE_KEY_INSTALLED_VERSION = 'emp_app_installed_version';
-export const STORAGE_KEY_LAST_CHECKED = 'emp_app_last_check_ts';
-export const STORAGE_KEY_LAST_UPDATED_AT = 'emp_app_last_updated_at';
+const STORAGE_KEY_DISMISSED_VERSION = 'emp_app_dismissed_version';
+const STORAGE_KEY_UPDATE_HISTORY = 'emp_app_update_history';
+const MAX_HISTORY_ENTRIES = 10;
 
-/**
- * Gets the current installed version stored on the device.
- * Defaults to 'v2.4.0' if not previously set, ensuring first visit triggers update check.
- */
-export function getInstalledVersion(): string {
+function safeGet(key: string): string | null {
   try {
-    const val = localStorage.getItem(STORAGE_KEY_INSTALLED_VERSION);
-    if (val) return val;
-  } catch {}
-  return 'v2.4.0';
-}
-
-/**
- * Checks if a newer version is available compared to the locally recorded version.
- */
-export async function checkAppUpdate(simulateDelayMs: number = 1200): Promise<{
-  hasUpdate: boolean;
-  installedVersion: string;
-  latestVersion: AppVersionInfo;
-}> {
-  // Simulate network check latency
-  if (simulateDelayMs > 0) {
-    await new Promise((r) => setTimeout(r, simulateDelayMs));
+    if (typeof localStorage === 'undefined') return null;
+    return localStorage.getItem(key);
+  } catch {
+    return null;
   }
+}
 
-  const installed = getInstalledVersion();
-  const hasUpdate = installed !== CURRENT_LATEST_VERSION.version;
-
+function safeSet(key: string, value: string): void {
   try {
-    localStorage.setItem(STORAGE_KEY_LAST_CHECKED, String(Date.now()));
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(key, value);
   } catch {}
+}
 
+function safeRemove(key: string): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(key);
+  } catch {}
+}
+
+/** Extract the Vite content hash from a bundle URL (null for dev / unknown). */
+export function parseBuildHash(url: string): string | null {
+  const match = url.match(/\/assets\/index-([A-Za-z0-9_-]+)\.js(?:[?#]|$)/);
+  return match ? match[1] : null;
+}
+
+/** The bundle this page actually loaded (null hash in dev mode). */
+export function getRunningBuild(): { hash: string | null; jsFile: string | null } {
+  try {
+    const hash = parseBuildHash(import.meta.url);
+    return { hash, jsFile: hash ? `index-${hash}.js` : null };
+  } catch {
+    return { hash: null, jsFile: null };
+  }
+}
+
+/** Display info for the running build ('dev' when no bundle hash exists). */
+export function getRunningVersionInfo(): AppVersionInfo {
+  const { hash } = getRunningBuild();
   return {
-    hasUpdate,
-    installedVersion: installed,
-    latestVersion: CURRENT_LATEST_VERSION,
+    version: hash ?? 'dev',
+    buildHash: hash ?? '',
+    jsFile: hash ? `index-${hash}.js` : '',
+    releaseDate: '',
+    releaseTime: '',
+    builtAt: '',
   };
 }
 
-/**
- * Marks the application as updated to the latest version.
- */
-export async function applyAppUpdate(): Promise<void> {
+function formatBuildDate(iso: string): { releaseDate: string; releaseTime: string } {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return { releaseDate: '', releaseTime: '' };
+  return {
+    releaseDate: date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+    releaseTime: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
+/** Fetch the currently deployed build (null when unreachable or malformed). */
+export async function fetchLatestVersion(): Promise<AppVersionInfo | null> {
+  // Vite always defines BASE_URL in real builds ('/HPT-ESP/' in prod);
+  // the fallback only guards non-Vite runtimes (tests, previews).
+  let baseUrl = '/';
   try {
-    localStorage.setItem(STORAGE_KEY_INSTALLED_VERSION, CURRENT_LATEST_VERSION.version);
-    localStorage.setItem(STORAGE_KEY_LAST_UPDATED_AT, String(Date.now()));
+    const configured = (import.meta as unknown as { env?: { BASE_URL?: unknown } })?.env
+      ?.BASE_URL;
+    if (typeof configured === 'string' && configured) baseUrl = configured;
+  } catch {}
+  try {
+    const response = await fetch(`${baseUrl}version.json`, {
+      cache: 'no-store',
+    });
+    if (!response.ok) return null;
+    const data: unknown = await response.json();
+    if (!data || typeof data !== 'object') return null;
+    const { hash, js, builtAt } = data as Record<string, unknown>;
+    if (typeof hash !== 'string' || !hash || typeof builtAt !== 'string') return null;
+    const { releaseDate, releaseTime } = formatBuildDate(builtAt);
+    return {
+      version: hash,
+      buildHash: hash,
+      jsFile: typeof js === 'string' && js ? js : `index-${hash}.js`,
+      releaseDate,
+      releaseTime,
+      builtAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** The build hash the user dismissed with "Remind Me Later" (if any). */
+export function getDismissedVersion(): string | null {
+  return safeGet(STORAGE_KEY_DISMISSED_VERSION);
+}
+
+export function dismissVersion(hash: string): void {
+  if (hash) safeSet(STORAGE_KEY_DISMISSED_VERSION, hash);
+}
+
+export function clearDismissedVersion(): void {
+  safeRemove(STORAGE_KEY_DISMISSED_VERSION);
+}
+
+export function getUpdateHistory(): UpdateHistoryEntry[] {
+  try {
+    const raw = safeGet(STORAGE_KEY_UPDATE_HISTORY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (entry): entry is UpdateHistoryEntry =>
+        !!entry &&
+        typeof entry === 'object' &&
+        typeof (entry as UpdateHistoryEntry).version === 'string' &&
+        typeof (entry as UpdateHistoryEntry).appliedAt === 'string'
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** Record an update the user chose (newest first, capped, deduped by build). */
+export function recordUpdateApplied(info: AppVersionInfo): void {
+  if (!info.buildHash) return;
+  try {
+    const list = getUpdateHistory().filter((entry) => entry.version !== info.buildHash);
+    list.unshift({
+      version: info.buildHash,
+      builtAt: info.builtAt,
+      appliedAt: new Date().toISOString(),
+    });
+    safeSet(STORAGE_KEY_UPDATE_HISTORY, JSON.stringify(list.slice(0, MAX_HISTORY_ENTRIES)));
   } catch {}
 }
 
+/** Pure prompt rule, unit-tested: unknown builds never prompt. */
+export function shouldPromptUpdate(
+  runningHash: string | null,
+  latestHash: string | null,
+  dismissedHash: string | null
+): boolean {
+  if (!runningHash || !latestHash) return false;
+  return latestHash !== runningHash && latestHash !== dismissedHash;
+}
+
 /**
- * Resets the installed version to an earlier build for demonstration/testing.
+ * True update check: a prompt appears only when the deployed build really
+ * differs from the running build and the user has not dismissed that build.
  */
-export function resetVersionForTesting(): void {
-  try {
-    localStorage.setItem(STORAGE_KEY_INSTALLED_VERSION, 'v2.4.0');
-    localStorage.removeItem(STORAGE_KEY_LAST_UPDATED_AT);
-  } catch {}
+export async function checkAppUpdate(): Promise<{
+  hasUpdate: boolean;
+  runningHash: string | null;
+  latest: AppVersionInfo | null;
+}> {
+  const { hash: runningHash } = getRunningBuild();
+  if (!runningHash) return { hasUpdate: false, runningHash, latest: null };
+  const latest = await fetchLatestVersion();
+  if (!latest) return { hasUpdate: false, runningHash, latest: null };
+  return {
+    hasUpdate: shouldPromptUpdate(runningHash, latest.buildHash, getDismissedVersion()),
+    runningHash,
+    latest,
+  };
 }

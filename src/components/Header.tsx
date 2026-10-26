@@ -35,7 +35,7 @@ interface HeaderProps {
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
   onCheckForUpdates?: () => void;
-  installedVersion?: string;
+  currentVersion?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -55,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
   theme = 'light',
   onToggleTheme,
   onCheckForUpdates,
-  installedVersion,
+  currentVersion,
 }) => {
   const t = translations[language];
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -134,7 +134,7 @@ export const Header: React.FC<HeaderProps> = ({
             {onCheckForUpdates && (
               <button
                 onClick={onCheckForUpdates}
-                title={`System Updates (Current: ${installedVersion || 'v2.4.2'})`}
+                title={`System Updates (Current build: ${currentVersion || 'dev'})`}
                 className="tbtn tbtn--neutral hover:!border-emerald-300 hover:!text-emerald-600 !h-9 !px-2.5 sm:!px-3"
               >
                 <span className="tbtn__icon">

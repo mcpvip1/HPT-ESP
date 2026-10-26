@@ -37,8 +37,8 @@ import { UpdateModal } from './components/UpdateModal';
 import { SupabaseConfigModal } from './components/SupabaseConfigModal';
 import { SyncHistoryModal } from './components/SyncHistoryModal';
 import {
-  CURRENT_LATEST_VERSION,
-  getInstalledVersion,
+  getRunningVersionInfo,
+  dismissVersion,
   AppVersionInfo,
 } from './utils/versionManager';
 import { translations } from './translations';
@@ -74,7 +74,6 @@ export default function App() {
   const [isSplashVisible, setIsSplashVisible] = useState(true);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState<AppVersionInfo | null>(null);
-  const [installedVersion, setInstalledVersion] = useState<string>(() => getInstalledVersion());
 
   // Supabase state
   const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(() => isSupabaseConfigured());
@@ -172,9 +171,9 @@ export default function App() {
   }, []);
 
   // Splash & update handlers
-  const handleSplashFinish = useCallback((hasUpdate: boolean, updateInfo: AppVersionInfo) => {
+  const handleSplashFinish = useCallback((hasUpdate: boolean, updateInfo: AppVersionInfo | null) => {
     setIsSplashVisible(false);
-    if (hasUpdate) {
+    if (hasUpdate && updateInfo) {
       setAvailableUpdate(updateInfo);
       setIsUpdateModalOpen(true);
     }
@@ -184,10 +183,12 @@ export default function App() {
     setIsSplashVisible(true);
   }, []);
 
-  const handleUpdateCompleted = useCallback(() => {
-    setInstalledVersion(CURRENT_LATEST_VERSION.version);
-    showToast(`System updated to ${CURRENT_LATEST_VERSION.version}`, 'success');
-  }, [showToast]);
+  // Closing the prompt without updating dismisses THAT build only, so the
+  // same deploy is not nagged about on every open — a newer deploy still prompts.
+  const handleUpdateModalClose = useCallback(() => {
+    if (availableUpdate) dismissVersion(availableUpdate.buildHash);
+    setIsUpdateModalOpen(false);
+  }, [availableUpdate]);
 
   // Initial Load: restore from local IndexedDB first for instant rendering
   useEffect(() => {
@@ -828,7 +829,7 @@ export default function App() {
         theme={theme}
         onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
         onCheckForUpdates={handleManualCheckUpdates}
-        installedVersion={installedVersion}
+        currentVersion={getRunningVersionInfo().version}
       />
 
       {/* 2. Main Content Viewport */}
@@ -976,10 +977,9 @@ export default function App() {
       {/* System Update Modal */}
       <UpdateModal
         isOpen={isUpdateModalOpen}
-        onClose={() => setIsUpdateModalOpen(false)}
-        updateInfo={availableUpdate || CURRENT_LATEST_VERSION}
+        onClose={handleUpdateModalClose}
+        updateInfo={availableUpdate || getRunningVersionInfo()}
         language={language}
-        onUpdateCompleted={handleUpdateCompleted}
       />
 
       {/* Cloud Upload & Sync History Modal */}
