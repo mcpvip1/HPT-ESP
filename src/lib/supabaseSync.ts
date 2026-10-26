@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import LZString from 'lz-string';
 import { saveToIDB, getFromIDB, deleteFromIDB, StorageKeys } from '../utils/storage';
 import type {
   ColumnConfigItem,
@@ -40,6 +41,95 @@ export interface FullWorkspacePayload {
   results?: MatchedRow[] | null;
   stats?: MatchingStats | null;
   settings?: WorkspaceSettings | null;
+}
+
+// ---------------------------------------------------------------------------
+// Workbook compression (fixes "TypeError: Failed to fetch" on large uploads)
+// ---------------------------------------------------------------------------
+//
+// The Main workbook serializes to ~16 MB of JSON. Sending that as one
+// PostgREST upsert dies in transit on slow/mobile connections (the browser
+// never receives a response, hence "Failed to fetch" with no HTTP code).
+// Workbooks are therefore compressed with lz-string (base64, JSON-safe) when
+// it actually shrinks them: 16.02 MB -> 1.27 MB on the real Main file.
+// Small payloads are left untouched, and old plain (uncompressed) rows keep
+// loading because decompression passes anything unmarked straight through.
+
+/** Marker wrapper stored in the jsonb column when a workbook is compressed. */
+interface CompressedWorkbook {
+  __hptCompressed: true;
+  algo: 'lz-base64';
+  /** Base64-compressed JSON of the WorkbookData. */
+  data: string;
+  /** Original uncompressed JSON byte size (for display/diagnostics). */
+  originalBytes: number;
+}
+
+function isCompressedWorkbook(value: unknown): value is CompressedWorkbook {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    (value as CompressedWorkbook).__hptCompressed === true &&
+    (value as CompressedWorkbook).algo === 'lz-base64' &&
+    typeof (value as CompressedWorkbook).data === 'string'
+  );
+}
+
+/** Below this JSON size compression is not worth its CPU cost. */
+const COMPRESSION_THRESHOLD_BYTES = 256 * 1024;
+
+/**
+ * Compress a workbook for the wire. Returns the original value when the
+ * payload is small or compression does not shrink it.
+ */
+export function compressWorkbookForSync(wb: WorkbookData): WorkbookData | CompressedWorkbook {
+  let json: string;
+  try {
+    json = JSON.stringify(wb);
+  } catch {
+    return wb;
+  }
+  if (json.length < COMPRESSION_THRESHOLD_BYTES) return wb;
+  try {
+    const compressed = LZString.compressToBase64(json);
+    if (!compressed || compressed.length >= json.length) return wb;
+    return {
+      __hptCompressed: true,
+      algo: 'lz-base64',
+      data: compressed,
+      originalBytes: new Blob([json]).size,
+    };
+  } catch {
+    return wb;
+  }
+}
+
+/**
+ * Restore a workbook read from Supabase. Plain (legacy) values pass through
+ * untouched; a corrupt compressed value yields null instead of crashing the
+ * pull, so the app can continue with its local copy.
+ */
+export function decompressWorkbookFromSync(value: unknown): WorkbookData | null | undefined {
+  if (value === null || value === undefined) return value as null | undefined;
+  if (!isCompressedWorkbook(value)) return value as WorkbookData;
+  try {
+    const json = LZString.decompressFromBase64(value.data);
+    if (!json) return null;
+    return JSON.parse(json) as WorkbookData;
+  } catch {
+    return null;
+  }
+}
+
+/** True for browser/network failures where no HTTP response arrived. */
+function isNetworkError(err: unknown): boolean {
+  const msg = String((err as { message?: unknown })?.message ?? err ?? '').toLowerCase();
+  return (
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror') ||
+    msg.includes('network request failed') ||
+    msg.includes('load failed')
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +314,13 @@ export async function syncWorkspaceToSupabase(
   }
 
   const startTime = Date.now();
-  const { sizeFormatted, itemCount, byteCount } = estimatePayloadDetails(payload);
+  // Item count and the preparing-phase total come from the original
+  // payload; the uploading/history size is the WIRE size (after
+  // compression). Declared here (not inside try) because the catch block
+  // also reports them.
+  const { itemCount, byteCount: estimatedBytes } = estimatePayloadDetails(payload);
+  let byteCount = 0;
+  let sizeFormatted = '0 B';
 
   // Determine kind
   let kind: SyncHistoryEntry['kind'] = 'settings';
@@ -248,22 +344,42 @@ export async function syncWorkspaceToSupabase(
     title: `Preparing ${title}...`,
     reason,
     startedAt: startTime,
-    totalBytes: byteCount,
+    totalBytes: estimatedBytes,
     bytesUploaded: 0,
     error: undefined,
   });
 
   try {
+    // Compress workbooks for the wire (null = workbook removed, passes through).
     const updatePayload: Record<string, any> = {
       user_id: userId,
       updated_at: new Date().toISOString(),
     };
 
-    if (payload.referenceWb !== undefined) updatePayload.reference_wb = payload.referenceWb;
-    if (payload.comparisonWb !== undefined) updatePayload.comparison_wb = payload.comparisonWb;
+    if (payload.referenceWb !== undefined) {
+      updatePayload.reference_wb =
+        payload.referenceWb === null ? null : compressWorkbookForSync(payload.referenceWb);
+    }
+    if (payload.comparisonWb !== undefined) {
+      updatePayload.comparison_wb =
+        payload.comparisonWb === null ? null : compressWorkbookForSync(payload.comparisonWb);
+    }
     if (payload.results !== undefined) updatePayload.results = payload.results;
     if (payload.stats !== undefined) updatePayload.stats = payload.stats;
     if (payload.settings !== undefined) updatePayload.settings = payload.settings;
+
+    // Wire size (after compression) is what the progress UI and history show.
+    try {
+      byteCount = new Blob([JSON.stringify(updatePayload)]).size;
+    } catch {
+      byteCount = 0;
+    }
+    sizeFormatted =
+      byteCount < 1024
+        ? `${byteCount} B`
+        : byteCount < 1024 * 1024
+        ? `${(byteCount / 1024).toFixed(1)} KB`
+        : `${(byteCount / (1024 * 1024)).toFixed(2)} MB`;
 
     // 2. Uploading Phase
     updateSyncProgress({
@@ -273,9 +389,35 @@ export async function syncWorkspaceToSupabase(
       bytesUploaded: Math.round(byteCount * 0.65),
     });
 
-    const { error } = await client
-      .from('workspaces')
-      .upsert(updatePayload, { onConflict: 'user_id' });
+    // One retry for network failures only ("Failed to fetch" = no response
+    // arrived). Server errors (RLS, validation, ...) are NOT retried.
+    let upsertError: { message?: string } | null = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { error } = await client
+          .from('workspaces')
+          .upsert(updatePayload, { onConflict: 'user_id' });
+        if (!error) {
+          upsertError = null;
+          break;
+        }
+        upsertError = error;
+      } catch (thrown: any) {
+        upsertError = thrown;
+      }
+      if (!isNetworkError(upsertError) || attempt === 1) break;
+      updateSyncProgress({
+        progressPercent: 65,
+        phase: 'uploading',
+        title: 'Connection interrupted — retrying upload...',
+        bytesUploaded: Math.round(byteCount * 0.65),
+      });
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    // A network failure that survived the retry goes to the outer catch so
+    // it is recorded in history exactly like any other sync failure.
+    if (upsertError && isNetworkError(upsertError)) throw upsertError;
+    const error = upsertError;
 
     // 3. Verifying Phase
     updateSyncProgress({
@@ -435,9 +577,11 @@ export async function fetchWorkspaceFromSupabase(
       return { success: true, data: undefined };
     }
 
+    // New rows store workbooks compressed; legacy rows store them plain.
+    // Both shapes load through the same path (null = no workbook stored).
     const payload: FullWorkspacePayload = {
-      referenceWb: data.reference_wb,
-      comparisonWb: data.comparison_wb,
+      referenceWb: decompressWorkbookFromSync(data.reference_wb) ?? undefined,
+      comparisonWb: decompressWorkbookFromSync(data.comparison_wb) ?? undefined,
       results: data.results,
       stats: data.stats,
       settings: data.settings,
