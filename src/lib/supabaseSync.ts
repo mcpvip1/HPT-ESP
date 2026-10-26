@@ -646,6 +646,166 @@ export async function fetchWorkspaceFromSupabase(
 }
 
 /**
+ * Startup cloud download, one column at a time, so the splash screen can
+ * show REAL download progress (which item, how many done, percent) instead
+ * of a fake timer. Columns are fetched sequentially: the progress callback
+ * fires before each fetch (item starts) and after each one (item done).
+ *
+ * A column whose row value is null is ABSENT, not failed (fresh/empty
+ * workspace). A column that errors or times out lands in `failed` — the
+ * caller shows the error screen (Retry / Continue with local data) rather
+ * than guessing, because a failed column is unknown, not empty.
+ */
+export interface WorkspaceColumnProgress {
+  /** Human-readable label of the column being downloaded. */
+  item: string;
+  done: number;
+  total: number;
+  percent: number;
+}
+
+export interface WorkspaceColumnsResult {
+  /** Only columns that downloaded successfully (null values omitted). */
+  columns: Partial<FullWorkspacePayload>;
+  /** Labels of columns that failed to download. */
+  failed: string[];
+}
+
+const WORKSPACE_COLUMNS: {
+  label: string;
+  column: string;
+  field: keyof FullWorkspacePayload;
+  workbook: boolean;
+}[] = [
+  { label: 'Main file', column: 'reference_wb', field: 'referenceWb', workbook: true },
+  { label: 'Comparison file', column: 'comparison_wb', field: 'comparisonWb', workbook: true },
+  { label: 'Rules & settings', column: 'settings', field: 'settings', workbook: false },
+  { label: 'Matching results', column: 'results', field: 'results', workbook: false },
+  { label: 'Result statistics', column: 'stats', field: 'stats', workbook: false },
+];
+
+/** Per-column download timeout: generous, so a slow Main file still lands. */
+const COLUMN_FETCH_TIMEOUT_MS = 60000;
+
+export async function fetchWorkspaceColumns(
+  userId: string,
+  onProgress: (progress: WorkspaceColumnProgress) => void
+): Promise<WorkspaceColumnsResult> {
+  const client = getSupabase();
+  const startTime = Date.now();
+  const total = WORKSPACE_COLUMNS.length;
+  const columns: Partial<FullWorkspacePayload> = {};
+  const failed: string[] = [];
+
+  updateSyncProgress({
+    isSyncing: true,
+    progressPercent: 10,
+    phase: 'uploading',
+    title: 'Downloading cloud workspace...',
+    reason: 'Startup workspace sync',
+    startedAt: startTime,
+  });
+
+  if (!client || !userId) {
+    updateSyncProgress({
+      isSyncing: false,
+      progressPercent: 100,
+      phase: 'error',
+      title: 'Cloud Pull Failed',
+      reason: 'Supabase client or user not authenticated',
+      error: 'Supabase client or user not authenticated',
+    });
+    return { columns, failed: WORKSPACE_COLUMNS.map((c) => c.label) };
+  }
+
+  for (let i = 0; i < WORKSPACE_COLUMNS.length; i++) {
+    const { label, column, field, workbook } = WORKSPACE_COLUMNS[i];
+    onProgress({ item: label, done: i, total, percent: Math.round((i / total) * 100) });
+    try {
+      const fetchPromise = client
+        .from('workspaces')
+        .select(column)
+        .eq('user_id', userId)
+        .maybeSingle();
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Download timed out')), COLUMN_FETCH_TIMEOUT_MS)
+      );
+      const { data, error } = await Promise.race([fetchPromise, timeout]);
+      if (error) throw new Error(error.message);
+      const value = (data as Record<string, unknown> | null)?.[column];
+      if (value !== undefined && value !== null) {
+        (columns as Record<string, unknown>)[field] = workbook
+          ? decompressWorkbookFromSync(value)
+          : value;
+        // A workbook column that decompresses to null is corrupt, not empty.
+        if (workbook && (columns as Record<string, unknown>)[field] == null) {
+          delete (columns as Record<string, unknown>)[field];
+          failed.push(label);
+        }
+      }
+    } catch (err: any) {
+      console.warn(`Supabase column fetch failed (${label}):`, err);
+      failed.push(label);
+    }
+    onProgress({
+      item: label,
+      done: i + 1,
+      total,
+      percent: Math.round(((i + 1) / total) * 100),
+    });
+  }
+
+  const durationMs = Date.now() - startTime;
+  const { sizeFormatted, itemCount } = estimatePayloadDetails(
+    columns as FullWorkspacePayload
+  );
+
+  if (failed.length > 0) {
+    updateSyncProgress({
+      isSyncing: false,
+      progressPercent: 100,
+      phase: 'error',
+      title: 'Cloud Pull Partially Failed',
+      reason: `Failed: ${failed.join(', ')}`,
+      error: `Failed: ${failed.join(', ')}`,
+    });
+    await addSyncHistoryEntry({
+      time: startTime,
+      kind: 'pull',
+      title: 'Cloud Pull Partially Failed',
+      reason: `Startup workspace sync — failed: ${failed.join(', ')}`,
+      status: 'failed',
+      size: sizeFormatted,
+      itemCount,
+      durationMs,
+      error: `Failed columns: ${failed.join(', ')}`,
+      target: 'supabase',
+    });
+  } else {
+    updateSyncProgress({
+      isSyncing: false,
+      progressPercent: 100,
+      phase: 'completed',
+      title: 'Cloud Workspace Pulled',
+      reason: 'Startup workspace sync',
+    });
+    await addSyncHistoryEntry({
+      time: startTime,
+      kind: 'pull',
+      title: 'Cloud Workspace Pulled',
+      reason: `Startup workspace sync (${itemCount.toLocaleString()} total items)`,
+      status: 'done',
+      size: sizeFormatted,
+      itemCount,
+      durationMs,
+      target: 'supabase',
+    });
+  }
+
+  return { columns, failed };
+}
+
+/**
  * Startup presence merge (no-sign-in shared workspace).
  *
  * Rule the user chose: local data is authoritative when it exists; the
@@ -723,7 +883,8 @@ const SETTINGS_FIELD_LABELS: { key: SettingsField; label: string }[] = [
 
 export function mergeWorkspacePresence(
   local: LocalWorkspaceSnapshot,
-  cloud: FullWorkspacePayload | undefined
+  cloud: FullWorkspacePayload | undefined,
+  options?: { allowPushBack?: boolean }
 ): MergedWorkspace {
   const present = (value: unknown): boolean => value !== undefined && value !== null;
   const pulled: string[] = [];
@@ -790,7 +951,10 @@ export function mergeWorkspacePresence(
   }
 
   let pushBack: FullWorkspacePayload | null = null;
-  if (pushBackNeeded) {
+  // A partial cloud (some columns failed to download) must never push:
+  // a failed column is unknown, not absent, and pushing local data over
+  // it could overwrite newer cloud data the device simply could not see.
+  if (pushBackNeeded && options?.allowPushBack !== false) {
     const cloudSettingsRecord = (cloudSettings ?? {}) as Partial<WorkspaceSettings>;
     const pushSettings: WorkspaceSettings | undefined =
       Object.keys(localOnlySettings).length > 0

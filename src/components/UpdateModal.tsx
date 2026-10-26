@@ -56,7 +56,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     en: {
       promptTitle: 'System Update Available',
       promptSubtitle: 'A new enterprise release is ready to install.',
-      updateNow: 'Update Now',
+      updateNow: 'Install now',
       remindLater: 'Remind Me Later',
       featuresTitle: "What's New in this Release:",
       updatingTitle: 'Installing System Update',
@@ -76,7 +76,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     zh: {
       promptTitle: '发现系统新版本',
       promptSubtitle: '全新的企业级更新已就绪，建议立即更新以获得最佳体验。',
-      updateNow: '立即更新',
+      updateNow: '立即安装',
       remindLater: '稍后提醒',
       featuresTitle: '新版本核心特性：',
       updatingTitle: '正在安装系统更新',
@@ -96,7 +96,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     th: {
       promptTitle: 'พบการอัปเดตระบบเวอร์ชันใหม่',
       promptSubtitle: 'เวอร์ชันใหม่พร้อมสำหรับการติดตั้งเพื่อประสิทธิภาพที่ดีที่สุด',
-      updateNow: 'อัปเดตทันที',
+      updateNow: 'ติดตั้งเลย',
       remindLater: 'เตือนฉันภายหลัง',
       featuresTitle: 'คุณสมบัติใหม่ในเวอร์ชันนี้:',
       updatingTitle: 'กำลังติดตั้งการอัปเดตระบบ',
@@ -116,7 +116,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     my: {
       promptTitle: 'စနစ်ဗားရှင်းအသစ် ရရှိနေပါပြီ',
       promptSubtitle: 'ပိုမိုကောင်းမွန်သော စနစ်အသစ်ကို ယခုပင် ထည့်သွင်းနိုင်ပါပြီ။',
-      updateNow: 'ယခု အဆင့်မြှင့်မည်',
+      updateNow: 'ယခု ထည့်သွင်းမည်',
       remindLater: 'နောက်မှ သတိပေးပါ',
       featuresTitle: 'ယခုဗားရှင်းတွင် ပါဝင်သော အသစ်များ:',
       updatingTitle: 'စနစ်အား အဆင့်မြှင့်တင်နေပါသည်',
@@ -136,7 +136,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   }[language] || {
     promptTitle: 'System Update Available',
     promptSubtitle: 'A new enterprise release is ready to install.',
-    updateNow: 'Update Now',
+    updateNow: 'Install now',
     remindLater: 'Remind Me Later',
     featuresTitle: "What's New in this Release:",
     updatingTitle: 'Installing System Update',

@@ -32,13 +32,14 @@ import { ResultsDashboard } from './components/ResultsDashboard';
 import { DataPreviewModal } from './components/DataPreviewModal';
 import { Toast, ToastMessage } from './components/Toast';
 import { GlobalLoadingSkeleton } from './components/GlobalLoadingSkeleton';
-import { SplashScreen } from './components/SplashScreen';
+import { SplashScreen, SplashSyncState } from './components/SplashScreen';
 import { UpdateModal } from './components/UpdateModal';
 import { SupabaseConfigModal } from './components/SupabaseConfigModal';
 import { SyncHistoryModal } from './components/SyncHistoryModal';
 import {
   getRunningVersionInfo,
   formatBuildDisplay,
+  checkAppUpdate,
   dismissVersion,
   AppVersionInfo,
 } from './utils/versionManager';
@@ -54,6 +55,7 @@ import type { User } from '@supabase/supabase-js';
 import {
   syncWorkspaceToSupabase,
   fetchWorkspaceFromSupabase,
+  fetchWorkspaceColumns,
   syncSettingsToSupabase,
   wipeSupabaseWorkspace,
   debounce,
@@ -61,6 +63,7 @@ import {
   WorkspaceSettings,
   StoredColumnSettings,
   LocalWorkspaceSnapshot,
+  FullWorkspacePayload,
 } from './lib/supabaseSync';
 import { AlertTriangle, RotateCcw, Loader2 } from 'lucide-react';
 
@@ -81,7 +84,6 @@ export default function App() {
   // Supabase state
   const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(() => isSupabaseConfigured());
   const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
-  const [isCloudPulling, setIsCloudPulling] = useState(false);
 
   useEffect(() => {
     return subscribeSupabaseConfig((configured) => {
@@ -173,24 +175,312 @@ export default function App() {
     setToasts((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
-  // Splash & update handlers
-  const handleSplashFinish = useCallback((hasUpdate: boolean, updateInfo: AppVersionInfo | null) => {
-    setIsSplashVisible(false);
-    if (hasUpdate && updateInfo) {
-      setAvailableUpdate(updateInfo);
-      setIsUpdateModalOpen(true);
+  // Startup sequence: App owns it, SplashScreen only renders it.
+  // Order: update check -> local scan -> cloud download (real per-column
+  // progress) -> compare -> apply. An update found pauses the sequence:
+  // the modal opens, and the merge runs after the user dismisses it.
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const startupRunRef = useRef(0);
+  const mergePendingRef = useRef(false);
+  const mergeDoneRef = useRef(false);
+  const errorDecisionRef = useRef<((decision: 'retry' | 'continue') => void) | null>(null);
+  const [syncState, setSyncState] = useState<SplashSyncState>({
+    phase: 'checking-update',
+    percent: 5,
+    messageKey: 'checkingUpdate',
+  });
+  const [needsReevaluate, setNeedsReevaluate] = useState(false);
+
+  const readLocalSnapshot = async (): Promise<LocalWorkspaceSnapshot> => {
+    const [
+      savedRef,
+      savedComp,
+      savedMappings,
+      savedNorm,
+      savedLayers,
+      savedHoldCol,
+      savedHoldVals,
+      savedHoldReason,
+      savedReleased,
+      savedColConfigs,
+    ] = await Promise.all([
+      getFromIDB<WorkbookData>(StorageKeys.REFERENCE_WORKBOOK),
+      getFromIDB<WorkbookData>(StorageKeys.COMPARISON_WORKBOOK),
+      getFromIDB<ColumnMapping[]>(StorageKeys.COLUMN_MAPPINGS),
+      getFromIDB<NormalizationRules>(StorageKeys.NORMALIZATION_RULES),
+      getFromIDB<DecisionLayer[]>(StorageKeys.DECISION_LAYERS),
+      getFromIDB<string>(StorageKeys.HOLD_COLUMN),
+      getFromIDB<string[]>(StorageKeys.HOLD_VALUES),
+      getFromIDB<string>(StorageKeys.HOLD_REASON),
+      getFromIDB<string[]>(StorageKeys.RELEASED_ROWS),
+      getFromIDB<StoredColumnSettings>(StorageKeys.COLUMN_CONFIGS),
+    ]);
+    return {
+      referenceWb: savedRef ?? null,
+      comparisonWb: savedComp ?? null,
+      normalization: savedNorm ?? null,
+      layers: savedLayers ?? null,
+      mappings: savedMappings ?? null,
+      holdColumn: savedHoldCol ?? null,
+      holdValues: savedHoldVals ?? null,
+      holdReason: savedHoldReason ?? null,
+      releasedRowIds: savedReleased ?? null,
+      columnConfigs: savedColConfigs ?? null,
+    };
+  };
+
+  /** Applies merged state + IDB. Never pushes to the cloud (see runMerge). */
+  const applyMergedState = async (merged: {
+    referenceWb?: WorkbookData;
+    comparisonWb?: WorkbookData;
+    settings?: Partial<WorkspaceSettings>;
+    results?: MatchedRow[];
+    stats?: MatchingStats;
+    settingsPulled: boolean;
+    filesPulled: boolean;
+  }) => {
+    if (merged.referenceWb) {
+      setReferenceWb(merged.referenceWb);
+      await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, merged.referenceWb);
     }
+    if (merged.comparisonWb) {
+      setComparisonWb(merged.comparisonWb);
+      await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, merged.comparisonWb);
+    }
+    if (merged.settings) {
+      const s = merged.settings;
+      if (s.normalization) {
+        setNormalization(s.normalization);
+        await saveToIDB(StorageKeys.NORMALIZATION_RULES, s.normalization);
+      }
+      if (s.layers) {
+        setLayers(s.layers);
+        await saveToIDB(StorageKeys.DECISION_LAYERS, s.layers);
+      }
+      if (s.mappings) {
+        setMappings(s.mappings);
+        await saveToIDB(StorageKeys.COLUMN_MAPPINGS, s.mappings);
+      }
+      if (typeof s.holdColumn === 'string') {
+        setHoldColumn(s.holdColumn);
+        await saveToIDB(StorageKeys.HOLD_COLUMN, s.holdColumn);
+      }
+      if (s.holdValues) {
+        setHoldValues(s.holdValues);
+        await saveToIDB(StorageKeys.HOLD_VALUES, s.holdValues);
+      }
+      if (typeof s.holdReason === 'string') {
+        setHoldReason(s.holdReason);
+        await saveToIDB(StorageKeys.HOLD_REASON, s.holdReason);
+      }
+      if (s.releasedRowIds) {
+        setReleasedRowIds(s.releasedRowIds);
+        await saveToIDB(StorageKeys.RELEASED_ROWS, s.releasedRowIds);
+      }
+      if (s.columnConfigs && Array.isArray(s.columnConfigs.order)) {
+        const cfg = s.columnConfigs;
+        const restored: ColumnConfigItem[] = cfg.order.map((id: string) => ({
+          id,
+          label: id,
+          category: 'data',
+          showInTable: cfg.visibility?.[id]?.table !== false,
+          showInExport: cfg.visibility?.[id]?.export !== false,
+        }));
+        setStudioColumnConfigs(restored);
+        await saveToIDB(StorageKeys.COLUMN_CONFIGS, cfg);
+      }
+    }
+    if (merged.results && merged.stats) {
+      setResults(merged.results);
+      setStats(merged.stats);
+    }
+    // Settings pulled while files are present leave results computed from
+    // older settings — re-run matching once with merged settings, unless
+    // results were pulled too (then they already match).
+    if (
+      (merged.settingsPulled || merged.filesPulled) &&
+      merged.referenceWb &&
+      merged.comparisonWb &&
+      (merged.settings?.mappings?.length ?? 0) > 0 &&
+      !(merged.results && merged.stats)
+    ) {
+      setNeedsReevaluate(true);
+    }
+  };
+
+  const runMerge = async (runId: number, startedAt: number): Promise<void> => {
+    const isCurrent = () => startupRunRef.current === runId;
+    const ensureMinTime = async () => {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 1500) await sleep(1500 - elapsed);
+    };
+    while (true) {
+      if (!isCurrent()) return;
+      setSyncState({ phase: 'scanning', percent: 20, messageKey: 'scanning' });
+      const local = await readLocalSnapshot();
+      if (!isCurrent()) return;
+
+      let columns: Partial<FullWorkspacePayload> = {};
+      let failed: string[] = [];
+      try {
+        const res = await fetchWorkspaceColumns(getEffectiveWorkspaceId(), (p) => {
+          if (!isCurrent()) return;
+          setSyncState({
+            phase: 'downloading',
+            percent: 20 + Math.round(60 * (p.done / p.total)),
+            messageKey: 'downloading',
+            downloadItem: p.item,
+            downloadPercent: p.percent,
+            downloadDone: p.done,
+            downloadTotal: p.total,
+          });
+        });
+        columns = res.columns;
+        failed = res.failed;
+      } catch {
+        failed = ['Cloud workspace'];
+      }
+      if (!isCurrent()) return;
+
+      if (failed.length > 0) {
+        setSyncState({ phase: 'error', percent: 80, messageKey: 'cloudError', failedItems: failed });
+        const decision = await new Promise<'retry' | 'continue'>((resolve) => {
+          errorDecisionRef.current = resolve;
+        });
+        errorDecisionRef.current = null;
+        if (!isCurrent()) return;
+        if (decision === 'retry') continue;
+        // Continue with local data: merge what did download, never push —
+        // a failed column is unknown, not absent.
+        const merged = mergeWorkspacePresence(local, columns, { allowPushBack: false });
+        await applyMergedState(merged);
+        setSyncState({ phase: 'complete', percent: 100, messageKey: 'continuedLocal' });
+        await ensureMinTime();
+        if (!isCurrent()) return;
+        mergeDoneRef.current = true;
+        setIsSplashVisible(false);
+        return;
+      }
+
+      const hasCloudData = Object.keys(columns).length > 0;
+      const merged = mergeWorkspacePresence(local, hasCloudData ? columns : undefined);
+      if (merged.pulled.length === 0 && !merged.pushBack) {
+        setSyncState({ phase: 'complete', percent: 100, messageKey: 'scanComplete' });
+      } else {
+        if (merged.pulled.length > 0) {
+          setSyncState({ phase: 'found-missing', percent: 85, messageKey: 'foundMissing' });
+        } else {
+          setSyncState({ phase: 'uploading', percent: 85, messageKey: 'uploading' });
+        }
+        await sleep(700);
+        if (!isCurrent()) return;
+        if (merged.pulled.length > 0) {
+          setSyncState({ phase: 'applying', percent: 92, messageKey: 'applying' });
+          await applyMergedState(merged);
+        }
+        if (merged.pushBack) {
+          setSyncState({ phase: 'uploading', percent: 92, messageKey: 'uploading' });
+          await syncWorkspaceToSupabase(
+            getEffectiveWorkspaceId(),
+            merged.pushBack,
+            'Startup sync: local data missing in cloud'
+          );
+        }
+        setSyncState({ phase: 'complete', percent: 100, messageKey: 'syncComplete' });
+      }
+      await ensureMinTime();
+      if (!isCurrent()) return;
+      mergeDoneRef.current = true;
+      setIsSplashVisible(false);
+      return;
+    }
+  };
+
+  const runStartup = async (opts: { checkOnly?: boolean; skipCheck?: boolean } = {}): Promise<void> => {
+    // A new run supersedes any parked error decision from an older run.
+    errorDecisionRef.current?.('continue');
+    errorDecisionRef.current = null;
+    const runId = ++startupRunRef.current;
+    const startedAt = Date.now();
+    const isCurrent = () => startupRunRef.current === runId;
+    setIsSplashVisible(true);
+    if (!opts.skipCheck) {
+      setSyncState({ phase: 'checking-update', percent: 5, messageKey: 'checkingUpdate' });
+      const update = await checkAppUpdate();
+      if (!isCurrent()) return;
+      if (update.hasUpdate && update.latest) {
+        setSyncState({ phase: 'update-found', percent: 100, messageKey: 'updateFound' });
+        setAvailableUpdate(update.latest);
+        await sleep(900);
+        if (!isCurrent()) return;
+        setIsSplashVisible(false);
+        setIsUpdateModalOpen(true);
+        mergePendingRef.current = !opts.checkOnly;
+        return;
+      }
+      setSyncState({ phase: 'up-to-date', percent: 15, messageKey: 'upToDate' });
+      if (opts.checkOnly) {
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < 1500) await sleep(1500 - elapsed);
+        if (!isCurrent()) return;
+        setIsSplashVisible(false);
+        return;
+      }
+    }
+    // No cloud configured: nothing to scan or download — straight in.
+    if (!isSupabaseConnected) {
+      setSyncState({ phase: 'complete', percent: 100, messageKey: 'scanComplete' });
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 1500) await sleep(1500 - elapsed);
+      if (!isCurrent()) return;
+      setIsSplashVisible(false);
+      return;
+    }
+    await runMerge(runId, startedAt);
+  };
+
+  // Startup sequence on first open.
+  useEffect(() => {
+    runStartup({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // If Supabase gets connected later (config modal), run the merge then —
+  // but only if it never ran this session and no modal is in the way.
+  const prevConnectedRef = useRef(isSupabaseConnected);
+  useEffect(() => {
+    const wasConnected = prevConnectedRef.current;
+    prevConnectedRef.current = isSupabaseConnected;
+    if (!wasConnected && isSupabaseConnected && !mergeDoneRef.current && !isUpdateModalOpen) {
+      runStartup({ skipCheck: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSupabaseConnected, isUpdateModalOpen]);
+
+  const handleSplashRetry = useCallback(() => {
+    errorDecisionRef.current?.('retry');
+  }, []);
+
+  const handleSplashContinueLocal = useCallback(() => {
+    errorDecisionRef.current?.('continue');
   }, []);
 
   const handleManualCheckUpdates = useCallback(() => {
-    setIsSplashVisible(true);
+    runStartup({ checkOnly: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Closing the prompt without updating dismisses THAT build only, so the
   // same deploy is not nagged about on every open — a newer deploy still prompts.
+  // The paused merge then runs, since the user chose to stay on this build.
   const handleUpdateModalClose = useCallback(() => {
     if (availableUpdate) dismissVersion(availableUpdate.buildHash);
     setIsUpdateModalOpen(false);
+    if (mergePendingRef.current) {
+      mergePendingRef.current = false;
+      runStartup({ skipCheck: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableUpdate]);
 
   // Initial Load: restore from local IndexedDB first for instant rendering
@@ -279,179 +569,6 @@ export default function App() {
     };
   }, []);
 
-  // Startup workspace reconciliation (shared no-sign-in workspace).
-  // Runs during the splash screen, which shows the scan status and waits
-  // for it. Rule: local data wins when present; the cloud only fills gaps;
-  // local-only data is pushed back so every device converges.
-  const hasMergedRef = useRef<boolean | null>(null);
-  const [mergeStatus, setMergeStatus] = useState<string | null>(null);
-  const [mergeDone, setMergeDone] = useState(false);
-  const [needsReevaluate, setNeedsReevaluate] = useState(false);
-  useEffect(() => {
-    if (hasMergedRef.current === isSupabaseConnected) return;
-    hasMergedRef.current = isSupabaseConnected;
-    if (!isSupabaseConnected) {
-      setMergeDone(true);
-      return;
-    }
-    let cancelled = false;
-    setIsCloudPulling(true);
-    (async () => {
-      try {
-        setMergeStatus('Scanning local data…');
-        const [
-          savedRef,
-          savedComp,
-          savedMappings,
-          savedNorm,
-          savedLayers,
-          savedHoldCol,
-          savedHoldVals,
-          savedHoldReason,
-          savedReleased,
-          savedColConfigs,
-        ] = await Promise.all([
-          getFromIDB<WorkbookData>(StorageKeys.REFERENCE_WORKBOOK),
-          getFromIDB<WorkbookData>(StorageKeys.COMPARISON_WORKBOOK),
-          getFromIDB<ColumnMapping[]>(StorageKeys.COLUMN_MAPPINGS),
-          getFromIDB<NormalizationRules>(StorageKeys.NORMALIZATION_RULES),
-          getFromIDB<DecisionLayer[]>(StorageKeys.DECISION_LAYERS),
-          getFromIDB<string>(StorageKeys.HOLD_COLUMN),
-          getFromIDB<string[]>(StorageKeys.HOLD_VALUES),
-          getFromIDB<string>(StorageKeys.HOLD_REASON),
-          getFromIDB<string[]>(StorageKeys.RELEASED_ROWS),
-          getFromIDB<StoredColumnSettings>(StorageKeys.COLUMN_CONFIGS),
-        ]);
-        if (cancelled) return;
-
-        setMergeStatus('Checking cloud workspace…');
-        const fetchPromise = fetchWorkspaceFromSupabase(
-          getEffectiveWorkspaceId(),
-          'Startup workspace sync'
-        );
-        const timeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Cloud check timed out')), 20000)
-        );
-        const { success, data } = await Promise.race([fetchPromise, timeout]).catch(() => ({
-          success: false as const,
-          data: undefined,
-        }));
-        if (cancelled) return;
-        if (!success) {
-          setMergeStatus('Cloud unreachable — using local data');
-          return;
-        }
-
-        const local: LocalWorkspaceSnapshot = {
-          referenceWb: savedRef ?? null,
-          comparisonWb: savedComp ?? null,
-          normalization: savedNorm ?? null,
-          layers: savedLayers ?? null,
-          mappings: savedMappings ?? null,
-          holdColumn: savedHoldCol ?? null,
-          holdValues: savedHoldVals ?? null,
-          holdReason: savedHoldReason ?? null,
-          releasedRowIds: savedReleased ?? null,
-          columnConfigs: savedColConfigs ?? null,
-        };
-        const merged = mergeWorkspacePresence(local, data);
-
-        if (merged.referenceWb) {
-          setReferenceWb(merged.referenceWb);
-          await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, merged.referenceWb);
-        }
-        if (merged.comparisonWb) {
-          setComparisonWb(merged.comparisonWb);
-          await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, merged.comparisonWb);
-        }
-        if (merged.settings) {
-          const s = merged.settings;
-          if (s.normalization) {
-            setNormalization(s.normalization);
-            await saveToIDB(StorageKeys.NORMALIZATION_RULES, s.normalization);
-          }
-          if (s.layers) {
-            setLayers(s.layers);
-            await saveToIDB(StorageKeys.DECISION_LAYERS, s.layers);
-          }
-          if (s.mappings) {
-            setMappings(s.mappings);
-            await saveToIDB(StorageKeys.COLUMN_MAPPINGS, s.mappings);
-          }
-          if (typeof s.holdColumn === 'string') {
-            setHoldColumn(s.holdColumn);
-            await saveToIDB(StorageKeys.HOLD_COLUMN, s.holdColumn);
-          }
-          if (s.holdValues) {
-            setHoldValues(s.holdValues);
-            await saveToIDB(StorageKeys.HOLD_VALUES, s.holdValues);
-          }
-          if (typeof s.holdReason === 'string') {
-            setHoldReason(s.holdReason);
-            await saveToIDB(StorageKeys.HOLD_REASON, s.holdReason);
-          }
-          if (s.releasedRowIds) {
-            setReleasedRowIds(s.releasedRowIds);
-            await saveToIDB(StorageKeys.RELEASED_ROWS, s.releasedRowIds);
-          }
-          if (s.columnConfigs && Array.isArray(s.columnConfigs.order)) {
-            const cfg = s.columnConfigs;
-            const restored: ColumnConfigItem[] = cfg.order.map((id: string) => ({
-              id,
-              label: id,
-              category: 'data',
-              showInTable: cfg.visibility?.[id]?.table !== false,
-              showInExport: cfg.visibility?.[id]?.export !== false,
-            }));
-            setStudioColumnConfigs(restored);
-            await saveToIDB(StorageKeys.COLUMN_CONFIGS, cfg);
-          }
-        }
-        if (merged.results && merged.stats) {
-          setResults(merged.results);
-          setStats(merged.stats);
-        }
-        if (cancelled) return;
-
-        if (merged.pulled.length > 0) {
-          setMergeStatus(`Pulled from cloud: ${merged.pulled.join(', ')}`);
-          showToast(`Pulled from cloud: ${merged.pulled.join(', ')}`, 'success');
-        }
-        if (merged.pushBack) {
-          setMergeStatus('Uploading local data to cloud…');
-          await syncWorkspaceToSupabase(
-            getEffectiveWorkspaceId(),
-            merged.pushBack,
-            'Startup sync: local data missing in cloud'
-          );
-        }
-        // Settings pulled while files are present leave results computed
-        // from older settings — re-run matching once with merged settings,
-        // unless results were pulled too (then they already match).
-        if (
-          (merged.settingsPulled || merged.filesPulled) &&
-          merged.referenceWb &&
-          merged.comparisonWb &&
-          (merged.settings?.mappings?.length ?? 0) > 0 &&
-          !(merged.results && merged.stats)
-        ) {
-          setNeedsReevaluate(true);
-        }
-        setMergeStatus('Sync complete');
-      } catch (err: any) {
-        console.warn('Failed to reconcile workspace:', err);
-        if (!cancelled) setMergeStatus('Cloud unreachable — using local data');
-      } finally {
-        if (!cancelled) {
-          setIsCloudPulling(false);
-          setMergeDone(true);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isSupabaseConnected, showToast]);
 
   // Debounced auto-sync to Supabase with human-readable reason
   const debouncedSyncToSupabase = useRef(
@@ -938,14 +1055,14 @@ export default function App() {
     }
   };
 
-  // 1. Initial Animated Splash Screen with Update Verification
+  // 1. Startup Splash Screen: App owns the sequence, SplashScreen renders it.
   if (isSplashVisible) {
     return (
       <SplashScreen
         language={language}
-        onFinish={handleSplashFinish}
-        syncStatus={mergeStatus}
-        readyToFinish={mergeDone}
+        syncState={syncState}
+        onRetry={handleSplashRetry}
+        onContinueLocal={handleSplashContinueLocal}
       />
     );
   }
@@ -954,21 +1071,8 @@ export default function App() {
     return <GlobalLoadingSkeleton language={language} />;
   }
 
-  const cloudPullOverlay = isCloudPulling && (
-    <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6">
-      <div className="bg-white dark:bg-[#111827] rounded-2xl px-7 py-6 shadow-xl flex items-center gap-4 max-w-sm w-full border border-slate-200 dark:border-slate-800">
-        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin shrink-0" />
-        <div className="min-w-0">
-          <p className="text-sm font-bold text-slate-900 dark:text-slate-100 font-heading">Syncing Supabase</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Downloading your cloud workspace...</p>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex flex-col font-ui transition-colors duration-200">
-      {cloudPullOverlay}
 
       {/* 1. Header */}
       <Header
