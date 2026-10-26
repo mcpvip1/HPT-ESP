@@ -150,7 +150,7 @@ export interface SavedDecisionPreset {
   description?: string;
 }
 
-// Cloud sync upload history (per-device log of what was uploaded to Firebase)
+// Cloud sync upload history (per-device log of uploaded sync checkpoints)
 export interface SyncHistoryEntry {
   id: string;
   time: number;

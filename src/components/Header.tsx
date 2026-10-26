@@ -3,20 +3,16 @@ import {
   Globe,
   SlidersHorizontal,
   Cloud,
-  CloudUpload,
+  Database,
   LogOut,
   RotateCcw,
   Sun,
   Moon,
-  ShieldAlert,
   Sparkles,
-  AlertTriangle,
 } from 'lucide-react';
 import { LOGO_DATA_URL } from '../assets/logo';
-import { ProgressRing } from './ProgressRing';
-import { CountryFlag, GoogleIcon } from './CountryFlag';
-import type { ActiveUpload } from '../types';
-import type { User } from 'firebase/auth';
+import { CountryFlag } from './CountryFlag';
+import type { User } from '@supabase/supabase-js';
 import { Language } from '../types';
 import { translations } from '../translations';
 
@@ -30,18 +26,14 @@ interface HeaderProps {
   hasRefFile: boolean;
   hasCompFile: boolean;
   hasResults: boolean;
-  isPreviewMode?: boolean;
-  onExitPreview?: () => void;
-  cloudUser?: User | null;
-  onCloudSignIn?: () => void;
-  onCloudSignOut?: () => void;
-  activeUpload?: ActiveUpload | null;
-  onOpenSyncPanel?: () => void;
+  supabaseUser?: User | null;
+  isSupabaseConnected?: boolean;
+  onOpenSupabaseConfig?: () => void;
+  onSupabaseSignOut?: () => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
   onCheckForUpdates?: () => void;
   installedVersion?: string;
-  isQuotaExceeded?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -53,18 +45,14 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenRestoreConfirm,
   hasRefFile,
   hasResults,
-  isPreviewMode,
-  onExitPreview,
-  cloudUser,
-  onCloudSignIn,
-  onCloudSignOut,
-  activeUpload,
-  onOpenSyncPanel,
+  supabaseUser,
+  isSupabaseConnected,
+  onOpenSupabaseConfig,
+  onSupabaseSignOut,
   theme = 'light',
   onToggleTheme,
   onCheckForUpdates,
   installedVersion,
-  isQuotaExceeded,
 }) => {
   const t = translations[language];
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -95,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               onClick={() => {
-                if (!isPreviewMode && onSelectStep) onSelectStep(1);
+                if (onSelectStep) onSelectStep(1);
               }}
               className="flex items-center gap-2 sm:gap-2.5 min-w-0 focus:outline-none group cursor-pointer text-left"
               title="Excellent Medical Technology ESP"
@@ -115,17 +103,6 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </button>
           </div>
-
-          {/* Mode Tag if in Preview */}
-          {isPreviewMode && (
-            <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1 rounded-lg bg-[var(--success-soft)] border border-[var(--success-border)] text-xs font-semibold text-[var(--success)] min-w-0">
-              <span className="pulse-dot shrink-0" />
-              <span className="hidden min-[420px]:inline truncate">{t.headerResultPreview}</span>
-              <span className="hidden sm:inline text-[var(--text-muted)] font-normal">
-                {t.headerLiveTable}
-              </span>
-            </div>
-          )}
 
           {/* Language Selector, Theme Switcher & Actions */}
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
@@ -165,10 +142,10 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             {/* Restore Original Stage Button */}
-            {!isPreviewMode && onOpenRestoreConfirm && (
+            {onOpenRestoreConfirm && (
               <button
                 onClick={onOpenRestoreConfirm}
-                title="Restore original stage - Clears all history, files, and data from cloud and local database"
+                title="Restore original stage - Clears all history, files, and data"
                 className="tbtn tbtn--neutral hover:!border-rose-300 hover:!text-rose-600 !h-9 !px-3"
               >
                 <span className="tbtn__icon">
@@ -179,82 +156,41 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* If Quota Exceeded, show clear status pill */}
-            {isQuotaExceeded && (
-              <div
-                title="Firestore daily write quota reached — operating safely in local IndexedDB mode"
-                className="flex items-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-xl text-xs font-semibold text-amber-800 dark:text-amber-200 bg-amber-100/90 dark:bg-amber-950/70 border border-amber-300 dark:border-amber-800 shadow-2xs shrink-0"
-              >
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                <span className="hidden sm:inline">Local Mode</span>
-                <span className="sm:hidden">Local</span>
-              </div>
-            )}
-
-            {/* Cloud sync upload status: animated arrow while uploading, opens status & history */}
-            {cloudUser && onOpenSyncPanel && !isQuotaExceeded && (
+            {/* Supabase Cloud Sync status & settings button */}
+            {onOpenSupabaseConfig && (
               <button
-                onClick={onOpenSyncPanel}
-                title={t.syncPanelTitle}
-                className="tbtn tbtn--upload !h-9 !px-3"
+                type="button"
+                onClick={onOpenSupabaseConfig}
+                title={isSupabaseConnected ? 'Supabase Connected' : 'Configure Supabase Cloud Database'}
+                className={`flex items-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  isSupabaseConnected
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80'
+                    : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200/70'
+                }`}
               >
-                <span className="tbtn__icon">
-                  {activeUpload ? (
-                    <ProgressRing
-                      pct={activeUpload.total > 0 ? Math.round((activeUpload.done / activeUpload.total) * 100) : null}
-                      size={18}
-                    />
-                  ) : (
-                    <CloudUpload className="w-3.5 h-3.5" />
-                  )}
+                <Database className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span className="hidden sm:inline">
+                  {isSupabaseConnected ? 'Supabase' : 'Connect Supabase'}
                 </span>
-                {activeUpload ? (
-                  <span className="font-mono text-xs font-bold tabular-nums">
-                    {activeUpload.total > 0 ? `${Math.round((activeUpload.done / activeUpload.total) * 100)}%` : '…'}
-                  </span>
-                ) : (
-                  <span className="hidden sm:inline text-xs">{t.syncAllSynced}</span>
-                )}
+                <span className="sm:hidden">Supabase</span>
               </button>
             )}
 
-            {/* Cloud sync: sign in with Google to share rules & live preview across devices */}
-            {cloudUser ? (
+            {/* Supabase Authenticated User / Sign-Out */}
+            {supabaseUser && onSupabaseSignOut && (
               <button
-                onClick={onCloudSignOut}
-                title={t.headerSignedInTitle.replace('{email}', cloudUser.email || t.headerGoogleUser)}
+                onClick={onSupabaseSignOut}
+                title={`Signed in as ${supabaseUser.email || 'Supabase User'}. Click to sign out.`}
                 className="tbtn tbtn--excel !h-9 !px-3"
               >
                 <span className="tbtn__icon">
                   <Cloud className="w-3.5 h-3.5" />
                 </span>
-                <span className="hidden sm:inline text-xs">{t.headerSynced}</span>
+                <span className="hidden sm:inline text-xs truncate max-w-[120px]">
+                  {supabaseUser.email?.split('@')[0] || 'Synced'}
+                </span>
                 <LogOut className="w-3 h-3 opacity-60 ml-0.5" />
               </button>
-            ) : (
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                {/* Guest Mode Indicator Button */}
-                <button
-                  type="button"
-                  title="Operating in Guest Mode (Offline)"
-                  className="flex items-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs cursor-default"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                  <span className="hidden sm:inline">Guest Mode</span>
-                  <span className="sm:hidden">Guest</span>
-                </button>
-
-                {/* Sign in with Google Button with Clean Styling */}
-                <button
-                  onClick={onCloudSignIn}
-                  title={t.headerSignInTitle}
-                  className="flex items-center gap-1.5 sm:gap-2 h-9 px-3 sm:px-3.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 border border-emerald-500/40 shadow-xs hover:shadow-sm transition-all cursor-pointer"
-                >
-                  <GoogleIcon className="w-3.5 h-3.5 shrink-0 text-white" monochrome={true} />
-                  <span className="hidden sm:inline">{t.gateSignIn}</span>
-                  <span className="sm:hidden">Sign In</span>
-                </button>
-              </div>
             )}
 
             {/* Language Switcher Dropdown with Country Flag */}
@@ -297,20 +233,18 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            {/* In preview mode, do not show editor action buttons per user request */}
-            {!isPreviewMode && (
-              <button
-                onClick={onOpenRulesSetting}
-                className="tbtn tbtn--primary !h-9 !px-3.5"
-                title={t.headerRulesTitle}
-              >
-                <span className="tbtn__icon">
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
-                </span>
-                <span className="hidden sm:inline text-xs">{t.rulesLogicSetting}</span>
-                <span className="sm:hidden text-xs">{t.headerRulesShort}</span>
-              </button>
-            )}
+            {/* Rules & Logic Settings Button */}
+            <button
+              onClick={onOpenRulesSetting}
+              className="tbtn tbtn--primary !h-9 !px-3.5"
+              title={t.headerRulesTitle}
+            >
+              <span className="tbtn__icon">
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+              </span>
+              <span className="hidden sm:inline text-xs">{t.rulesLogicSetting}</span>
+              <span className="sm:hidden text-xs">{t.headerRulesShort}</span>
+            </button>
           </div>
         </div>
       </div>

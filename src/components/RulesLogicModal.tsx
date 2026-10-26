@@ -24,7 +24,7 @@ import { DecisionLayers } from './DecisionLayers';
 import { SuggestionEnginePanel } from './SuggestionEnginePanel';
 import { analyzeColumnSuggestions } from '../utils/suggestionEngine';
 import { translations } from '../translations';
-import type { User } from 'firebase/auth';
+import type { User } from '@supabase/supabase-js';
 
 interface RulesLogicModalProps {
   isOpen: boolean;

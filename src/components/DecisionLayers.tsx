@@ -34,8 +34,7 @@ import {
   getRecentDecisionLayers,
   pushRecentDecisionLayers,
 } from '../utils/storage';
-import type { User } from 'firebase/auth';
-import { publishRulesState, publishDecisionPresets } from '../lib/cloudSync';
+import type { User } from '@supabase/supabase-js';
 
 interface DecisionLayersProps {
   referenceWb: WorkbookData | null;
@@ -280,10 +279,6 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
       setSavedPresets(updated);
       setNewPresetName('');
       setShowSaveDialog(false);
-      if (cloudUser) {
-        publishDecisionPresets(cloudUser.uid, updated);
-        publishRulesState(cloudUser.uid, { layers, decisionPresets: updated });
-      }
     } catch (e) {
       console.warn('Failed to save decision preset', e);
     }
@@ -300,9 +295,6 @@ export const DecisionLayers: React.FC<DecisionLayersProps> = ({
     try {
       const updated = await deleteDecisionPreset(id);
       setSavedPresets(updated);
-      if (cloudUser) {
-        publishDecisionPresets(cloudUser.uid, updated);
-      }
     } catch {}
   };
 

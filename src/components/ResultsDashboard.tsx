@@ -41,17 +41,7 @@ import {
 } from '../types';
 import { translations } from '../translations';
 import { exportStyledExcel, exportCsv } from '../utils/excel';
-import { generatePreviewLink, copyPreviewLinkToClipboard, getSharePreviewUrl, getFixedPreviewUrl } from '../utils/previewSharing';
-import type { SharedPreviewPayload } from '../utils/previewSharing';
-import type { User } from 'firebase/auth';
-import {
-  publishPreviewSnapshot,
-  publishSharedSnapshot,
-  publishColumnConfigs,
-  publishRulesState,
-  debounce,
-  FIXED_PREVIEW_SHARE_ID,
-} from '../lib/cloudSync';
+import type { User } from '@supabase/supabase-js';
 import { saveToIDB, StorageKeys } from '../utils/storage';
 import { RowDetailModal } from './RowDetailModal';
 import { ColumnCustomizationModal } from './ColumnCustomizationModal';
@@ -68,10 +58,8 @@ interface ResultsDashboardProps {
   initialSearchTerm?: string;
   initialSearchColumn?: string;
   initialColumnConfigs?: ColumnConfigItem[];
-  isPreviewMode?: boolean;
-  onExitPreview?: () => void;
   onRefresh?: () => void;
-  cloudUser?: User | null;
+  supabaseUser?: User | null;
   holdReason?: string;
   onReleaseHoldKey?: (key: string) => Promise<{ key: string; green: number; yellow: number; total: number }>;
   onViewStateChange?: (v: { activeFilter: FilterType; searchTerm: string; searchColumn: string; onlyAccept: boolean }) => void;
@@ -135,10 +123,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   initialSearchTerm,
   initialSearchColumn,
   initialColumnConfigs,
-  isPreviewMode,
-  onExitPreview,
   onRefresh,
-  cloudUser,
+  supabaseUser,
   holdReason = '',
   onReleaseHoldKey,
   onViewStateChange,
@@ -187,7 +173,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   // Report the current view state (filter tab, search, Only Accept) so the
   // studio can sync it to the cloud; debounced to avoid chatter on typing.
   useEffect(() => {
-    if (isPreviewMode || !onViewStateChange) return;
+    if (!onViewStateChange) return;
     const timer = setTimeout(() => {
       onViewStateChange({
         activeFilter,
@@ -197,7 +183,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       });
     }, 800);
     return () => clearTimeout(timer);
-  }, [activeFilter, searchTerm, searchColumn, hideSupersededPostpone, isPreviewMode, onViewStateChange]);
+  }, [activeFilter, searchTerm, searchColumn, hideSupersededPostpone, onViewStateChange]);
 
   // Excel-style column filters: mapping colId -> allowed string values
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
@@ -416,49 +402,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       localStorage.setItem('emp_column_configs', JSON.stringify(saveObj));
       saveToIDB(StorageKeys.COLUMN_CONFIGS, saveObj).catch(() => {});
 
-      if (cloudUser) {
-        publishColumnConfigs(cloudUser.uid, saveObj);
-        publishRulesState(cloudUser.uid, { columnConfigs: saveObj });
-      }
       if (onSaveColumnConfigs) {
         onSaveColumnConfigs(newConfigs);
       }
       if (!silent) {
-        onShowToast(
-          cloudUser ? `${t.dashSaveView} (Synced to Cloud)` : t.dashSaveView,
-          'success'
-        );
-      }
-
-      // Sync to shared preview cache
-      const latestPreview = localStorage.getItem('emp_shared_preview_latest');
-      if (latestPreview) {
-        try {
-          const p = JSON.parse(latestPreview);
-          p.columnConfigs = newConfigs;
-          localStorage.setItem('emp_shared_preview_latest', JSON.stringify(p));
-        } catch {}
-      }
-
-      // If in preview mode, also update hash immediately
-      if (isPreviewMode) {
-        const linkInfo = generatePreviewLink({
-          version: 1,
-          createdAt: Date.now(),
-          comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
-        comparisonWbUploadedAt: comparisonWb?.uploadedAt,
-          stats,
-          results,
-          filter: activeFilter,
-          onlyAccept: hideSupersededPostpone,
-          searchTerm,
-          searchColumn,
-          columnConfigs: newConfigs,
-        });
-        const hashPart = linkInfo.hashUrl.split('#')[1];
-        if (hashPart && window.location.hash !== `#${hashPart}`) {
-          window.history.replaceState(null, '', `#${hashPart}`);
-        }
+        onShowToast(t.dashSaveView, 'success');
       }
     } catch (e) {
       console.warn('Failed to save column settings', e);
@@ -535,192 +483,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
   const tableVisibleCount = columnConfigs.filter((c) => c.showInTable).length;
   const exportVisibleCount = columnConfigs.filter((c) => c.showInExport).length;
-
-  // Live preview snapshot sync status (cloud-id: FIXED_PREVIEW_SHARE_ID = 'latest')
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
-  const [lastSyncedAt, setLastSyncedAt] = useState<number>(Date.now());
-
-  // Forced synchronization check: immediately pushes the current view state
-  // (filters, search term, active column, and column configs) to the preview snapshot URL & cloud ID
-  const pushSnapshotImmediate = useCallback(
-    async (overrides?: {
-      filter?: FilterType;
-      searchTerm?: string;
-      searchColumn?: string;
-      onlyAccept?: boolean;
-      columnConfigs?: ColumnConfigItem[];
-    }) => {
-      if (!results || results.length === 0 || !stats) return;
-
-      const effFilter = overrides?.filter !== undefined ? overrides.filter : activeFilter;
-      const effSearchTerm = overrides?.searchTerm !== undefined ? overrides.searchTerm : searchTerm;
-      const effSearchColumn = overrides?.searchColumn !== undefined ? overrides.searchColumn : searchColumn;
-      const effOnlyAccept = overrides?.onlyAccept !== undefined ? overrides.onlyAccept : hideSupersededPostpone;
-      const effConfigs = overrides?.columnConfigs !== undefined ? overrides.columnConfigs : columnConfigs;
-
-      const payload: SharedPreviewPayload = {
-        version: 1,
-        createdAt: Date.now(),
-        comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
-        comparisonWbUploadedAt: comparisonWb?.uploadedAt,
-        stats,
-        results,
-        filter: effFilter,
-        onlyAccept: effOnlyAccept,
-        searchTerm: effSearchTerm,
-        searchColumn: effSearchColumn,
-        columnConfigs: effConfigs,
-      };
-
-      // 1. Immediately cache locally so the public /preview slot immediately renders this exact state
-      try {
-        localStorage.setItem('emp_shared_preview_latest', JSON.stringify(payload));
-      } catch {}
-
-      // 2. Immediately notify parent of view state changes without debounce delay
-      if (!isPreviewMode && onViewStateChange) {
-        onViewStateChange({
-          activeFilter: effFilter,
-          searchTerm: effSearchTerm,
-          searchColumn: effSearchColumn,
-          onlyAccept: effOnlyAccept,
-        });
-      }
-
-      // 3. Forced synchronization push to cloud fixed snapshot (cloud-id: FIXED_PREVIEW_SHARE_ID = 'latest')
-      if (cloudUser) {
-        setSyncStatus('syncing');
-        try {
-          publishPreviewSnapshot(cloudUser.uid, payload);
-          const ok = await publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, cloudUser.uid, payload);
-          if (ok) {
-            setSyncStatus('synced');
-            setLastSyncedAt(Date.now());
-          } else {
-            setSyncStatus('error');
-          }
-        } catch (e) {
-          console.warn('Forced snapshot synchronization check failed', e);
-          setSyncStatus('error');
-        }
-      } else {
-        setSyncStatus('synced');
-        setLastSyncedAt(Date.now());
-      }
-
-      // 4. Update preview hash immediately if in preview mode
-      if (isPreviewMode) {
-        try {
-          const linkInfo = generatePreviewLink(payload);
-          const hashPart = linkInfo.hashUrl.split('#')[1];
-          if (hashPart && window.location.hash !== `#${hashPart}`) {
-            window.history.replaceState(null, '', `#${hashPart}`);
-          }
-        } catch {}
-      }
-    },
-    [
-      results,
-      stats,
-      activeFilter,
-      searchTerm,
-      searchColumn,
-      hideSupersededPostpone,
-      columnConfigs,
-      comparisonWb,
-      isPreviewMode,
-      onViewStateChange,
-      cloudUser,
-    ]
-  );
-
-  // Debounced search sync for typing keystrokes
-  const debouncedSearchSync = useRef(
-    debounce((term: string) => {
-      pushSnapshotImmediate({ searchTerm: term });
-    }, 350)
-  ).current;
-
-  // Background debounced synchronization fallback
-  const debouncedPublishPreview = useRef(
-    debounce((uid: string, payload: SharedPreviewPayload) => {
-      publishPreviewSnapshot(uid, payload);
-      publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, uid, payload).then((ok) => {
-        if (!ok) console.warn('Auto-publish to fixed preview slot failed');
-      });
-    }, 2000)
-  ).current;
-
-  useEffect(() => {
-    if (isPreviewMode || !cloudUser) return;
-    if (!results || results.length === 0 || !stats) return;
-    debouncedPublishPreview(cloudUser.uid, {
-      version: 1,
-      createdAt: Date.now(),
-      comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
-      comparisonWbUploadedAt: comparisonWb?.uploadedAt,
-      stats,
-      results,
-      filter: activeFilter,
-      onlyAccept: hideSupersededPostpone,
-      searchTerm,
-      searchColumn,
-      columnConfigs,
-    });
-    return () => debouncedPublishPreview.cancel();
-  }, [
-    isPreviewMode,
-    cloudUser,
-    results,
-    stats,
-    activeFilter,
-    hideSupersededPostpone,
-    searchTerm,
-    searchColumn,
-    columnConfigs,
-    comparisonWb,
-    debouncedPublishPreview,
-  ]);
-
-  // Keep URL hash updated seamlessly when in preview mode as filters or columns change
-  useEffect(() => {
-    if (!isPreviewMode) return;
-    try {
-      const linkInfo = generatePreviewLink({
-        version: 1,
-        createdAt: Date.now(),
-        comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
-        comparisonWbUploadedAt: comparisonWb?.uploadedAt,
-        stats,
-        results,
-        filter: activeFilter,
-        onlyAccept: hideSupersededPostpone,
-        searchTerm,
-        searchColumn,
-        columnConfigs,
-      });
-      const hashPart = linkInfo.hashUrl.split('#')[1];
-      if (hashPart && window.location.hash !== `#${hashPart}`) {
-        window.history.replaceState(null, '', `#${hashPart}`);
-      }
-    } catch {
-      // Ignore URL length edge cases
-    }
-  }, [isPreviewMode, activeFilter, hideSupersededPostpone, searchTerm, searchColumn, columnConfigs, comparisonWb, stats, results]);
-
-  const buildSharePayload = (): SharedPreviewPayload => ({
-    version: 1,
-    createdAt: Date.now(),
-    comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
-    comparisonWbUploadedAt: comparisonWb?.uploadedAt,
-    stats,
-    results,
-    filter: activeFilter,
-    onlyAccept: hideSupersededPostpone,
-    searchTerm,
-    searchColumn,
-    columnConfigs,
-  });
 
   const copyTextToClipboard = async (text: string, setCopied: (v: boolean) => void) => {
     try {
@@ -829,59 +591,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     copyCellText(fullText, `${row.id}_fullRow`, row.id);
   }, [copyCellText]);
 
-  const handleCopyShareLink = async () => {
-    // If logged into Firebase, immediately publish so the fixed preview link has the newest results
-    if (cloudUser && results && results.length > 0 && stats) {
-      handlePublishPreview();
-      await copyTextToClipboard(getFixedPreviewUrl(), setShareLinkCopied);
-      return;
-    }
-
-    // Guest / Offline Mode: copy portable hash preview link (contains full packed data, works everywhere without account)
-    if (results && results.length > 0 && stats) {
-      const payload = buildSharePayload();
-      const res = await copyPreviewLinkToClipboard(payload);
-      if (res.success) {
-        setShareLinkCopied(true);
-        setTimeout(() => setShareLinkCopied(false), 2000);
-        onShowToast(t.dashCopied || 'Preview link copied to clipboard', 'success');
-        return;
-      }
-    }
-
-    await copyTextToClipboard(getFixedPreviewUrl(), setShareLinkCopied);
-  };
-
-  // Manual publish to the fixed public preview slot (/preview).
-  // The auto-publish is debounced; this lets the user force the latest
-  // results to the preview link immediately (e.g. after swapping files).
-  const handlePublishPreview = async () => {
-    if (!cloudUser || !results || results.length === 0 || !stats) return;
-    try {
-      const payload: SharedPreviewPayload = {
-        version: 1,
-        createdAt: Date.now(),
-        comparisonWbName: comparisonWb?.name || 'Evaluation_Results',
-        comparisonWbUploadedAt: comparisonWb?.uploadedAt,
-        stats,
-        results,
-        filter: activeFilter,
-        onlyAccept: hideSupersededPostpone,
-        searchTerm,
-        searchColumn,
-        columnConfigs,
-      };
-      const ok = await publishSharedSnapshot(FIXED_PREVIEW_SHARE_ID, cloudUser.uid, payload);
-      if (!ok) {
-        onShowToast(t.dashPreviewPublishFailed || 'Failed to update preview', 'error');
-        return;
-      }
-      onShowToast(t.dashPreviewPublished || 'Preview updated with latest results', 'success');
-    } catch (e) {
-      console.warn('Manual preview publish failed', e);
-      onShowToast(t.dashPreviewPublishFailed || 'Failed to update preview', 'error');
-    }
-  };
 
   // Helper to retrieve cell string value for any column (System, Ref, Comp)
   const getRowColValue = (row: MatchedRow, colId: string): string => {
@@ -1059,16 +768,12 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     });
   }, [filteredRows, sortColumn, sortDirection]);
 
-  // Pagination (In Preview Mode, show all rows with no pagination cutoff)
+  // Pagination
   const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
   const currentPageRows = useMemo(() => {
-    if (isPreviewMode) {
-      // User request: "Only show this Result Table in the live preview page; show all the rows."
-      return sortedRows;
-    }
     const start = (page - 1) * pageSize;
     return sortedRows.slice(start, start + pageSize);
-  }, [sortedRows, page, pageSize, isPreviewMode]);
+  }, [sortedRows, page, pageSize]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -1171,7 +876,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 onClick={() => {
                   setActiveFilter(k.key);
                   setPage(1);
-                  pushSnapshotImmediate({ filter: k.key });
+                  if (onViewStateChange) {
+                    onViewStateChange({ activeFilter: k.key, searchTerm, searchColumn, onlyAccept: hideSupersededPostpone });
+                  }
                 }}
                 className={`rounded-xl border p-2 sm:p-3 text-left transition-all cursor-pointer ${
                   isActive ? k.active : 'border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--accent-light)] hover:shadow-xs'
@@ -1196,9 +903,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           })}
         </div>
 
-        {/* 2. Action toolbar — grouped View / Share / Export actions */}
+        {/* 2. Action toolbar — grouped View / Export actions */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 pt-3 border-t border-[var(--border-light)]">
-          {/* Left: View & Sync Actions */}
+          {/* Left: View Actions */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             {/* Only Accept toggle */}
             <button
@@ -1206,7 +913,9 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 const next = !hideSupersededPostpone;
                 setHideSupersededPostpone(next);
                 setPage(1);
-                pushSnapshotImmediate({ onlyAccept: next });
+                if (onViewStateChange) {
+                  onViewStateChange({ activeFilter, searchTerm, searchColumn, onlyAccept: next });
+                }
               }}
               className="flex items-center gap-2 group pr-1 shrink-0 select-none cursor-pointer"
               title={t.dashOnlyAcceptTitle}
@@ -1256,58 +965,33 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 {tableVisibleCount}
               </span>
             </button>
-
-            {!isPreviewMode && (
-              <>
-                <div className="hidden md:block h-5 w-px bg-[var(--border-light)] shrink-0" />
-                {/* Copy Share Link Button */}
-                <button
-                  onClick={handleCopyShareLink}
-                  className="tbtn tbtn--upload"
-                  title={t.dashCopyShareLink}
-                >
-                  <span className="tbtn__icon">
-                    {shareLinkCopied ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    ) : (
-                      <Link2 className="w-3.5 h-3.5 shrink-0" />
-                    )}
-                  </span>
-                  <span>{shareLinkCopied ? t.dashCopied : t.dashCopyShareLink}</span>
-                </button>
-
-              </>
-            )}
           </div>
 
           {/* Right: Export group */}
-          {!isPreviewMode && (
-            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 ml-auto">
-              <button
-                onClick={handleExportExcel}
-                className="tbtn tbtn--excel"
-                title={t.dashExportExcelTitle}
-              >
-                <span className="tbtn__icon">
-                  <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
-                </span>
-                <span>{t.exportExcel}</span>
-              </button>
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 ml-auto">
+            <button
+              onClick={handleExportExcel}
+              className="tbtn tbtn--excel"
+              title={t.dashExportExcelTitle}
+            >
+              <span className="tbtn__icon">
+                <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
+              </span>
+              <span>{t.exportExcel}</span>
+            </button>
 
-              <button
-                onClick={handleExportCsv}
-                className="tbtn tbtn--print"
-                title={t.dashExportCsvTitle}
-              >
-                <span className="tbtn__icon">
-                  <Download className="w-3.5 h-3.5 shrink-0" />
-                </span>
-                <span>{t.exportCsv}</span>
-              </button>
-            </div>
-          )}
+            <button
+              onClick={handleExportCsv}
+              className="tbtn tbtn--print"
+              title={t.dashExportCsvTitle}
+            >
+              <span className="tbtn__icon">
+                <Download className="w-3.5 h-3.5 shrink-0" />
+              </span>
+              <span>{t.exportCsv}</span>
+            </button>
+          </div>
         </div>
-
 
         {/* 3. DEDICATED REAL-TIME SEARCH BAR */}
         <div className="pt-3 border-t border-[var(--border-light)] flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
@@ -1323,15 +1007,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   const val = e.target.value;
                   setSearchTerm(val);
                   setPage(1);
-                  debouncedSearchSync(val);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    pushSnapshotImmediate({ searchTerm });
-                  }
-                }}
-                onBlur={() => {
-                  pushSnapshotImmediate({ searchTerm });
                 }}
                 placeholder={t.dashSearchPlaceholder}
                 className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-xl pl-9 pr-8 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all font-mono shadow-xs"
@@ -1341,7 +1016,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   onClick={() => {
                     setSearchTerm('');
                     setPage(1);
-                    pushSnapshotImmediate({ searchTerm: '' });
                   }}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded transition-colors"
                   title={t.dashClearSearchTitle}
@@ -1396,25 +1070,23 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               </div>
             )}
 
-            {/* Rows Per Page Selector (Only in Studio mode since Preview mode shows all rows) */}
-            {!isPreviewMode && (
-              <div className="flex items-center gap-1.5 text-xs text-slate-600 shrink-0 select-none">
-                <span className="whitespace-nowrap">{t.rowsPerPage}:</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => {
-                    setPageSize(Number(e.target.value));
-                    setPage(1);
-                  }}
-                  className="bg-white border border-slate-200 rounded-md px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-emerald-500 font-mono shadow-xs cursor-pointer"
-                >
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value={250}>250</option>
-                </select>
-              </div>
-            )}
+            {/* Rows Per Page Selector */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-600 shrink-0 select-none">
+              <span className="whitespace-nowrap">{t.rowsPerPage}:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="bg-white border border-slate-200 rounded-md px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-emerald-500 font-mono shadow-xs cursor-pointer"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={250}>250</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -1444,7 +1116,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         return next;
                       });
                       setPage(1);
-                      pushSnapshotImmediate();
                     }}
                     className="p-0.5 hover:text-slate-900 rounded hover:bg-emerald-100 transition-colors ml-0.5 text-emerald-700"
                     title={t.dashClearFilterOn.replace('{label}', label)}
@@ -1459,7 +1130,6 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               onClick={() => {
                 setColumnFilters({});
                 setPage(1);
-                pushSnapshotImmediate();
               }}
               className="text-xs text-rose-600 hover:text-rose-700 underline font-semibold ml-1 transition-colors"
             >
@@ -1599,35 +1269,33 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             )}
                           </div>
 
-                          {/* Move Column Left / Right Arrows (Only in Main Results page, hidden in Preview Mode per user instructions) */}
-                          {!isPreviewMode && (
-                            <div className="flex items-center gap-0.5 opacity-60 group-hover/th:opacity-100 transition-opacity">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleMoveColumn(col.id, 'left');
-                                }}
-                                disabled={isFirst}
-                                className="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
-                                title={t.dashMoveColumnLeft}
-                              >
-                                <ChevronLeft className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleMoveColumn(col.id, 'right');
-                                }}
-                                disabled={isLast}
-                                className="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
-                                title={t.dashMoveColumnRight}
-                              >
-                                <ChevronRight className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
+                          {/* Move Column Left / Right Arrows */}
+                          <div className="flex items-center gap-0.5 opacity-60 group-hover/th:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMoveColumn(col.id, 'left');
+                              }}
+                              disabled={isFirst}
+                              className="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+                              title={t.dashMoveColumnLeft}
+                            >
+                              <ChevronLeft className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMoveColumn(col.id, 'right');
+                              }}
+                              disabled={isLast}
+                              className="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+                              title={t.dashMoveColumnRight}
+                            >
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </th>
@@ -1982,7 +1650,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       {/* Row Action Buttons: Copy Row + Inspect Detail */}
                       <td className={`py-1.5 px-2 sm:py-2.5 sm:px-3 text-center whitespace-nowrap sticky right-0 z-[5] border-l border-[var(--border-light)] ${frozenBg}`}>
                         <div className="flex items-center justify-center gap-1">
-                          {!isPreviewMode && row.isHold && row.holdKey && onReleaseHoldKey && (
+                          {row.isHold && row.holdKey && onReleaseHoldKey && (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -2053,68 +1721,48 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
         {/* 5. Table Pagination Footer */}
         <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-          {isPreviewMode ? (
-            <div className="w-full flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-800 font-mono">
-                  {t.dashShowingAllRows.replace('{count}', currentPageRows.length.toLocaleString())}
-                </span>
-                {results.length !== currentPageRows.length && (
-                  <span className="text-slate-500">
-                    {t.dashFilteredFromTotal.replace('{count}', results.length.toLocaleString())}
-                  </span>
-                )}
-              </div>
-              <div className="text-[11px] text-emerald-700 font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                {t.dashFullResultView}
-              </div>
-            </div>
-          ) : (
-            <>
-              <div>
-                {t.showingRows}{' '}
-                <strong className="text-slate-800 font-mono tabular-nums">
-                  {filteredRows.length > 0 ? (page - 1) * pageSize + 1 : 0}
-                </strong>{' '}
-                -{' '}
-                <strong className="text-slate-800 font-mono tabular-nums">
-                  {Math.min(page * pageSize, filteredRows.length)}
-                </strong>{' '}
-                {t.of}{' '}
-                <strong className="text-slate-800 font-mono tabular-nums">
-                  {filteredRows.length.toLocaleString()}
-                </strong>{' '}
-                {t.dashRowsUnit}
-                {searchTerm.trim() && (
-                  <span className="text-slate-500 ml-2">
-                    {t.dashFilteredFromTotal.replace('{count}', results.length.toLocaleString())}
-                  </span>
-                )}
-              </div>
+          <div>
+            {t.showingRows}{' '}
+            <strong className="text-slate-800 font-mono tabular-nums">
+              {filteredRows.length > 0 ? (page - 1) * pageSize + 1 : 0}
+            </strong>{' '}
+            -{' '}
+            <strong className="text-slate-800 font-mono tabular-nums">
+              {Math.min(page * pageSize, filteredRows.length)}
+            </strong>{' '}
+            {t.of}{' '}
+            <strong className="text-slate-800 font-mono tabular-nums">
+              {filteredRows.length.toLocaleString()}
+            </strong>{' '}
+            {t.dashRowsUnit}
+            {searchTerm.trim() && (
+              <span className="text-slate-500 ml-2">
+                {t.dashFilteredFromTotal.replace('{count}', results.length.toLocaleString())}
+              </span>
+            )}
+          </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>{t.prevPage}</span>
-                </button>
-                <span className="px-2 font-mono text-slate-700 font-bold tabular-nums">
-                  {page} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs"
-                >
-                  <span>{t.nextPage}</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </>
-          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span>{t.prevPage}</span>
+            </button>
+            <span className="px-2 font-mono text-slate-700 font-bold tabular-nums">
+              {page} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs"
+            >
+              <span>{t.nextPage}</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
