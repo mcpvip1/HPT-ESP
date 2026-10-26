@@ -221,7 +221,10 @@ export function onSupabaseAuthStateChange(callback: (user: User | null) => void)
 }
 
 /** Standard SQL schema for users to run in their Supabase SQL editor */
-export const SUPABASE_SQL_SCHEMA = `-- 1. Workspaces table (stores entire workbooks & matching results in JSONB without chunking)
+export const SUPABASE_SQL_SCHEMA = `-- Disable statement timeout for this script so lock acquisition does not time out
+set statement_timeout = 0;
+
+-- 1. Workspaces table (stores entire workbooks & matching results in JSONB without chunking)
 create table if not exists public.workspaces (
   user_id uuid primary key default gen_random_uuid(),
   reference_wb jsonb,

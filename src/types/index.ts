@@ -154,9 +154,28 @@ export interface SavedDecisionPreset {
 export interface SyncHistoryEntry {
   id: string;
   time: number;
-  kind: 'file' | 'settings' | 'results';
+  kind: 'file' | 'settings' | 'results' | 'pull' | 'wipe';
   title: string;
-  status: 'done' | 'failed';
+  reason: string;
+  status: 'done' | 'failed' | 'in_progress';
+  size?: string;
+  itemCount?: number;
+  durationMs?: number;
+  error?: string;
+  target?: 'supabase' | 'local';
+}
+
+// Live upload & sync progress tracking
+export interface SyncProgress {
+  isSyncing: boolean;
+  progressPercent: number; // 0 to 100
+  phase: 'idle' | 'preparing' | 'uploading' | 'verifying' | 'completed' | 'error';
+  title: string;
+  reason: string;
+  startedAt?: number;
+  bytesUploaded?: number;
+  totalBytes?: number;
+  error?: string;
 }
 
 // A cloud upload currently in flight (for the upload-manager UI)
@@ -167,3 +186,4 @@ export interface ActiveUpload {
   done: number;
   total: number; // 0 = indeterminate
 }
+

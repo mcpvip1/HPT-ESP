@@ -35,6 +35,7 @@ import { GlobalLoadingSkeleton } from './components/GlobalLoadingSkeleton';
 import { SplashScreen } from './components/SplashScreen';
 import { UpdateModal } from './components/UpdateModal';
 import { SupabaseConfigModal } from './components/SupabaseConfigModal';
+import { SyncHistoryModal } from './components/SyncHistoryModal';
 import {
   CURRENT_LATEST_VERSION,
   getInstalledVersion,
@@ -56,6 +57,7 @@ import {
   wipeSupabaseWorkspace,
   debounce,
   WorkspaceSettings,
+  StoredColumnSettings,
 } from './lib/supabaseSync';
 import { AlertTriangle, RotateCcw, Loader2 } from 'lucide-react';
 
@@ -66,6 +68,7 @@ export default function App() {
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isSupabaseConfigOpen, setIsSupabaseConfigOpen] = useState(false);
+  const [isSyncHistoryOpen, setIsSyncHistoryOpen] = useState(false);
 
   // Auto-Update & Animated Splash Screen State
   const [isSplashVisible, setIsSplashVisible] = useState(true);
@@ -337,10 +340,10 @@ export default function App() {
     })();
   }, [supabaseUser, showToast]);
 
-  // Debounced auto-sync to Supabase when user is authenticated
+  // Debounced auto-sync to Supabase with human-readable reason
   const debouncedSyncToSupabase = useRef(
-    debounce((uid: string, payload: any) => {
-      syncWorkspaceToSupabase(uid, payload).then((res) => {
+    debounce((uid: string, payload: any, reason?: string) => {
+      syncWorkspaceToSupabase(uid, payload, reason).then((res) => {
         if (!res.success) {
           console.warn('Auto-sync to Supabase warning:', res.error);
         }
@@ -371,7 +374,10 @@ export default function App() {
     }
 
     if (isSupabaseConnected) {
-      debouncedSyncToSupabase(getEffectiveWorkspaceId(supabaseUser), { referenceWb: wb });
+      const reason = wb
+        ? `Reference Workbook loaded: '${wb.name || wb.activeSheet || 'File'}' (${wb.rows?.length || 0} rows)`
+        : 'Reference Workbook removed';
+      debouncedSyncToSupabase(getEffectiveWorkspaceId(supabaseUser), { referenceWb: wb }, reason);
     }
   };
 
@@ -391,7 +397,10 @@ export default function App() {
     }
 
     if (isSupabaseConnected) {
-      debouncedSyncToSupabase(getEffectiveWorkspaceId(supabaseUser), { comparisonWb: wb });
+      const reason = wb
+        ? `Comparison Workbook loaded: '${wb.name || wb.activeSheet || 'File'}' (${wb.rows?.length || 0} rows)`
+        : 'Comparison Workbook removed';
+      debouncedSyncToSupabase(getEffectiveWorkspaceId(supabaseUser), { comparisonWb: wb }, reason);
     }
   };
 
@@ -495,7 +504,11 @@ export default function App() {
         releasedRowIds,
         updatedAt: Date.now(),
       };
-      await syncSettingsToSupabase(getEffectiveWorkspaceId(supabaseUser), settingsPayload);
+      await syncSettingsToSupabase(
+        getEffectiveWorkspaceId(supabaseUser),
+        settingsPayload,
+        `Updated ${layers.length} decision layers & ${mappings.length} column mappings`
+      );
       showToast(`${t.toastRulesSaved} (Synced to Supabase)`, 'success');
     } else {
       showToast(t.toastRulesSaved, 'success');
@@ -554,10 +567,14 @@ export default function App() {
         setStats(evaluatedStats);
 
         if (isSupabaseConnected) {
-          debouncedSyncToSupabase(getEffectiveWorkspaceId(supabaseUser), {
-            results: evaluatedResults,
-            stats: evaluatedStats,
-          });
+          debouncedSyncToSupabase(
+            getEffectiveWorkspaceId(supabaseUser),
+            {
+              results: evaluatedResults,
+              stats: evaluatedStats,
+            },
+            `Matching evaluated (${evaluatedStats.totalIncoming} rows: ${evaluatedStats.greenCount} Green, ${evaluatedStats.yellowCount} Yellow, ${evaluatedStats.redCount} Red)`
+          );
         }
 
         if (notifySuccess) {
@@ -650,6 +667,120 @@ export default function App() {
     }
   };
 
+  const handleTriggerManualSync = async () => {
+    if (!isSupabaseConnected) {
+      showToast('Please configure Supabase first.', 'error');
+      return;
+    }
+
+    const storedColConfigs: StoredColumnSettings | undefined = studioColumnConfigs
+      ? {
+          order: studioColumnConfigs.map((c) => c.id),
+          visibility: studioColumnConfigs.reduce(
+            (acc, c) => ({ ...acc, [c.id]: { table: c.showInTable, export: c.showInExport } }),
+            {} as Record<string, { table: boolean; export: boolean }>
+          ),
+          updatedAt: Date.now(),
+        }
+      : undefined;
+
+    const settingsPayload: WorkspaceSettings = {
+      normalization,
+      layers,
+      mappings,
+      holdColumn,
+      holdValues,
+      holdReason,
+      releasedRowIds,
+      columnConfigs: storedColConfigs,
+      updatedAt: Date.now(),
+    };
+    const payload = {
+      referenceWb,
+      comparisonWb,
+      results,
+      stats,
+      settings: settingsPayload,
+    };
+    const res = await syncWorkspaceToSupabase(
+      getEffectiveWorkspaceId(supabaseUser),
+      payload,
+      'Manual full cloud sync'
+    );
+    if (!res.success) {
+      throw new Error(res.error || 'Failed to sync to Supabase');
+    }
+  };
+
+  const handleTriggerManualPull = async () => {
+    if (!isSupabaseConnected) {
+      showToast('Please configure Supabase first.', 'error');
+      return;
+    }
+    const { success, data, error } = await fetchWorkspaceFromSupabase(
+      getEffectiveWorkspaceId(supabaseUser),
+      'Manual workspace restore from cloud'
+    );
+    if (!success) {
+      throw new Error(error || 'Failed to fetch from Supabase');
+    }
+    if (data) {
+      if (data.referenceWb) {
+        setReferenceWb(data.referenceWb);
+        await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, data.referenceWb);
+      }
+      if (data.comparisonWb) {
+        setComparisonWb(data.comparisonWb);
+        await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, data.comparisonWb);
+      }
+      if (data.settings) {
+        if (data.settings.normalization) {
+          setNormalization(data.settings.normalization);
+          await saveToIDB(StorageKeys.NORMALIZATION_RULES, data.settings.normalization);
+        }
+        if (data.settings.layers) {
+          setLayers(data.settings.layers);
+          await saveToIDB(StorageKeys.DECISION_LAYERS, data.settings.layers);
+        }
+        if (data.settings.mappings) {
+          setMappings(data.settings.mappings);
+          await saveToIDB(StorageKeys.COLUMN_MAPPINGS, data.settings.mappings);
+        }
+        if (typeof data.settings.holdColumn === 'string') {
+          setHoldColumn(data.settings.holdColumn);
+          await saveToIDB(StorageKeys.HOLD_COLUMN, data.settings.holdColumn);
+        }
+        if (data.settings.holdValues) {
+          setHoldValues(data.settings.holdValues);
+          await saveToIDB(StorageKeys.HOLD_VALUES, data.settings.holdValues);
+        }
+        if (typeof data.settings.holdReason === 'string') {
+          setHoldReason(data.settings.holdReason);
+          await saveToIDB(StorageKeys.HOLD_REASON, data.settings.holdReason);
+        }
+        if (data.settings.releasedRowIds) {
+          setReleasedRowIds(data.settings.releasedRowIds);
+          await saveToIDB(StorageKeys.RELEASED_ROWS, data.settings.releasedRowIds);
+        }
+        if (data.settings.columnConfigs && Array.isArray(data.settings.columnConfigs.order)) {
+          const cfg = data.settings.columnConfigs;
+          const restored: ColumnConfigItem[] = cfg.order.map((id: string) => ({
+            id,
+            label: id,
+            category: 'data',
+            showInTable: cfg.visibility?.[id]?.table !== false,
+            showInExport: cfg.visibility?.[id]?.export !== false,
+          }));
+          setStudioColumnConfigs(restored);
+        }
+      }
+      if (data.results && data.stats) {
+        setResults(data.results);
+        setStats(data.stats);
+      }
+    }
+  };
+
   // 1. Initial Animated Splash Screen with Update Verification
   if (isSplashVisible) {
     return (
@@ -692,6 +823,7 @@ export default function App() {
         supabaseUser={supabaseUser}
         isSupabaseConnected={isSupabaseConnected}
         onOpenSupabaseConfig={() => setIsSupabaseConfigOpen(true)}
+        onOpenSyncHistory={() => setIsSyncHistoryOpen(true)}
         onSupabaseSignOut={handleSupabaseSignOut}
         theme={theme}
         onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
@@ -848,6 +980,17 @@ export default function App() {
         updateInfo={availableUpdate || CURRENT_LATEST_VERSION}
         language={language}
         onUpdateCompleted={handleUpdateCompleted}
+      />
+
+      {/* Cloud Upload & Sync History Modal */}
+      <SyncHistoryModal
+        isOpen={isSyncHistoryOpen}
+        onClose={() => setIsSyncHistoryOpen(false)}
+        onTriggerManualSync={handleTriggerManualSync}
+        onTriggerManualPull={handleTriggerManualPull}
+        isSupabaseConnected={isSupabaseConnected}
+        onOpenSupabaseConfig={() => setIsSupabaseConfigOpen(true)}
+        onShowToast={showToast}
       />
 
       {/* Toast Notifications */}
