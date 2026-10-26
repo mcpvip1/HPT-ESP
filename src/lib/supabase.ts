@@ -44,31 +44,22 @@ export function isSupabaseConfigured(): boolean {
   );
 }
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/**
+ * Shared workspace, no sign-in (user decision 2026-10-26).
+ *
+ * Previously every signed-out device got its own random workspace id, so
+ * files/rules/settings synced per device and never met on other devices —
+ * and the migration had removed the only sign-in button, so there was no
+ * way to join them. Now every device uses this one fixed id, so the cloud
+ * row is the same wherever the app is opened. Trade-off, stated plainly:
+ * anyone with the app link can read and write this row (the table's anon
+ * policy allows it), which is what "no sign-in" means. Old per-device
+ * guest rows are left untouched, not deleted.
+ */
+export const SHARED_WORKSPACE_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
 
-export function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-export function getEffectiveWorkspaceId(user: User | null): string {
-  if (user?.id) return user.id;
-  try {
-    let devId = localStorage.getItem('emp_device_workspace_id');
-    if (!devId || !UUID_REGEX.test(devId)) {
-      devId = generateUUID();
-      localStorage.setItem('emp_device_workspace_id', devId);
-    }
-    return devId;
-  } catch {
-    return '00000000-0000-4000-8000-000000000001';
-  }
+export function getEffectiveWorkspaceId(): string {
+  return SHARED_WORKSPACE_ID;
 }
 
 export function getSupabase(): SupabaseClient | null {

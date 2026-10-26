@@ -1,6 +1,13 @@
 import { getSupabase } from './supabase';
 import LZString from 'lz-string';
-import { saveToIDB, getFromIDB, deleteFromIDB, StorageKeys } from '../utils/storage';
+import {
+  saveToIDB,
+  getFromIDB,
+  deleteFromIDB,
+  StorageKeys,
+  defaultNormalizationRules,
+  defaultDecisionLayers,
+} from '../utils/storage';
 import type {
   ColumnConfigItem,
   ColumnMapping,
@@ -636,6 +643,196 @@ export async function fetchWorkspaceFromSupabase(
 
     return { success: false, error: errMsg };
   }
+}
+
+/**
+ * Startup presence merge (no-sign-in shared workspace).
+ *
+ * Rule the user chose: local data is authoritative when it exists; the
+ * cloud only fills gaps. Field by field:
+ * - local present -> keep local (push it to the cloud only if the cloud
+ *   lacks that field, so other devices converge on it);
+ * - local absent + cloud present -> pull the cloud value;
+ * - both absent -> nothing.
+ * Results/stats are pulled only when no local data could change them
+ * (no local files, mappings, layers, normalization, or hold state);
+ * otherwise the app re-evaluates matching from merged inputs, because
+ * cloud results computed from cloud inputs would not match merged inputs.
+ *
+ * Push-back settings are built COMPLETE (cloud values preserved for shared
+ * fields, local values only for missing fields, app defaults for the rest)
+ * because the sync upsert replaces the whole settings column.
+ */
+export interface LocalWorkspaceSnapshot {
+  referenceWb?: WorkbookData | null;
+  comparisonWb?: WorkbookData | null;
+  normalization?: NormalizationRules | null;
+  layers?: DecisionLayer[] | null;
+  mappings?: ColumnMapping[] | null;
+  holdColumn?: string | null;
+  holdValues?: string[] | null;
+  holdReason?: string | null;
+  releasedRowIds?: string[] | null;
+  columnConfigs?: StoredColumnSettings | null;
+  mappingPresets?: SavedMappingPreset[] | null;
+  decisionPresets?: SavedDecisionPreset[] | null;
+}
+
+export interface MergedWorkspace {
+  referenceWb?: WorkbookData;
+  comparisonWb?: WorkbookData;
+  /** Presence-accurate merged settings: only fields that exist somewhere. */
+  settings?: Partial<WorkspaceSettings>;
+  results?: MatchedRow[];
+  stats?: MatchingStats;
+  /** Human-readable labels of fields pulled from the cloud. */
+  pulled: string[];
+  /** True when any settings field was pulled (caller re-runs matching). */
+  settingsPulled: boolean;
+  /** True when a workbook file was pulled. */
+  filesPulled: boolean;
+  /** Upload payload for local-only data, or null when the cloud already
+   *  has everything local has. */
+  pushBack: FullWorkspacePayload | null;
+}
+
+type SettingsField =
+  | 'normalization'
+  | 'layers'
+  | 'mappings'
+  | 'holdColumn'
+  | 'holdValues'
+  | 'holdReason'
+  | 'releasedRowIds'
+  | 'columnConfigs'
+  | 'mappingPresets'
+  | 'decisionPresets';
+
+const SETTINGS_FIELD_LABELS: { key: SettingsField; label: string }[] = [
+  { key: 'normalization', label: 'Normalization rules' },
+  { key: 'layers', label: 'Decision layers' },
+  { key: 'mappings', label: 'Column mappings' },
+  { key: 'holdColumn', label: 'Hold column' },
+  { key: 'holdValues', label: 'Hold values' },
+  { key: 'holdReason', label: 'Hold reason' },
+  { key: 'releasedRowIds', label: 'Released rows' },
+  { key: 'columnConfigs', label: 'Column view settings' },
+  { key: 'mappingPresets', label: 'Mapping presets' },
+  { key: 'decisionPresets', label: 'Decision presets' },
+];
+
+export function mergeWorkspacePresence(
+  local: LocalWorkspaceSnapshot,
+  cloud: FullWorkspacePayload | undefined
+): MergedWorkspace {
+  const present = (value: unknown): boolean => value !== undefined && value !== null;
+  const pulled: string[] = [];
+  let settingsPulled = false;
+  let filesPulled = false;
+  let pushBackNeeded = false;
+
+  let referenceWb: WorkbookData | undefined;
+  if (present(local.referenceWb)) {
+    referenceWb = local.referenceWb as WorkbookData;
+    if (!present(cloud?.referenceWb)) pushBackNeeded = true;
+  } else if (present(cloud?.referenceWb)) {
+    referenceWb = cloud?.referenceWb as WorkbookData;
+    pulled.push('Reference Workbook');
+    filesPulled = true;
+  }
+
+  let comparisonWb: WorkbookData | undefined;
+  if (present(local.comparisonWb)) {
+    comparisonWb = local.comparisonWb as WorkbookData;
+    if (!present(cloud?.comparisonWb)) pushBackNeeded = true;
+  } else if (present(cloud?.comparisonWb)) {
+    comparisonWb = cloud?.comparisonWb as WorkbookData;
+    pulled.push('Comparison Workbook');
+    filesPulled = true;
+  }
+
+  const cloudSettings = cloud?.settings ?? undefined;
+  const mergedSettings: Partial<WorkspaceSettings> = {};
+  const localOnlySettings: Partial<WorkspaceSettings> = {};
+  for (const { key, label } of SETTINGS_FIELD_LABELS) {
+    const localValue = (local as Record<string, unknown>)[key];
+    const cloudValue = (cloudSettings as Record<string, unknown> | undefined)?.[key];
+    if (present(localValue)) {
+      (mergedSettings as Record<string, unknown>)[key] = localValue;
+      if (!present(cloudValue)) {
+        (localOnlySettings as Record<string, unknown>)[key] = localValue;
+        pushBackNeeded = true;
+      }
+    } else if (present(cloudValue)) {
+      (mergedSettings as Record<string, unknown>)[key] = cloudValue;
+      pulled.push(label);
+      settingsPulled = true;
+    }
+  }
+  const settings = Object.keys(mergedSettings).length > 0 ? mergedSettings : undefined;
+
+  let results: MatchedRow[] | undefined;
+  let stats: MatchingStats | undefined;
+  const localAffectsResults =
+    present(local.referenceWb) ||
+    present(local.comparisonWb) ||
+    present(local.normalization) ||
+    present(local.layers) ||
+    present(local.mappings) ||
+    present(local.holdColumn) ||
+    present(local.holdValues) ||
+    present(local.holdReason) ||
+    present(local.releasedRowIds);
+  if (!localAffectsResults && present(cloud?.results) && present(cloud?.stats)) {
+    results = cloud?.results as MatchedRow[];
+    stats = cloud?.stats as MatchingStats;
+    pulled.push('Matching results');
+  }
+
+  let pushBack: FullWorkspacePayload | null = null;
+  if (pushBackNeeded) {
+    const cloudSettingsRecord = (cloudSettings ?? {}) as Partial<WorkspaceSettings>;
+    const pushSettings: WorkspaceSettings | undefined =
+      Object.keys(localOnlySettings).length > 0
+        ? {
+            normalization:
+              localOnlySettings.normalization ?? cloudSettingsRecord.normalization ?? defaultNormalizationRules,
+            layers: localOnlySettings.layers ?? cloudSettingsRecord.layers ?? defaultDecisionLayers,
+            mappings: localOnlySettings.mappings ?? cloudSettingsRecord.mappings ?? [],
+            holdColumn: localOnlySettings.holdColumn ?? cloudSettingsRecord.holdColumn ?? '',
+            holdValues: localOnlySettings.holdValues ?? cloudSettingsRecord.holdValues ?? [],
+            holdReason: localOnlySettings.holdReason ?? cloudSettingsRecord.holdReason ?? '',
+            releasedRowIds: localOnlySettings.releasedRowIds ?? cloudSettingsRecord.releasedRowIds ?? [],
+            mappingPresets: localOnlySettings.mappingPresets ?? cloudSettingsRecord.mappingPresets,
+            decisionPresets: localOnlySettings.decisionPresets ?? cloudSettingsRecord.decisionPresets,
+            columnConfigs: localOnlySettings.columnConfigs ?? cloudSettingsRecord.columnConfigs,
+            updatedAt: Date.now(),
+          }
+        : undefined;
+    pushBack = {
+      referenceWb:
+        present(local.referenceWb) && !present(cloud?.referenceWb)
+          ? (local.referenceWb as WorkbookData)
+          : undefined,
+      comparisonWb:
+        present(local.comparisonWb) && !present(cloud?.comparisonWb)
+          ? (local.comparisonWb as WorkbookData)
+          : undefined,
+      settings: pushSettings,
+    };
+  }
+
+  return {
+    referenceWb,
+    comparisonWb,
+    settings,
+    results,
+    stats,
+    pulled,
+    settingsPulled,
+    filesPulled,
+    pushBack,
+  };
 }
 
 /**

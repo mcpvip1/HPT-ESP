@@ -38,6 +38,7 @@ import { SupabaseConfigModal } from './components/SupabaseConfigModal';
 import { SyncHistoryModal } from './components/SyncHistoryModal';
 import {
   getRunningVersionInfo,
+  formatBuildDisplay,
   dismissVersion,
   AppVersionInfo,
 } from './utils/versionManager';
@@ -56,8 +57,10 @@ import {
   syncSettingsToSupabase,
   wipeSupabaseWorkspace,
   debounce,
+  mergeWorkspacePresence,
   WorkspaceSettings,
   StoredColumnSettings,
+  LocalWorkspaceSnapshot,
 } from './lib/supabaseSync';
 import { AlertTriangle, RotateCcw, Loader2 } from 'lucide-react';
 
@@ -276,70 +279,179 @@ export default function App() {
     };
   }, []);
 
-  // Supabase workspace pull
-  const hasPulledSupabaseRef = useRef<string | null>(null);
+  // Startup workspace reconciliation (shared no-sign-in workspace).
+  // Runs during the splash screen, which shows the scan status and waits
+  // for it. Rule: local data wins when present; the cloud only fills gaps;
+  // local-only data is pushed back so every device converges.
+  const hasMergedRef = useRef<boolean | null>(null);
+  const [mergeStatus, setMergeStatus] = useState<string | null>(null);
+  const [mergeDone, setMergeDone] = useState(false);
+  const [needsReevaluate, setNeedsReevaluate] = useState(false);
   useEffect(() => {
-    if (!isSupabaseConnected) return;
-    const wId = getEffectiveWorkspaceId(supabaseUser);
-    if (hasPulledSupabaseRef.current === wId) return;
-    hasPulledSupabaseRef.current = wId;
-
+    if (hasMergedRef.current === isSupabaseConnected) return;
+    hasMergedRef.current = isSupabaseConnected;
+    if (!isSupabaseConnected) {
+      setMergeDone(true);
+      return;
+    }
+    let cancelled = false;
     setIsCloudPulling(true);
     (async () => {
       try {
-        const { success, data } = await fetchWorkspaceFromSupabase(wId);
-        if (success && data) {
-          if (data.referenceWb) {
-            setReferenceWb(data.referenceWb);
-            await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, data.referenceWb);
-          }
-          if (data.comparisonWb) {
-            setComparisonWb(data.comparisonWb);
-            await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, data.comparisonWb);
-          }
-          if (data.settings) {
-            if (data.settings.normalization) {
-              setNormalization(data.settings.normalization);
-              await saveToIDB(StorageKeys.NORMALIZATION_RULES, data.settings.normalization);
-            }
-            if (data.settings.layers) {
-              setLayers(data.settings.layers);
-              await saveToIDB(StorageKeys.DECISION_LAYERS, data.settings.layers);
-            }
-            if (data.settings.mappings) {
-              setMappings(data.settings.mappings);
-              await saveToIDB(StorageKeys.COLUMN_MAPPINGS, data.settings.mappings);
-            }
-            if (typeof data.settings.holdColumn === 'string') {
-              setHoldColumn(data.settings.holdColumn);
-              await saveToIDB(StorageKeys.HOLD_COLUMN, data.settings.holdColumn);
-            }
-            if (data.settings.holdValues) {
-              setHoldValues(data.settings.holdValues);
-              await saveToIDB(StorageKeys.HOLD_VALUES, data.settings.holdValues);
-            }
-            if (typeof data.settings.holdReason === 'string') {
-              setHoldReason(data.settings.holdReason);
-              await saveToIDB(StorageKeys.HOLD_REASON, data.settings.holdReason);
-            }
-            if (data.settings.releasedRowIds) {
-              setReleasedRowIds(data.settings.releasedRowIds);
-              await saveToIDB(StorageKeys.RELEASED_ROWS, data.settings.releasedRowIds);
-            }
-          }
-          if (data.results && data.stats) {
-            setResults(data.results);
-            setStats(data.stats);
-          }
-          showToast('Workspace synced from Supabase successfully!', 'success');
+        setMergeStatus('Scanning local data…');
+        const [
+          savedRef,
+          savedComp,
+          savedMappings,
+          savedNorm,
+          savedLayers,
+          savedHoldCol,
+          savedHoldVals,
+          savedHoldReason,
+          savedReleased,
+          savedColConfigs,
+        ] = await Promise.all([
+          getFromIDB<WorkbookData>(StorageKeys.REFERENCE_WORKBOOK),
+          getFromIDB<WorkbookData>(StorageKeys.COMPARISON_WORKBOOK),
+          getFromIDB<ColumnMapping[]>(StorageKeys.COLUMN_MAPPINGS),
+          getFromIDB<NormalizationRules>(StorageKeys.NORMALIZATION_RULES),
+          getFromIDB<DecisionLayer[]>(StorageKeys.DECISION_LAYERS),
+          getFromIDB<string>(StorageKeys.HOLD_COLUMN),
+          getFromIDB<string[]>(StorageKeys.HOLD_VALUES),
+          getFromIDB<string>(StorageKeys.HOLD_REASON),
+          getFromIDB<string[]>(StorageKeys.RELEASED_ROWS),
+          getFromIDB<StoredColumnSettings>(StorageKeys.COLUMN_CONFIGS),
+        ]);
+        if (cancelled) return;
+
+        setMergeStatus('Checking cloud workspace…');
+        const fetchPromise = fetchWorkspaceFromSupabase(
+          getEffectiveWorkspaceId(),
+          'Startup workspace sync'
+        );
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Cloud check timed out')), 20000)
+        );
+        const { success, data } = await Promise.race([fetchPromise, timeout]).catch(() => ({
+          success: false as const,
+          data: undefined,
+        }));
+        if (cancelled) return;
+        if (!success) {
+          setMergeStatus('Cloud unreachable — using local data');
+          return;
         }
+
+        const local: LocalWorkspaceSnapshot = {
+          referenceWb: savedRef ?? null,
+          comparisonWb: savedComp ?? null,
+          normalization: savedNorm ?? null,
+          layers: savedLayers ?? null,
+          mappings: savedMappings ?? null,
+          holdColumn: savedHoldCol ?? null,
+          holdValues: savedHoldVals ?? null,
+          holdReason: savedHoldReason ?? null,
+          releasedRowIds: savedReleased ?? null,
+          columnConfigs: savedColConfigs ?? null,
+        };
+        const merged = mergeWorkspacePresence(local, data);
+
+        if (merged.referenceWb) {
+          setReferenceWb(merged.referenceWb);
+          await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, merged.referenceWb);
+        }
+        if (merged.comparisonWb) {
+          setComparisonWb(merged.comparisonWb);
+          await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, merged.comparisonWb);
+        }
+        if (merged.settings) {
+          const s = merged.settings;
+          if (s.normalization) {
+            setNormalization(s.normalization);
+            await saveToIDB(StorageKeys.NORMALIZATION_RULES, s.normalization);
+          }
+          if (s.layers) {
+            setLayers(s.layers);
+            await saveToIDB(StorageKeys.DECISION_LAYERS, s.layers);
+          }
+          if (s.mappings) {
+            setMappings(s.mappings);
+            await saveToIDB(StorageKeys.COLUMN_MAPPINGS, s.mappings);
+          }
+          if (typeof s.holdColumn === 'string') {
+            setHoldColumn(s.holdColumn);
+            await saveToIDB(StorageKeys.HOLD_COLUMN, s.holdColumn);
+          }
+          if (s.holdValues) {
+            setHoldValues(s.holdValues);
+            await saveToIDB(StorageKeys.HOLD_VALUES, s.holdValues);
+          }
+          if (typeof s.holdReason === 'string') {
+            setHoldReason(s.holdReason);
+            await saveToIDB(StorageKeys.HOLD_REASON, s.holdReason);
+          }
+          if (s.releasedRowIds) {
+            setReleasedRowIds(s.releasedRowIds);
+            await saveToIDB(StorageKeys.RELEASED_ROWS, s.releasedRowIds);
+          }
+          if (s.columnConfigs && Array.isArray(s.columnConfigs.order)) {
+            const cfg = s.columnConfigs;
+            const restored: ColumnConfigItem[] = cfg.order.map((id: string) => ({
+              id,
+              label: id,
+              category: 'data',
+              showInTable: cfg.visibility?.[id]?.table !== false,
+              showInExport: cfg.visibility?.[id]?.export !== false,
+            }));
+            setStudioColumnConfigs(restored);
+            await saveToIDB(StorageKeys.COLUMN_CONFIGS, cfg);
+          }
+        }
+        if (merged.results && merged.stats) {
+          setResults(merged.results);
+          setStats(merged.stats);
+        }
+        if (cancelled) return;
+
+        if (merged.pulled.length > 0) {
+          setMergeStatus(`Pulled from cloud: ${merged.pulled.join(', ')}`);
+          showToast(`Pulled from cloud: ${merged.pulled.join(', ')}`, 'success');
+        }
+        if (merged.pushBack) {
+          setMergeStatus('Uploading local data to cloud…');
+          await syncWorkspaceToSupabase(
+            getEffectiveWorkspaceId(),
+            merged.pushBack,
+            'Startup sync: local data missing in cloud'
+          );
+        }
+        // Settings pulled while files are present leave results computed
+        // from older settings — re-run matching once with merged settings,
+        // unless results were pulled too (then they already match).
+        if (
+          (merged.settingsPulled || merged.filesPulled) &&
+          merged.referenceWb &&
+          merged.comparisonWb &&
+          (merged.settings?.mappings?.length ?? 0) > 0 &&
+          !(merged.results && merged.stats)
+        ) {
+          setNeedsReevaluate(true);
+        }
+        setMergeStatus('Sync complete');
       } catch (err: any) {
-        console.warn('Failed to pull from Supabase:', err);
+        console.warn('Failed to reconcile workspace:', err);
+        if (!cancelled) setMergeStatus('Cloud unreachable — using local data');
       } finally {
-        setIsCloudPulling(false);
+        if (!cancelled) {
+          setIsCloudPulling(false);
+          setMergeDone(true);
+        }
       }
     })();
-  }, [supabaseUser, showToast]);
+    return () => {
+      cancelled = true;
+    };
+  }, [isSupabaseConnected, showToast]);
 
   // Debounced auto-sync to Supabase with human-readable reason
   const debouncedSyncToSupabase = useRef(
@@ -378,7 +490,7 @@ export default function App() {
       const reason = wb
         ? `Reference Workbook loaded: '${wb.name || wb.activeSheet || 'File'}' (${wb.rows?.length || 0} rows)`
         : 'Reference Workbook removed';
-      debouncedSyncToSupabase(getEffectiveWorkspaceId(supabaseUser), { referenceWb: wb }, reason);
+      debouncedSyncToSupabase(getEffectiveWorkspaceId(), { referenceWb: wb }, reason);
     }
   };
 
@@ -401,7 +513,7 @@ export default function App() {
       const reason = wb
         ? `Comparison Workbook loaded: '${wb.name || wb.activeSheet || 'File'}' (${wb.rows?.length || 0} rows)`
         : 'Comparison Workbook removed';
-      debouncedSyncToSupabase(getEffectiveWorkspaceId(supabaseUser), { comparisonWb: wb }, reason);
+      debouncedSyncToSupabase(getEffectiveWorkspaceId(), { comparisonWb: wb }, reason);
     }
   };
 
@@ -503,10 +615,11 @@ export default function App() {
         holdValues,
         holdReason,
         releasedRowIds,
+        columnConfigs: buildStoredColConfigs(studioColumnConfigs),
         updatedAt: Date.now(),
       };
       await syncSettingsToSupabase(
-        getEffectiveWorkspaceId(supabaseUser),
+        getEffectiveWorkspaceId(),
         settingsPayload,
         `Updated ${layers.length} decision layers & ${mappings.length} column mappings`
       );
@@ -569,7 +682,7 @@ export default function App() {
 
         if (isSupabaseConnected) {
           debouncedSyncToSupabase(
-            getEffectiveWorkspaceId(supabaseUser),
+            getEffectiveWorkspaceId(),
             {
               results: evaluatedResults,
               stats: evaluatedStats,
@@ -605,7 +718,8 @@ export default function App() {
   const handleSupabaseSignOut = async () => {
     await signOutSupabase();
     setSupabaseUser(null);
-    hasPulledSupabaseRef.current = null;
+    // Shared workspace: signing out changes no workspace id, so no
+    // re-merge is needed (the old per-user pull reset is gone).
     showToast('Signed out of Supabase.', 'info');
   };
 
@@ -613,7 +727,7 @@ export default function App() {
     setIsRestoring(true);
     try {
       if (isSupabaseConnected) {
-        await wipeSupabaseWorkspace(getEffectiveWorkspaceId(supabaseUser));
+        await wipeSupabaseWorkspace(getEffectiveWorkspaceId());
       }
 
       for (const k of [
@@ -668,22 +782,64 @@ export default function App() {
     }
   };
 
-  const handleTriggerManualSync = async () => {
-    if (!isSupabaseConnected) {
-      showToast('Please configure Supabase first.', 'error');
-      return;
-    }
-
-    const storedColConfigs: StoredColumnSettings | undefined = studioColumnConfigs
+  // Column view settings (StoredColumnSettings) shared by every settings sync.
+  const buildStoredColConfigs = (
+    configs: ColumnConfigItem[] | undefined
+  ): StoredColumnSettings | undefined =>
+    configs
       ? {
-          order: studioColumnConfigs.map((c) => c.id),
-          visibility: studioColumnConfigs.reduce(
+          order: configs.map((c) => c.id),
+          visibility: configs.reduce(
             (acc, c) => ({ ...acc, [c.id]: { table: c.showInTable, export: c.showInExport } }),
             {} as Record<string, { table: boolean; export: boolean }>
           ),
           updatedAt: Date.now(),
         }
       : undefined;
+
+  // Re-run matching once after startup reconciliation pulled newer settings
+  // or files (results computed from older settings would otherwise linger).
+  useEffect(() => {
+    if (!needsReevaluate) return;
+    if (!referenceWb || !comparisonWb || mappings.length === 0) {
+      setNeedsReevaluate(false);
+      return;
+    }
+    setNeedsReevaluate(false);
+    handleExecuteMatching(undefined, undefined, undefined, false);
+  }, [needsReevaluate, referenceWb, comparisonWb, mappings]);
+
+  // Column view changes sync to the cloud like any other setting.
+  const handleSaveColumnConfigs = (configs: ColumnConfigItem[]) => {
+    setStudioColumnConfigs(configs);
+    if (isSupabaseConnected) {
+      debouncedSyncToSupabase(
+        getEffectiveWorkspaceId(),
+        {
+          settings: {
+            normalization,
+            layers,
+            mappings,
+            holdColumn,
+            holdValues,
+            holdReason,
+            releasedRowIds,
+            columnConfigs: buildStoredColConfigs(configs),
+            updatedAt: Date.now(),
+          },
+        },
+        'Column view settings updated'
+      );
+    }
+  };
+
+  const handleTriggerManualSync = async () => {
+    if (!isSupabaseConnected) {
+      showToast('Please configure Supabase first.', 'error');
+      return;
+    }
+
+    const storedColConfigs = buildStoredColConfigs(studioColumnConfigs);
 
     const settingsPayload: WorkspaceSettings = {
       normalization,
@@ -704,7 +860,7 @@ export default function App() {
       settings: settingsPayload,
     };
     const res = await syncWorkspaceToSupabase(
-      getEffectiveWorkspaceId(supabaseUser),
+      getEffectiveWorkspaceId(),
       payload,
       'Manual full cloud sync'
     );
@@ -719,7 +875,7 @@ export default function App() {
       return;
     }
     const { success, data, error } = await fetchWorkspaceFromSupabase(
-      getEffectiveWorkspaceId(supabaseUser),
+      getEffectiveWorkspaceId(),
       'Manual workspace restore from cloud'
     );
     if (!success) {
@@ -788,6 +944,8 @@ export default function App() {
       <SplashScreen
         language={language}
         onFinish={handleSplashFinish}
+        syncStatus={mergeStatus}
+        readyToFinish={mergeDone}
       />
     );
   }
@@ -830,6 +988,7 @@ export default function App() {
         onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
         onCheckForUpdates={handleManualCheckUpdates}
         currentVersion={getRunningVersionInfo().version}
+        currentBuildTime={formatBuildDisplay(getRunningVersionInfo().builtAt)}
       />
 
       {/* 2. Main Content Viewport */}
@@ -864,7 +1023,7 @@ export default function App() {
                 initialOnlyAccept={true}
                 initialSearchTerm=""
                 initialColumnConfigs={studioColumnConfigs}
-                onSaveColumnConfigs={(configs) => setStudioColumnConfigs(configs)}
+                onSaveColumnConfigs={handleSaveColumnConfigs}
                 supabaseUser={supabaseUser}
                 holdReason={holdReason}
                 onReleaseHoldKey={handleReleaseHoldKey}

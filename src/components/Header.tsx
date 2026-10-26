@@ -36,6 +36,7 @@ interface HeaderProps {
   onToggleTheme?: () => void;
   onCheckForUpdates?: () => void;
   currentVersion?: string;
+  currentBuildTime?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -56,9 +57,26 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTheme,
   onCheckForUpdates,
   currentVersion,
+  currentBuildTime,
 }) => {
   const t = translations[language];
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  // Sync & Config buttons stay hidden until the logo is triple-clicked
+  // (toggles back off on the next triple-click). Session-only: every fresh
+  // open starts hidden again.
+  const [advancedVisible, setAdvancedVisible] = useState(false);
+  const logoClicksRef = useRef({ count: 0, lastTime: 0 });
+  const handleLogoClick = () => {
+    if (onSelectStep) onSelectStep(1);
+    const now = Date.now();
+    const clicks = logoClicksRef.current;
+    clicks.count = now - clicks.lastTime > 800 ? 1 : clicks.count + 1;
+    clicks.lastTime = now;
+    if (clicks.count >= 3) {
+      clicks.count = 0;
+      setAdvancedVisible((v) => !v);
+    }
+  };
   const langRef = useRef<HTMLDivElement>(null);
 
   const languageLabels: Record<Language, { native: string; code: string }> = {
@@ -85,9 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Brand: Excellent Medical Technology logo + name + creator */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
-              onClick={() => {
-                if (onSelectStep) onSelectStep(1);
-              }}
+              onClick={handleLogoClick}
               className="flex items-center gap-2 sm:gap-2.5 min-w-0 focus:outline-none group cursor-pointer text-left"
               title="Excellent Medical Technology ESP"
             >
@@ -130,6 +146,18 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
+            {/* Current build number (release version, e.g. V2.1.4) */}
+            <span
+              className="px-2 py-1 rounded-lg text-[11px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 shrink-0"
+              title={
+                currentBuildTime
+                  ? `Build ${currentVersion || 'dev'} · ${currentBuildTime}`
+                  : `Build ${currentVersion || 'dev'}`
+              }
+            >
+              {currentVersion || 'dev'}
+            </span>
+
             {/* Check for Updates Button */}
             {onCheckForUpdates && (
               <button
@@ -159,16 +187,16 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Live Upload & Sync Progress Widget */}
-            {onOpenSyncHistory && (
+            {/* Live Upload & Sync Progress Widget (hidden until logo triple-click) */}
+            {advancedVisible && onOpenSyncHistory && (
               <SyncProgressIndicator
                 onOpenHistory={onOpenSyncHistory}
                 isSupabaseConnected={Boolean(isSupabaseConnected)}
               />
             )}
 
-            {/* Supabase Cloud Sync settings & status button */}
-            {onOpenSupabaseConfig && (
+            {/* Supabase Cloud Sync settings & status button (hidden until logo triple-click) */}
+            {advancedVisible && onOpenSupabaseConfig && (
               <button
                 type="button"
                 onClick={onOpenSupabaseConfig}

@@ -9,17 +9,26 @@ interface SplashScreenProps {
   language: Language;
   onFinish: (hasUpdate: boolean, updateInfo: AppVersionInfo | null) => void;
   minDurationMs?: number;
+  /** Startup workspace scan status from App (overrides the animated steps). */
+  syncStatus?: string | null;
+  /** When false, the splash waits (showing syncStatus) instead of finishing. */
+  readyToFinish?: boolean;
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({
   language,
   onFinish,
   minDurationMs = 2400,
+  syncStatus,
+  readyToFinish = true,
 }) => {
   const t = translations[language] || translations.en;
   const [progress, setProgress] = useState(10);
   const [statusText, setStatusText] = useState('Initializing application runtime...');
   const [isFadingOut, setIsFadingOut] = useState(false);
+  // Latest readyToFinish without restarting the check when it flips.
+  const readyToFinishRef = React.useRef(readyToFinish);
+  readyToFinishRef.current = readyToFinish;
 
   useEffect(() => {
     let isCancelled = false;
@@ -70,6 +79,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       }
     }, 60);
 
+    const pendingWaits: ReturnType<typeof setInterval>[] = [];
+
     // Parallel real update check (fetches version.json; no fake delay).
     const checkPromise = checkAppUpdate();
 
@@ -77,26 +88,47 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       checkPromise,
       new Promise((resolve) => setTimeout(resolve, minDurationMs)),
     ]).then(([result]) => {
-      if (isCancelled) return;
-      clearInterval(interval);
-      setProgress(100);
-      setStatusText(statusSteps[4].text);
-
-      // Brief pause at 100% then fade out
-      setTimeout(() => {
+      // Finish only once the workspace reconciliation is done too; until
+      // then keep showing the splash (with the live sync status) instead
+      // of dropping the user into an unsynced app.
+      const finish = () => {
         if (isCancelled) return;
-        setIsFadingOut(true);
+        clearInterval(interval);
+        setProgress(100);
+        setStatusText(statusSteps[4].text);
+
+        // Brief pause at 100% then fade out
         setTimeout(() => {
-          if (!isCancelled) {
-            onFinish(result.hasUpdate, result.latest);
+          if (isCancelled) return;
+          setIsFadingOut(true);
+          setTimeout(() => {
+            if (!isCancelled) {
+              onFinish(result.hasUpdate, result.latest);
+            }
+          }, 400);
+        }, 300);
+      };
+      if (readyToFinishRef.current) {
+        finish();
+      } else {
+        const wait = setInterval(() => {
+          if (isCancelled) {
+            clearInterval(wait);
+            return;
           }
-        }, 400);
-      }, 300);
+          if (readyToFinishRef.current) {
+            clearInterval(wait);
+            finish();
+          }
+        }, 300);
+        pendingWaits.push(wait);
+      }
     });
 
     return () => {
       isCancelled = true;
       clearInterval(interval);
+      pendingWaits.forEach((w) => clearInterval(w));
     };
   }, [language, minDurationMs, onFinish]);
 
@@ -166,7 +198,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
           <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
             <span className="flex items-center gap-1.5 truncate max-w-[210px] text-left">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
-              <span className="truncate">{statusText}</span>
+              <span className="truncate">{syncStatus || statusText}</span>
             </span>
             <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular-nums shrink-0">
               {progress}%

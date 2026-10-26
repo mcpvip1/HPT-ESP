@@ -1,20 +1,17 @@
 /**
  * Real build-based update checking.
  *
- * The previous implementation hardcoded a "latest version" (v2.4.2) in
- * source and faked the update with a timed animation: it downloaded
- * nothing, reloaded nothing, and only flipped a localStorage flag. So the
- * displayed version never changed on real deploys, and dismissing the
- * prompt meant being nagged again on every open.
+ * Displayed version numbers come from release.json (V2.1.4 style), bumped
+ * on every release push, with the change log carried in version.json.
+ * The bundle content hash is still tracked underneath: it is what makes
+ * the prompt fire even for a rebuild whose release number was not bumped.
  *
- * Now the version is the Vite bundle's own content hash:
  * - At build time, a Vite plugin writes `dist/version.json` with the
- *   current bundle's hash and build timestamp.
- * - At runtime, the running bundle's hash is parsed from its own
- *   `import.meta.url`, and the latest hash is fetched fresh (no-store)
- *   from `version.json`.
- * - An update is offered only when the fetched hash differs from the
- *   running hash AND the user has not dismissed that exact hash.
+ *   release version, change log, bundle hash, and build timestamp, and
+ *   the same release version is baked into the bundle via define.
+ * - At runtime, the latest version.json is fetched fresh (no-store).
+ * - An update is offered only when the deployed version OR hash differs
+ *   from the running build AND the user has not dismissed that exact hash.
  * - "Update" records the update in history and reloads the page, which is
  *   what actually loads the new bundle. If the reload still serves stale
  *   code (cached index.html), the prompt correctly reappears.
@@ -24,8 +21,9 @@
  */
 
 export interface AppVersionInfo {
-  /** Short build hash, e.g. 'B9OvoesV' — this IS the version now. */
+  /** Release version number, e.g. 'V2.1.4' (from release.json). */
   version: string;
+  /** Vite bundle content hash, e.g. 'WTHRyv-2' (the per-build identity). */
   buildHash: string;
   jsFile: string;
   releaseDate: string;
@@ -84,16 +82,35 @@ export function getRunningBuild(): { hash: string | null; jsFile: string | null 
   }
 }
 
+/** Release version baked into this bundle ('dev' outside a Vite build). */
+export function getRunningReleaseVersion(): string {
+  try {
+    return typeof __APP_VERSION__ !== 'undefined' && __APP_VERSION__ ? __APP_VERSION__ : 'dev';
+  } catch {
+    return 'dev';
+  }
+}
+
+function getRunningBuiltAt(): string {
+  try {
+    return typeof __APP_BUILT_AT__ !== 'undefined' && __APP_BUILT_AT__ ? __APP_BUILT_AT__ : '';
+  } catch {
+    return '';
+  }
+}
+
 /** Display info for the running build ('dev' when no bundle hash exists). */
 export function getRunningVersionInfo(): AppVersionInfo {
   const { hash } = getRunningBuild();
+  const builtAt = getRunningBuiltAt();
+  const { releaseDate, releaseTime } = formatBuildDate(builtAt);
   return {
-    version: hash ?? 'dev',
+    version: getRunningReleaseVersion(),
     buildHash: hash ?? '',
     jsFile: hash ? `index-${hash}.js` : '',
-    releaseDate: '',
-    releaseTime: '',
-    builtAt: '',
+    releaseDate,
+    releaseTime,
+    builtAt,
   };
 }
 
@@ -108,6 +125,14 @@ function formatBuildDate(iso: string): { releaseDate: string; releaseTime: strin
     }),
     releaseTime: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
   };
+}
+
+/** One-line build stamp for tooltips, e.g. 'Oct 26, 2026, 4:47 PM'. */
+export function formatBuildDisplay(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const { releaseDate, releaseTime } = formatBuildDate(iso);
+  return `${releaseDate}, ${releaseTime}`;
 }
 
 /** Fetch the currently deployed build (null when unreachable or malformed). */
@@ -127,16 +152,20 @@ export async function fetchLatestVersion(): Promise<AppVersionInfo | null> {
     if (!response.ok) return null;
     const data: unknown = await response.json();
     if (!data || typeof data !== 'object') return null;
-    const { hash, js, builtAt } = data as Record<string, unknown>;
+    const { hash, js, builtAt, version, highlights } = data as Record<string, unknown>;
     if (typeof hash !== 'string' || !hash || typeof builtAt !== 'string') return null;
     const { releaseDate, releaseTime } = formatBuildDate(builtAt);
     return {
-      version: hash,
+      version: typeof version === 'string' && version ? version : hash,
       buildHash: hash,
       jsFile: typeof js === 'string' && js ? js : `index-${hash}.js`,
       releaseDate,
       releaseTime,
       builtAt,
+      highlights:
+        highlights && typeof highlights === 'object'
+          ? (highlights as Record<string, string[]>)
+          : undefined,
     };
   } catch {
     return null;
@@ -188,14 +217,22 @@ export function recordUpdateApplied(info: AppVersionInfo): void {
   } catch {}
 }
 
-/** Pure prompt rule, unit-tested: unknown builds never prompt. */
+/**
+ * Pure prompt rule, unit-tested: unknown builds never prompt. A prompt
+ * fires when the release number OR the bundle hash differs — so a rebuild
+ * whose release number was not bumped still prompts — unless the user
+ * dismissed exactly that build.
+ */
 export function shouldPromptUpdate(
+  runningVersion: string,
   runningHash: string | null,
+  latestVersion: string | null,
   latestHash: string | null,
   dismissedHash: string | null
 ): boolean {
   if (!runningHash || !latestHash) return false;
-  return latestHash !== runningHash && latestHash !== dismissedHash;
+  if (latestHash === dismissedHash) return false;
+  return latestVersion !== runningVersion || latestHash !== runningHash;
 }
 
 /**
@@ -212,7 +249,13 @@ export async function checkAppUpdate(): Promise<{
   const latest = await fetchLatestVersion();
   if (!latest) return { hasUpdate: false, runningHash, latest: null };
   return {
-    hasUpdate: shouldPromptUpdate(runningHash, latest.buildHash, getDismissedVersion()),
+    hasUpdate: shouldPromptUpdate(
+      getRunningReleaseVersion(),
+      runningHash,
+      latest.version,
+      latest.buildHash,
+      getDismissedVersion()
+    ),
     runningHash,
     latest,
   };
