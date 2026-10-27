@@ -588,6 +588,26 @@ export default function App() {
   };
 
   // File Upload Handlers
+  // Saved mapping key survives a file replace: mappings are matched by
+  // header name, so any mapping whose columns still exist in the new file
+  // is kept. Only mappings pointing at removed columns are dropped, and
+  // auto-map runs only when nothing survives (e.g. renamed columns).
+  // The kept mappings are saved locally AND pushed to the cloud together
+  // with the file and the fresh results in one combined sync — the
+  // debounced sync only fires the last call in its window, so a separate
+  // file/settings sync here would be swallowed by the results sync.
+  const buildCompleteSettings = (nextMappings: ColumnMapping[]): WorkspaceSettings => ({
+    normalization,
+    layers,
+    mappings: nextMappings,
+    holdColumn,
+    holdValues,
+    holdReason,
+    releasedRowIds,
+    columnConfigs: buildStoredColConfigs(studioColumnConfigs),
+    updatedAt: Date.now(),
+  });
+
   const handleSetReferenceWb = async (wb: WorkbookData | null) => {
     setReferenceWb(wb);
     if (wb) {
@@ -597,13 +617,17 @@ export default function App() {
     }
 
     if (wb && comparisonWb) {
-      const auto = autoMapColumns(wb.headers, comparisonWb.headers);
-      setMappings(auto);
-      await saveToIDB(StorageKeys.COLUMN_MAPPINGS, auto);
-      handleExecuteMatching(wb, comparisonWb, auto, false);
-    }
-
-    if (isSupabaseConnected) {
+      const kept = mappings.filter(
+        (m) => wb.headers.includes(m.mainCol) && comparisonWb.headers.includes(m.comparisonCol)
+      );
+      const next = kept.length > 0 ? kept : autoMapColumns(wb.headers, comparisonWb.headers);
+      setMappings(next);
+      await saveToIDB(StorageKeys.COLUMN_MAPPINGS, next);
+      handleExecuteMatching(wb, comparisonWb, next, false, undefined, undefined, undefined, {
+        referenceWb: wb,
+        settings: buildCompleteSettings(next),
+      });
+    } else if (isSupabaseConnected) {
       const reason = wb
         ? `Reference Workbook loaded: '${wb.name || wb.activeSheet || 'File'}' (${wb.rows?.length || 0} rows)`
         : 'Reference Workbook removed';
@@ -620,13 +644,17 @@ export default function App() {
     }
 
     if (referenceWb && wb) {
-      const auto = autoMapColumns(referenceWb.headers, wb.headers);
-      setMappings(auto);
-      await saveToIDB(StorageKeys.COLUMN_MAPPINGS, auto);
-      handleExecuteMatching(referenceWb, wb, auto, false);
-    }
-
-    if (isSupabaseConnected) {
+      const kept = mappings.filter(
+        (m) => referenceWb.headers.includes(m.mainCol) && wb.headers.includes(m.comparisonCol)
+      );
+      const next = kept.length > 0 ? kept : autoMapColumns(referenceWb.headers, wb.headers);
+      setMappings(next);
+      await saveToIDB(StorageKeys.COLUMN_MAPPINGS, next);
+      handleExecuteMatching(referenceWb, wb, next, false, undefined, undefined, undefined, {
+        comparisonWb: wb,
+        settings: buildCompleteSettings(next),
+      });
+    } else if (isSupabaseConnected) {
       const reason = wb
         ? `Comparison Workbook loaded: '${wb.name || wb.activeSheet || 'File'}' (${wb.rows?.length || 0} rows)`
         : 'Comparison Workbook removed';
@@ -754,7 +782,14 @@ export default function App() {
     notifySuccess = true,
     customHoldValues?: string[],
     customReleasedRowIds?: string[],
-    customHoldColumn?: string
+    customHoldColumn?: string,
+    // Extra columns for the results sync (e.g. a replaced file + its
+    // complete settings), so one debounced call carries everything.
+    extraSync?: {
+      referenceWb?: WorkbookData | null;
+      comparisonWb?: WorkbookData | null;
+      settings?: WorkspaceSettings;
+    }
   ) => {
     const ref = customRef !== undefined ? customRef : referenceWb;
     const comp = customComp !== undefined ? customComp : comparisonWb;
@@ -803,6 +838,7 @@ export default function App() {
             {
               results: evaluatedResults,
               stats: evaluatedStats,
+              ...extraSync,
             },
             `Matching evaluated (${evaluatedStats.totalIncoming} rows: ${evaluatedStats.greenCount} Green, ${evaluatedStats.yellowCount} Yellow, ${evaluatedStats.redCount} Red)`
           );
