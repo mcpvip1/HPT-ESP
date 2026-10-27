@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Tailwind v4's dark: variant defaults to the OS prefers-color-scheme
+   media query, which ignored the app's own Light/Dark toggle (App.tsx
+   toggles .dark on <html>). Binding it to the .dark class makes the
+   toggle control every dark: utility — table headers, rows, borders —
+   on every computer, regardless of that computer's Windows/macOS
+   appearance setting. Without this, a PC set to Dark in Windows showed
+   a mixed theme: white page (CSS vars) with a dark table header. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ================================================================
    Theme Variables — Light (Default)
    From UI_THEME_STYLE_GUIDE_02d51ffb.md
