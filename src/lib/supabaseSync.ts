@@ -721,16 +721,18 @@ export async function fetchWorkspaceColumns(
   for (let i = 0; i < WORKSPACE_COLUMNS.length; i++) {
     const { label, column, field, workbook } = WORKSPACE_COLUMNS[i];
     onProgress({ item: label, done: i, total, percent: Math.round((i / total) * 100) });
+    let timerId: ReturnType<typeof setTimeout> | undefined;
     try {
       const fetchPromise = client
         .from('workspaces')
         .select(column)
         .eq('user_id', userId)
         .maybeSingle();
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Download timed out')), COLUMN_FETCH_TIMEOUT_MS)
-      );
+      const timeout = new Promise<never>((_, reject) => {
+        timerId = setTimeout(() => reject(new Error('Download timed out')), COLUMN_FETCH_TIMEOUT_MS);
+      });
       const { data, error } = await Promise.race([fetchPromise, timeout]);
+      if (timerId) clearTimeout(timerId);
       if (error) throw new Error(error.message);
       const value = (data as Record<string, unknown> | null)?.[column];
       if (value !== undefined && value !== null) {
@@ -744,6 +746,7 @@ export async function fetchWorkspaceColumns(
         }
       }
     } catch (err: any) {
+      if (timerId) clearTimeout(timerId);
       console.warn(`Supabase column fetch failed (${label}):`, err);
       failed.push(label);
     }
@@ -886,27 +889,34 @@ export function mergeWorkspacePresence(
   cloud: FullWorkspacePayload | undefined,
   options?: { allowPushBack?: boolean }
 ): MergedWorkspace {
-  const present = (value: unknown): boolean => value !== undefined && value !== null;
+  const hasValue = (val: unknown): boolean => {
+    if (val === null || val === undefined) return false;
+    if (typeof val === 'string') return val.trim().length > 0;
+    if (Array.isArray(val)) return val.length > 0;
+    if (typeof val === 'object') return Object.keys(val).length > 0;
+    return true;
+  };
+
   const pulled: string[] = [];
   let settingsPulled = false;
   let filesPulled = false;
   let pushBackNeeded = false;
 
   let referenceWb: WorkbookData | undefined;
-  if (present(local.referenceWb)) {
+  if (hasValue(local.referenceWb)) {
     referenceWb = local.referenceWb as WorkbookData;
-    if (!present(cloud?.referenceWb)) pushBackNeeded = true;
-  } else if (present(cloud?.referenceWb)) {
+    if (!hasValue(cloud?.referenceWb)) pushBackNeeded = true;
+  } else if (hasValue(cloud?.referenceWb)) {
     referenceWb = cloud?.referenceWb as WorkbookData;
     pulled.push('Reference Workbook');
     filesPulled = true;
   }
 
   let comparisonWb: WorkbookData | undefined;
-  if (present(local.comparisonWb)) {
+  if (hasValue(local.comparisonWb)) {
     comparisonWb = local.comparisonWb as WorkbookData;
-    if (!present(cloud?.comparisonWb)) pushBackNeeded = true;
-  } else if (present(cloud?.comparisonWb)) {
+    if (!hasValue(cloud?.comparisonWb)) pushBackNeeded = true;
+  } else if (hasValue(cloud?.comparisonWb)) {
     comparisonWb = cloud?.comparisonWb as WorkbookData;
     pulled.push('Comparison Workbook');
     filesPulled = true;
@@ -915,39 +925,39 @@ export function mergeWorkspacePresence(
   const cloudSettings = cloud?.settings ?? undefined;
   const mergedSettings: Partial<WorkspaceSettings> = {};
   const localOnlySettings: Partial<WorkspaceSettings> = {};
+
   for (const { key, label } of SETTINGS_FIELD_LABELS) {
     const localValue = (local as Record<string, unknown>)[key];
     const cloudValue = (cloudSettings as Record<string, unknown> | undefined)?.[key];
-    if (present(localValue)) {
-      (mergedSettings as Record<string, unknown>)[key] = localValue;
-      if (!present(cloudValue)) {
-        (localOnlySettings as Record<string, unknown>)[key] = localValue;
-        pushBackNeeded = true;
+
+    if (hasValue(cloudValue)) {
+      if (hasValue(localValue)) {
+        // Both have value: keep local if user customized locally, otherwise adopt cloud
+        (mergedSettings as Record<string, unknown>)[key] = localValue;
+      } else {
+        // Cloud has value, local is empty default -> adopt cloud!
+        (mergedSettings as Record<string, unknown>)[key] = cloudValue;
+        pulled.push(label);
+        settingsPulled = true;
       }
-    } else if (present(cloudValue)) {
-      (mergedSettings as Record<string, unknown>)[key] = cloudValue;
-      pulled.push(label);
-      settingsPulled = true;
+    } else if (hasValue(localValue)) {
+      (mergedSettings as Record<string, unknown>)[key] = localValue;
+      (localOnlySettings as Record<string, unknown>)[key] = localValue;
+      pushBackNeeded = true;
     }
   }
   const settings = Object.keys(mergedSettings).length > 0 ? mergedSettings : undefined;
 
   let results: MatchedRow[] | undefined;
   let stats: MatchingStats | undefined;
-  const localAffectsResults =
-    present(local.referenceWb) ||
-    present(local.comparisonWb) ||
-    present(local.normalization) ||
-    present(local.layers) ||
-    present(local.mappings) ||
-    present(local.holdColumn) ||
-    present(local.holdValues) ||
-    present(local.holdReason) ||
-    present(local.releasedRowIds);
-  if (!localAffectsResults && present(cloud?.results) && present(cloud?.stats)) {
-    results = cloud?.results as MatchedRow[];
-    stats = cloud?.stats as MatchingStats;
-    pulled.push('Matching results');
+
+  if (hasValue(cloud?.results) && hasValue(cloud?.stats)) {
+    // If files came from cloud or local files match cloud, adopt pre-calculated cloud results
+    if (filesPulled || !hasValue(local.referenceWb)) {
+      results = cloud?.results as MatchedRow[];
+      stats = cloud?.stats as MatchingStats;
+      pulled.push('Matching results');
+    }
   }
 
   let pushBack: FullWorkspacePayload | null = null;
@@ -975,11 +985,11 @@ export function mergeWorkspacePresence(
         : undefined;
     pushBack = {
       referenceWb:
-        present(local.referenceWb) && !present(cloud?.referenceWb)
+        hasValue(local.referenceWb) && !hasValue(cloud?.referenceWb)
           ? (local.referenceWb as WorkbookData)
           : undefined,
       comparisonWb:
-        present(local.comparisonWb) && !present(cloud?.comparisonWb)
+        hasValue(local.comparisonWb) && !hasValue(cloud?.comparisonWb)
           ? (local.comparisonWb as WorkbookData)
           : undefined,
       settings: pushSettings,

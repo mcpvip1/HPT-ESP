@@ -538,8 +538,8 @@ export default function App() {
           setStudioColumnConfigs(configs);
         }
 
-        // Auto-run matching if files and rules were previously loaded
-        if (savedRef && savedComp && savedMappings && savedMappings.length > 0) {
+        // Auto-run matching if files and rules were previously loaded and Supabase is not handling startup reconciliation
+        if (savedRef && savedComp && savedMappings && savedMappings.length > 0 && !isSupabaseConfigured()) {
           try {
             const { results: evaluated, stats: evStats } = processMatching(
               savedRef,
@@ -789,7 +789,8 @@ export default function App() {
       referenceWb?: WorkbookData | null;
       comparisonWb?: WorkbookData | null;
       settings?: WorkspaceSettings;
-    }
+    },
+    skipCloudSync = false
   ) => {
     const ref = customRef !== undefined ? customRef : referenceWb;
     const comp = customComp !== undefined ? customComp : comparisonWb;
@@ -832,7 +833,7 @@ export default function App() {
         setResults(evaluatedResults);
         setStats(evaluatedStats);
 
-        if (isSupabaseConnected) {
+        if (isSupabaseConnected && !skipCloudSync) {
           debouncedSyncToSupabase(
             getEffectiveWorkspaceId(),
             {
@@ -959,7 +960,7 @@ export default function App() {
       return;
     }
     setNeedsReevaluate(false);
-    handleExecuteMatching(undefined, undefined, undefined, false);
+    handleExecuteMatching(undefined, undefined, undefined, false, undefined, undefined, undefined, undefined, true);
   }, [needsReevaluate, referenceWb, comparisonWb, mappings]);
 
   // Column view changes sync to the cloud like any other setting.

@@ -142,7 +142,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   const isError = syncState.phase === 'error';
   const isDownloading = syncState.phase === 'downloading';
 
-  const message = copy[syncState.messageKey]
+  const rawMsg = copy[syncState.messageKey] || splashCopy.en[syncState.messageKey] || 'Loading…';
+  const message = rawMsg
     .replace('{item}', syncState.downloadItem || '')
     .replace('{pct}', String(syncState.downloadPercent ?? 0));
 

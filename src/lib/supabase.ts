@@ -58,7 +58,8 @@ export function isSupabaseConfigured(): boolean {
  */
 export const SHARED_WORKSPACE_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
 
-export function getEffectiveWorkspaceId(): string {
+export function getEffectiveWorkspaceId(user?: User | null): string {
+  if (user?.id) return user.id;
   return SHARED_WORKSPACE_ID;
 }
 

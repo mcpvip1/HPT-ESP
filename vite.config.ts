@@ -12,17 +12,19 @@ export default defineConfig(({command}) => {
     : '/HPT-ESP/';
   const base = isDev ? '/' : (process.env.VITE_BASE || repoName);
 
+  const rootDir = typeof import.meta.dirname === 'string' ? import.meta.dirname : path.resolve();
+
   // Release identity: release.json is the single source of truth for the
-  // displayed version number (V2.1.4 style) and its change log. Bump
+  // displayed version number (V2.1.8 style) and its change log. Bump
   // `version` (and the highlights) on every release push; the bundle hash
   // in version.json still catches unbumped rebuilds for update prompts.
   let release: { version?: unknown; highlights?: unknown } = {};
   try {
-    release = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'release.json'), 'utf-8'));
+    release = JSON.parse(fs.readFileSync(path.resolve(rootDir, 'release.json'), 'utf-8'));
   } catch {
-    console.warn('[release] release.json missing or invalid — falling back to V0.0.0');
+    console.warn('[release] release.json missing or invalid — falling back to V2.1.8');
   }
-  const releaseVersion = typeof release.version === 'string' && release.version ? release.version : 'V0.0.0';
+  const releaseVersion = typeof release.version === 'string' && release.version ? release.version : 'V2.1.8';
   const releaseHighlights =
     release.highlights && typeof release.highlights === 'object' ? release.highlights : {};
 
@@ -38,7 +40,7 @@ export default defineConfig(({command}) => {
       {
         name: 'copy-404-for-github-pages',
         closeBundle() {
-          const distDir = path.resolve(__dirname, 'dist');
+          const distDir = path.resolve(rootDir, 'dist');
           const indexPath = path.join(distDir, 'index.html');
           const notFoundPath = path.join(distDir, '404.html');
           if (fs.existsSync(indexPath)) {
@@ -50,12 +52,10 @@ export default defineConfig(({command}) => {
         // Writes dist/version.json so the app can tell a real new deploy
         // apart from the bundle it is currently running (see versionManager).
         // Carries the release version + change log from release.json.
-        // Never fails the build: without version.json the app simply shows
-        // no update prompt instead of a fake one.
         name: 'write-version-json',
         closeBundle() {
           try {
-            const distDir = path.resolve(__dirname, 'dist');
+            const distDir = path.resolve(rootDir, 'dist');
             const indexPath = path.join(distDir, 'index.html');
             if (!fs.existsSync(indexPath)) return;
             const html = fs.readFileSync(indexPath, 'utf-8');
@@ -87,7 +87,7 @@ export default defineConfig(({command}) => {
     ],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': typeof import.meta.dirname === 'string' ? import.meta.dirname : path.resolve(),
       },
     },
     server: {

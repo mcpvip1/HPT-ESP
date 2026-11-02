@@ -120,6 +120,11 @@ export const SupabaseConfigModal: React.FC<SupabaseConfigModalProps> = ({
               message: 'RLS policy verified! To allow guest saves without user sign-in, run step 4 in the SQL editor below (alter table public.workspaces drop constraint if exists workspaces_user_id_fkey;).',
             });
             setShowSqlGuide(true);
+          } else if (writeErr.code === '57014' || writeErr.message?.toLowerCase().includes('statement timeout') || writeErr.message?.toLowerCase().includes('canceling statement')) {
+            setTestResult({
+              ok: true,
+              message: 'Connected! Database lock was temporarily busy (statement timeout). The app has automatic retry enabled.',
+            });
           } else {
             setTestResult({
               ok: true,
