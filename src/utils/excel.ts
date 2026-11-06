@@ -585,16 +585,65 @@ export function evaluateDecisionLayers(
   };
 }
 
+export interface UnmatchedDiagnosticIndex {
+  /** Map from normalized primary main column value to array of reference rows */
+  primaryColMap: Map<string, ExcelRow[]>;
+  /** Map from clean alphanumeric token (lowercase, length >= 3) to reference row and column info */
+  cleanTokenMap: Map<string, { refRow: ExcelRow; colName: string; rawVal: string; rowIndex: number }>;
+}
+
+export function buildDiagnosticIndex(
+  mainWb: WorkbookData,
+  primaryMainCol: string | undefined,
+  normalization: NormalizationRules
+): UnmatchedDiagnosticIndex {
+  const primaryColMap = new Map<string, ExcelRow[]>();
+  const cleanTokenMap = new Map<string, { refRow: ExcelRow; colName: string; rawVal: string; rowIndex: number }>();
+
+  if (!mainWb || !mainWb.rows) return { primaryColMap, cleanTokenMap };
+
+  for (let r = 0; r < mainWb.rows.length; r++) {
+    const refRow = mainWb.rows[r];
+    // 1. Index primary key column
+    if (primaryMainCol) {
+      const primaryVal = getRowFieldValue(refRow, primaryMainCol);
+      const normPrimary = normalizeValue(primaryVal, normalization);
+      if (normPrimary) {
+        let list = primaryColMap.get(normPrimary);
+        if (!list) {
+          list = [];
+          primaryColMap.set(normPrimary, list);
+        }
+        list.push(refRow);
+      }
+    }
+
+    // 2. Index clean tokens for rapid fuzzy candidate discovery without full scans
+    for (const [colName, val] of Object.entries(refRow)) {
+      if (val === undefined || val === null || val === '') continue;
+      const valStr = String(val).trim();
+      if (!valStr) continue;
+      const cleanRefVal = valStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cleanRefVal.length >= 3 && !cleanTokenMap.has(cleanRefVal)) {
+        cleanTokenMap.set(cleanRefVal, { refRow, colName, rawVal: valStr, rowIndex: r + 1 });
+      }
+    }
+  }
+
+  return { primaryColMap, cleanTokenMap };
+}
+
 /**
  * Analyzes an unmatched row to provide granular diagnostics:
  * which key or fields failed, whether a partial match exists in the reference file,
- * and what the exact differing values are.
+ * and what the exact differing values are. Uses precomputed DiagnosticIndex for O(1) performance.
  */
 export function analyzeUnmatchedRow(
   compRow: ExcelRow,
   mappings: ColumnMapping[],
   normalization: NormalizationRules,
-  mainWb: WorkbookData
+  mainWb: WorkbookData,
+  diagnosticIndex?: UnmatchedDiagnosticIndex
 ): UnmatchedInfo {
   const primaryMapping = mappings[0];
   const primaryVal = primaryMapping ? getRowFieldValue(compRow, primaryMapping.comparisonCol) : '';
@@ -623,19 +672,26 @@ export function analyzeUnmatchedRow(
     };
   }
 
-  // 1. Scan reference rows to detect closest candidate or partial matches across mapped columns.
-  // The candidate is anchored on the PRIMARY key column (the first mapping, e.g.
-  // Material Code ↔ Item #): a reference row for the SAME item always outranks a
-  // row for a different item, even when the other row shares more secondary key
-  // fields (PO, PON, …). Within the same tier, the most matched key columns win;
-  // ties keep the earliest row.
+  const normPrimaryComp = primaryMapping ? normalizeValue(primaryVal, normalization) : '';
+
+  // Determine candidate reference rows:
+  // If diagnosticIndex is provided, do instant O(1) candidate lookup
+  let candidateRows: ExcelRow[] = [];
+  if (diagnosticIndex && normPrimaryComp && diagnosticIndex.primaryColMap.has(normPrimaryComp)) {
+    candidateRows = diagnosticIndex.primaryColMap.get(normPrimaryComp) || [];
+  } else if (!diagnosticIndex) {
+    // If no index provided, check first 250 rows to prevent freezing
+    const limit = Math.min(mainWb.rows.length, 250);
+    candidateRows = mainWb.rows.slice(0, limit);
+  }
+
   let bestCandidate: ExcelRow | null = null;
   let bestMatchCount = 0;
   let bestPrimaryMatch = false;
   let bestDiffs: UnmatchedFieldDiff[] = [];
 
-  for (let r = 0; r < mainWb.rows.length; r++) {
-    const refRow = mainWb.rows[r];
+  for (let r = 0; r < candidateRows.length; r++) {
+    const refRow = candidateRows[r];
     let matchCount = 0;
     const diffs: UnmatchedFieldDiff[] = [];
 
@@ -692,52 +748,43 @@ export function analyzeUnmatchedRow(
   }
 
   // 2. Intelligent Fallback: Check if the key identifier (e.g. '48545T') exists anywhere in the Reference catalog
-  // (handles relaxed formatting with hyphens/spaces stripped, or located under another column)
   if (primaryIdentifier && primaryIdentifier !== 'Unidentified') {
     const cleanId = primaryIdentifier.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-    for (let r = 0; r < mainWb.rows.length; r++) {
-      const refRow = mainWb.rows[r];
-
-      for (const [colName, val] of Object.entries(refRow)) {
-        if (val === undefined || val === null || val === '') continue;
-        const valStr = String(val).trim();
-        const cleanRefVal = valStr.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-        if (cleanRefVal === cleanId || (cleanId.length >= 4 && cleanRefVal.includes(cleanId))) {
-          bestCandidate = refRow;
-
-          const diffs: UnmatchedFieldDiff[] = mappings.map((m) => {
-            const compVal = getRowFieldValue(compRow, m.comparisonCol);
-            const refVal = getRowFieldValue(refRow, m.mainCol);
-            const compNorm = normalizeValue(compVal, normalization);
-            const refNorm = normalizeValue(refVal, normalization);
-            const isMatch = compNorm === refNorm && compNorm !== '';
-            return {
-              comparisonCol: m.comparisonCol,
-              mainCol: m.mainCol,
-              compValue: compVal,
-              refValue: refVal ?? (m.mainCol.toLowerCase().includes(colName.toLowerCase()) ? valStr : undefined),
-              isMatch,
-            };
-          });
-
-          const isFormatDiff = cleanRefVal === cleanId && valStr !== primaryIdentifier;
-          const diffReason = isFormatDiff
-            ? `Formatting difference: Reference row #${r + 1} contains '${valStr}' in column '${colName}' (differs in punctuation/spacing from incoming '${primaryIdentifier}')`
-            : `Identifier '${primaryIdentifier}' located in Reference row #${r + 1} under column '${colName}' ('${valStr}')`;
-
+    if (diagnosticIndex) {
+      const foundToken = diagnosticIndex.cleanTokenMap.get(cleanId);
+      if (foundToken) {
+        const refRow = foundToken.refRow;
+        bestCandidate = refRow;
+        const diffs: UnmatchedFieldDiff[] = mappings.map((m) => {
+          const cVal = getRowFieldValue(compRow, m.comparisonCol);
+          const rVal = getRowFieldValue(refRow, m.mainCol);
+          const compNorm = normalizeValue(cVal, normalization);
+          const refNorm = normalizeValue(rVal, normalization);
+          const isMatch = compNorm === refNorm && compNorm !== '';
           return {
-            unmatchedKeyDisplay,
-            primaryIdentifier,
-            reason: diffReason,
-            matchType: 'partial_mismatch',
-            fieldDiffs: diffs,
-            closestReferenceRow: bestCandidate,
+            comparisonCol: m.comparisonCol,
+            mainCol: m.mainCol,
+            compValue: cVal,
+            refValue: rVal ?? (m.mainCol.toLowerCase().includes(foundToken.colName.toLowerCase()) ? foundToken.rawVal : undefined),
+            isMatch,
           };
-        }
+        });
+
+        const isFormatDiff = cleanId === foundToken.rawVal.toLowerCase().replace(/[^a-z0-9]/g, '') && foundToken.rawVal !== primaryIdentifier;
+        const diffReason = isFormatDiff
+          ? `Formatting difference: Reference row #${foundToken.rowIndex} contains '${foundToken.rawVal}' in column '${foundToken.colName}' (differs in punctuation/spacing from incoming '${primaryIdentifier}')`
+          : `Identifier '${primaryIdentifier}' located in Reference row #${foundToken.rowIndex} under column '${foundToken.colName}' ('${foundToken.rawVal}')`;
+
+        return {
+          unmatchedKeyDisplay,
+          primaryIdentifier,
+          reason: diffReason,
+          matchType: 'partial_mismatch',
+          fieldDiffs: diffs,
+          closestReferenceRow: bestCandidate,
+        };
       }
-      if (bestCandidate) break;
     }
   }
 
@@ -814,6 +861,10 @@ export function processMatching(
     }
   }
 
+  // Precompute diagnostic index ONCE for lightning-fast unmatched diagnosis without O(N^2) scans
+  const primaryMapping = effectiveMappings[0];
+  const diagnosticIndex = buildDiagnosticIndex(mainWb, primaryMapping?.mainCol, normalization);
+
   const results: MatchedRow[] = [];
   let greenCount = 0;
   let yellowCount = 0;
@@ -843,9 +894,9 @@ export function processMatching(
       }
     }
 
-    // Granular Unmatched Root Cause Diagnosis
+    // Granular Unmatched Root Cause Diagnosis with instant index lookup
     const unmatchedInfo = !isMatched
-      ? analyzeUnmatchedRow(compRow, effectiveMappings, normalization, mainWb)
+      ? analyzeUnmatchedRow(compRow, effectiveMappings, normalization, mainWb, diagnosticIndex)
       : undefined;
 
     const evaluation = evaluateDecisionLayers(
@@ -862,6 +913,25 @@ export function processMatching(
     else if (evaluation.color === 'red') redCount++;
     else otherCount++;
 
+    // Generate precomputed lowercase searchBlob for instant, zero-allocation real-time search
+    const searchTokens: string[] = [
+      String(idx + 1),
+      matchKey || '',
+      evaluation.color,
+      evaluation.reason || '',
+      isMatched ? 'matched' : 'unmatched new',
+    ];
+    for (const k in compRow) {
+      const v = compRow[k];
+      if (v !== undefined && v !== null && v !== '') searchTokens.push(String(v));
+    }
+    if (matchedMainRow) {
+      for (const k in matchedMainRow) {
+        const v = matchedMainRow[k];
+        if (v !== undefined && v !== null && v !== '') searchTokens.push(String(v));
+      }
+    }
+
     results.push({
       id: `row_${idx + 1}`,
       rowIndex: idx + 1,
@@ -874,6 +944,7 @@ export function processMatching(
       decisionReason: evaluation.reason,
       decisionLayerName: evaluation.layerName,
       mergedRow,
+      searchBlob: searchTokens.join(' ').toLowerCase(),
     });
   }
 

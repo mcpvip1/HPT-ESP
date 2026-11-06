@@ -111,6 +111,8 @@ export interface MatchedRow {
   holdKey?: string;
   /** True when the row was released from hold by supervisor confirmation but did not pass (forced yellow). */
   releasedFromHold?: boolean;
+  /** Pre-indexed lowercase search string for instant real-time filtering without allocations. */
+  searchBlob?: string;
 }
 
 export interface MatchingStats {

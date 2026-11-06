@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback, useDeferredValue } from 'react';
 import {
   Download,
   Search,
@@ -134,6 +134,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
   const [activeFilter, setActiveFilter] = useState<FilterType>(initialFilter || 'all');
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm || '');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [searchColumn, setSearchColumn] = useState<string>(initialSearchColumn || 'all');
   // Public live-share: anyone with the link sees the latest snapshot, no sign-in
   const [shareLinkCopied, setShareLinkCopied] = useState(false);
@@ -207,56 +208,36 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     }
   };
 
-  // Synchronize the Only Accept toggle when the parent provides it (preview links)
-  useEffect(() => {
-    if (initialOnlyAccept !== undefined) {
-      setHideSupersededPostpone(initialOnlyAccept);
-    }
-  }, [initialOnlyAccept]);
-
-  // Synchronize state when initialFilter/Search changes from URL or parent
-  useEffect(() => {
-    if (initialFilter) {
-      setActiveFilter(initialFilter);
-    }
-  }, [initialFilter]);
-
-  useEffect(() => {
-    if (initialSearchTerm !== undefined) {
-      setSearchTerm(initialSearchTerm);
-    }
-  }, [initialSearchTerm]);
-
-  useEffect(() => {
-    if (initialSearchColumn) {
-      setSearchColumn(initialSearchColumn);
-    }
-  }, [initialSearchColumn]);
-
-  // Safely derive comparison headers from comparisonWb, or fall back to results
+  // Safely derive comparison headers from comparisonWb, or fall back to results (sampling up to 50 rows)
   const compHeaders = useMemo(() => {
     if (comparisonWb?.headers && comparisonWb.headers.length > 0) {
       return comparisonWb.headers;
     }
     const keys = new Set<string>();
-    for (const r of results) {
-      if (r.comparisonRow) {
-        Object.keys(r.comparisonRow).forEach((k) => keys.add(k));
+    const limit = Math.min(results.length, 50);
+    for (let i = 0; i < limit; i++) {
+      const r = results[i];
+      if (r?.comparisonRow) {
+        for (const k in r.comparisonRow) keys.add(k);
       }
     }
     return Array.from(keys);
   }, [comparisonWb, results]);
 
-  // Extract any reference headers from merged/matched results
+  // Extract any reference headers from merged/matched results using Set for O(1) checks
   const refHeaders = useMemo(() => {
     const keys = new Set<string>();
+    const compHeaderSet = new Set(compHeaders);
+    let matchedExamined = 0;
     for (const r of results) {
       if (r.matchedMainRow) {
-        for (const k of Object.keys(r.matchedMainRow)) {
-          if (!compHeaders.includes(k)) {
+        matchedExamined++;
+        for (const k in r.matchedMainRow) {
+          if (!compHeaderSet.has(k)) {
             keys.add(`[Ref] ${k}`);
           }
         }
+        if (matchedExamined >= 50) break;
       }
     }
     return Array.from(keys);
@@ -651,10 +632,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       }
     }
 
-    // 3. Real-Time Content Search Field
-    const query = searchTerm.trim().toLowerCase();
+    // 3. Real-Time Content Search Field (accelerated by searchBlob and deferredSearchTerm)
+    const query = deferredSearchTerm.trim().toLowerCase();
     if (query) {
       if (searchColumn === 'all') {
+        if (item.searchBlob) {
+          return item.searchBlob.includes(query);
+        }
         const inKey = (item.matchKey || '').toLowerCase().includes(query);
         const inReason = (item.decisionReason || '').toLowerCase().includes(query);
         const inOutcome = (item.decisionColor === 'green' ? 'passed accept' : item.decisionColor === 'yellow' ? 'review postpone' : item.decisionColor === 'red' ? 'rejected fail' : item.decisionColor === 'blue' ? 'hold blue' : '').includes(query);
@@ -663,14 +647,22 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         const inUnmatched = item.unmatchedInfo
           ? (item.unmatchedInfo.primaryIdentifier + ' ' + item.unmatchedInfo.reason + ' ' + item.unmatchedInfo.unmatchedKeyDisplay).toLowerCase().includes(query)
           : false;
-        const inComp = Object.values(item.comparisonRow).some((v) =>
-          String(v ?? '').toLowerCase().includes(query)
-        );
-        const inRef = item.matchedMainRow
-          ? Object.values(item.matchedMainRow).some((v) =>
-              String(v ?? '').toLowerCase().includes(query)
-            )
-          : false;
+        let inComp = false;
+        for (const k in item.comparisonRow) {
+          if (String(item.comparisonRow[k] ?? '').toLowerCase().includes(query)) {
+            inComp = true;
+            break;
+          }
+        }
+        let inRef = false;
+        if (item.matchedMainRow) {
+          for (const k in item.matchedMainRow) {
+            if (String(item.matchedMainRow[k] ?? '').toLowerCase().includes(query)) {
+              inRef = true;
+              break;
+            }
+          }
+        }
 
         return inKey || inReason || inOutcome || inMatchStatus || inRowIdx || inUnmatched || inComp || inRef;
       } else if (searchColumn === 'reason') {
@@ -714,10 +706,16 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
       });
   };
 
+  // Memoize unique values for the currently opened filter dropdown to prevent full scans on each render
+  const activeColumnUniqueValues = useMemo(() => {
+    if (!openFilterColId) return [];
+    return getColumnUniqueValues(openFilterColId);
+  }, [openFilterColId, results, activeFilter, columnFilters, deferredSearchTerm, hideSupersededPostpone]);
+
   // Real-Time Filter & Search Logic (shared predicate above)
   const filteredRows = useMemo(() => {
     return results.filter((item) => passesRowFilters(item));
-  }, [results, activeFilter, columnFilters, searchTerm, searchColumn, hideSupersededPostpone]);
+  }, [results, activeFilter, columnFilters, deferredSearchTerm, searchColumn, hideSupersededPostpone]);
 
 
   // Sorting Logic
@@ -1230,7 +1228,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                 language={language}
                                 columnId={col.id}
                                 columnLabel={col.label}
-                                uniqueValues={getColumnUniqueValues(col.id)}
+                                uniqueValues={activeColumnUniqueValues}
                                 selectedValues={columnFilters[col.id]}
                                 anchorRect={filterAnchorRect}
                                 onApply={(newVals) => {
@@ -1387,7 +1385,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                               title="Click to copy"
                             >
                               <div className="flex items-center justify-center gap-1">
-                                <span>{highlightText(row.rowIndex, searchTerm)}</span>
+                                <span>{highlightText(row.rowIndex, deferredSearchTerm)}</span>
                                 {isCopied ? (
                                   <Check className="w-3 h-3 text-emerald-600 stroke-[3] shrink-0" />
                                 ) : (
@@ -1482,7 +1480,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                     title={`Click 1 time to copy identifier "${copyVal}"`}
                                   >
                                     <span className="truncate">
-                                      {highlightText(copyVal, searchTerm)}
+                                      {highlightText(copyVal, deferredSearchTerm)}
                                     </span>
                                     {isCopied ? (
                                       <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1 py-0.2 rounded border border-emerald-300 shrink-0">
@@ -1521,7 +1519,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             >
                               <div className="flex items-center justify-between gap-1.5">
                                 <span className="truncate" title={row.decisionReason}>
-                                  {highlightText(row.decisionReason, searchTerm)}
+                                  {highlightText(row.decisionReason, deferredSearchTerm)}
                                 </span>
                                 {isCopied ? (
                                   <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1 py-0.5 rounded border border-emerald-300 shrink-0">
@@ -1561,7 +1559,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                               </span>
                             );
                           }
-                          return highlightText(valStr, searchTerm);
+                          return highlightText(valStr, deferredSearchTerm);
                         };
 
                         if (col.id.startsWith('[Ref] ')) {
@@ -1586,7 +1584,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <span className="truncate">
-                                  {isInspectionCol ? renderFilledInspectionCell(valStr) : highlightText(valStr, searchTerm)}
+                                  {isInspectionCol ? renderFilledInspectionCell(valStr) : highlightText(valStr, deferredSearchTerm)}
                                 </span>
                                 {hasValue && (
                                   isCopied ? (
@@ -1627,7 +1625,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           >
                             <div className="flex items-center justify-between gap-2">
                               <span className="truncate">
-                                {isInspectionCol ? renderFilledInspectionCell(valStr) : highlightText(valStr, searchTerm)}
+                                {isInspectionCol ? renderFilledInspectionCell(valStr) : highlightText(valStr, deferredSearchTerm)}
                               </span>
                               {hasValue && (
                                 isCopied ? (

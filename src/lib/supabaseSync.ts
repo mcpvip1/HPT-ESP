@@ -85,11 +85,94 @@ function isCompressedWorkbook(value: unknown): value is CompressedWorkbook {
 /** Below this JSON size compression is not worth its CPU cost. */
 const COMPRESSION_THRESHOLD_BYTES = 256 * 1024;
 
+let compressionWorker: Worker | null = null;
+let workerMsgId = 0;
+const workerCallbacks = new Map<string, (res: { success: boolean; result?: string | null; error?: string }) => void>();
+
+function getCompressionWorker(): Worker | null {
+  if (typeof window === 'undefined' || typeof Worker === 'undefined') return null;
+  if (!compressionWorker) {
+    try {
+      compressionWorker = new Worker(new URL('../workers/compression.worker.ts', import.meta.url), {
+        type: 'module',
+      });
+      compressionWorker.onmessage = (e: MessageEvent<{ id: string; success: boolean; result?: string | null; error?: string }>) => {
+        const cb = workerCallbacks.get(e.data.id);
+        if (cb) {
+          workerCallbacks.delete(e.data.id);
+          cb(e.data);
+        }
+      };
+      compressionWorker.onerror = () => {
+        compressionWorker = null;
+      };
+    } catch {
+      compressionWorker = null;
+    }
+  }
+  return compressionWorker;
+}
+
+export async function compressStringAsync(str: string): Promise<string> {
+  const worker = getCompressionWorker();
+  if (worker) {
+    return new Promise((resolve) => {
+      const id = `cw_${++workerMsgId}`;
+      const timeout = setTimeout(() => {
+        workerCallbacks.delete(id);
+        resolve(LZString.compressToBase64(str));
+      }, 5000);
+      workerCallbacks.set(id, (res) => {
+        clearTimeout(timeout);
+        if (res.success && typeof res.result === 'string') {
+          resolve(res.result);
+        } else {
+          resolve(LZString.compressToBase64(str));
+        }
+      });
+      worker.postMessage({ id, action: 'compress', data: str });
+    });
+  }
+  await new Promise((r) => setTimeout(r, 0));
+  return LZString.compressToBase64(str);
+}
+
+export async function decompressStringAsync(data: string): Promise<string | null> {
+  const worker = getCompressionWorker();
+  if (worker) {
+    return new Promise((resolve) => {
+      const id = `cw_${++workerMsgId}`;
+      const timeout = setTimeout(() => {
+        workerCallbacks.delete(id);
+        resolve(LZString.decompressFromBase64(data));
+      }, 5000);
+      workerCallbacks.set(id, (res) => {
+        clearTimeout(timeout);
+        if (res.success && res.result !== undefined) {
+          resolve(res.result);
+        } else {
+          resolve(LZString.decompressFromBase64(data));
+        }
+      });
+      worker.postMessage({ id, action: 'decompress', data });
+    });
+  }
+  await new Promise((r) => setTimeout(r, 0));
+  return LZString.decompressFromBase64(data);
+}
+
 /**
- * Compress a workbook for the wire. Returns the original value when the
- * payload is small or compression does not shrink it.
+ * Compress a workbook for the wire. Offloaded to background Web Worker to
+ * prevent UI freezing on large datasets.
  */
-export function compressWorkbookForSync(wb: WorkbookData): WorkbookData | CompressedWorkbook {
+export async function compressWorkbookForSync(wb: WorkbookData): Promise<WorkbookData | CompressedWorkbook> {
+  // Fast check: avoid JSON serialization if workbook is obviously small
+  const estimatedBytes = (wb.rows?.length || 0) * 150 + 1024;
+  if (estimatedBytes < COMPRESSION_THRESHOLD_BYTES) return wb;
+
+  // Small event-loop yield
+  await new Promise((r) => setTimeout(r, 0));
+
   let json: string;
   try {
     json = JSON.stringify(wb);
@@ -98,13 +181,13 @@ export function compressWorkbookForSync(wb: WorkbookData): WorkbookData | Compre
   }
   if (json.length < COMPRESSION_THRESHOLD_BYTES) return wb;
   try {
-    const compressed = LZString.compressToBase64(json);
+    const compressed = await compressStringAsync(json);
     if (!compressed || compressed.length >= json.length) return wb;
     return {
       __hptCompressed: true,
       algo: 'lz-base64',
       data: compressed,
-      originalBytes: new Blob([json]).size,
+      originalBytes: json.length,
     };
   } catch {
     return wb;
@@ -116,11 +199,11 @@ export function compressWorkbookForSync(wb: WorkbookData): WorkbookData | Compre
  * untouched; a corrupt compressed value yields null instead of crashing the
  * pull, so the app can continue with its local copy.
  */
-export function decompressWorkbookFromSync(value: unknown): WorkbookData | null | undefined {
+export async function decompressWorkbookFromSync(value: unknown): Promise<WorkbookData | null | undefined> {
   if (value === null || value === undefined) return value as null | undefined;
   if (!isCompressedWorkbook(value)) return value as WorkbookData;
   try {
-    const json = LZString.decompressFromBase64(value.data);
+    const json = await decompressStringAsync(value.data);
     if (!json) return null;
     return JSON.parse(json) as WorkbookData;
   } catch {
@@ -264,16 +347,24 @@ export function estimatePayloadDetails(payload: FullWorkspacePayload): {
   byteCount: number;
 } {
   let count = 0;
-  if (payload.referenceWb?.rows) count += payload.referenceWb.rows.length;
-  if (payload.comparisonWb?.rows) count += payload.comparisonWb.rows.length;
-  if (payload.results) count += payload.results.length;
-
   let approxBytes = 0;
-  try {
-    const str = JSON.stringify(payload);
-    approxBytes = new Blob([str]).size;
-  } catch {
-    approxBytes = 1024;
+  if (payload.referenceWb?.rows) {
+    count += payload.referenceWb.rows.length;
+    approxBytes += payload.referenceWb.size || payload.referenceWb.rows.length * 200;
+  }
+  if (payload.comparisonWb?.rows) {
+    count += payload.comparisonWb.rows.length;
+    approxBytes += payload.comparisonWb.size || payload.comparisonWb.rows.length * 200;
+  }
+  if (payload.results) {
+    count += payload.results.length;
+    approxBytes += payload.results.length * 250;
+  }
+  if (payload.settings) {
+    approxBytes += 2048;
+  }
+  if (approxBytes === 0) {
+    approxBytes = 512;
   }
 
   const formatted =
@@ -365,22 +456,36 @@ export async function syncWorkspaceToSupabase(
 
     if (payload.referenceWb !== undefined) {
       updatePayload.reference_wb =
-        payload.referenceWb === null ? null : compressWorkbookForSync(payload.referenceWb);
+        payload.referenceWb === null ? null : await compressWorkbookForSync(payload.referenceWb);
     }
     if (payload.comparisonWb !== undefined) {
       updatePayload.comparison_wb =
-        payload.comparisonWb === null ? null : compressWorkbookForSync(payload.comparisonWb);
+        payload.comparisonWb === null ? null : await compressWorkbookForSync(payload.comparisonWb);
     }
     if (payload.results !== undefined) updatePayload.results = payload.results;
     if (payload.stats !== undefined) updatePayload.stats = payload.stats;
     if (payload.settings !== undefined) updatePayload.settings = payload.settings;
 
-    // Wire size (after compression) is what the progress UI and history show.
-    try {
-      byteCount = new Blob([JSON.stringify(updatePayload)]).size;
-    } catch {
-      byteCount = 0;
+    // Fast wire size calculation without re-stringifying whole payload
+    byteCount = 0;
+    if (updatePayload.reference_wb) {
+      if (typeof updatePayload.reference_wb.data === 'string') {
+        byteCount += updatePayload.reference_wb.data.length;
+      } else {
+        byteCount += (payload.referenceWb?.size || (payload.referenceWb?.rows?.length || 0) * 150);
+      }
     }
+    if (updatePayload.comparison_wb) {
+      if (typeof updatePayload.comparison_wb.data === 'string') {
+        byteCount += updatePayload.comparison_wb.data.length;
+      } else {
+        byteCount += (payload.comparisonWb?.size || (payload.comparisonWb?.rows?.length || 0) * 150);
+      }
+    }
+    if (updatePayload.results) {
+      byteCount += updatePayload.results.length * 250;
+    }
+    if (byteCount === 0) byteCount = 512;
     sizeFormatted =
       byteCount < 1024
         ? `${byteCount} B`
@@ -587,8 +692,8 @@ export async function fetchWorkspaceFromSupabase(
     // New rows store workbooks compressed; legacy rows store them plain.
     // Both shapes load through the same path (null = no workbook stored).
     const payload: FullWorkspacePayload = {
-      referenceWb: decompressWorkbookFromSync(data.reference_wb) ?? undefined,
-      comparisonWb: decompressWorkbookFromSync(data.comparison_wb) ?? undefined,
+      referenceWb: (await decompressWorkbookFromSync(data.reference_wb)) ?? undefined,
+      comparisonWb: (await decompressWorkbookFromSync(data.comparison_wb)) ?? undefined,
       results: data.results,
       stats: data.stats,
       settings: data.settings,
@@ -737,7 +842,7 @@ export async function fetchWorkspaceColumns(
       const value = (data as Record<string, unknown> | null)?.[column];
       if (value !== undefined && value !== null) {
         (columns as Record<string, unknown>)[field] = workbook
-          ? decompressWorkbookFromSync(value)
+          ? await decompressWorkbookFromSync(value)
           : value;
         // A workbook column that decompresses to null is corrupt, not empty.
         if (workbook && (columns as Record<string, unknown>)[field] == null) {
@@ -931,16 +1036,13 @@ export function mergeWorkspacePresence(
     const cloudValue = (cloudSettings as Record<string, unknown> | undefined)?.[key];
 
     if (hasValue(cloudValue)) {
-      if (hasValue(localValue)) {
-        // Both have value: keep local if user customized locally, otherwise adopt cloud
-        (mergedSettings as Record<string, unknown>)[key] = localValue;
-      } else {
-        // Cloud has value, local is empty default -> adopt cloud!
-        (mergedSettings as Record<string, unknown>)[key] = cloudValue;
-        pulled.push(label);
-        settingsPulled = true;
-      }
+      // Cloud is authoritative for the shared workspace:
+      // Adopt cloud settings so all devices converge on what was saved in the cloud
+      (mergedSettings as Record<string, unknown>)[key] = cloudValue;
+      pulled.push(label);
+      settingsPulled = true;
     } else if (hasValue(localValue)) {
+      // Cloud lacks this setting: initialize cloud from local
       (mergedSettings as Record<string, unknown>)[key] = localValue;
       (localOnlySettings as Record<string, unknown>)[key] = localValue;
       pushBackNeeded = true;

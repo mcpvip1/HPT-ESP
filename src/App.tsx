@@ -620,13 +620,16 @@ export default function App() {
       const kept = mappings.filter(
         (m) => wb.headers.includes(m.mainCol) && comparisonWb.headers.includes(m.comparisonCol)
       );
-      const next = kept.length > 0 ? kept : autoMapColumns(wb.headers, comparisonWb.headers);
-      setMappings(next);
-      await saveToIDB(StorageKeys.COLUMN_MAPPINGS, next);
-      handleExecuteMatching(wb, comparisonWb, next, false, undefined, undefined, undefined, {
-        referenceWb: wb,
-        settings: buildCompleteSettings(next),
-      });
+      setMappings(kept);
+      await saveToIDB(StorageKeys.COLUMN_MAPPINGS, kept);
+      if (kept.length > 0) {
+        handleExecuteMatching(wb, comparisonWb, kept, false, undefined, undefined, undefined, {
+          referenceWb: wb,
+          settings: buildCompleteSettings(kept),
+        });
+      } else {
+        showToast(t.toastMappingRequired, 'info');
+      }
     } else if (isSupabaseConnected) {
       const reason = wb
         ? `Reference Workbook loaded: '${wb.name || wb.activeSheet || 'File'}' (${wb.rows?.length || 0} rows)`
@@ -647,13 +650,16 @@ export default function App() {
       const kept = mappings.filter(
         (m) => referenceWb.headers.includes(m.mainCol) && wb.headers.includes(m.comparisonCol)
       );
-      const next = kept.length > 0 ? kept : autoMapColumns(referenceWb.headers, wb.headers);
-      setMappings(next);
-      await saveToIDB(StorageKeys.COLUMN_MAPPINGS, next);
-      handleExecuteMatching(referenceWb, wb, next, false, undefined, undefined, undefined, {
-        comparisonWb: wb,
-        settings: buildCompleteSettings(next),
-      });
+      setMappings(kept);
+      await saveToIDB(StorageKeys.COLUMN_MAPPINGS, kept);
+      if (kept.length > 0) {
+        handleExecuteMatching(referenceWb, wb, kept, false, undefined, undefined, undefined, {
+          comparisonWb: wb,
+          settings: buildCompleteSettings(kept),
+        });
+      } else {
+        showToast(t.toastMappingRequired, 'info');
+      }
     } else if (isSupabaseConnected) {
       const reason = wb
         ? `Comparison Workbook loaded: '${wb.name || wb.activeSheet || 'File'}' (${wb.rows?.length || 0} rows)`
@@ -669,10 +675,14 @@ export default function App() {
       setReferenceWb(updated);
       await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, updated);
       if (comparisonWb) {
-        const auto = autoMapColumns(updated.headers, comparisonWb.headers);
-        setMappings(auto);
-        await saveToIDB(StorageKeys.COLUMN_MAPPINGS, auto);
-        handleExecuteMatching(updated, comparisonWb, auto);
+        const kept = mappings.filter(
+          (m) => updated.headers.includes(m.mainCol) && comparisonWb.headers.includes(m.comparisonCol)
+        );
+        setMappings(kept);
+        await saveToIDB(StorageKeys.COLUMN_MAPPINGS, kept);
+        if (kept.length > 0) {
+          handleExecuteMatching(updated, comparisonWb, kept);
+        }
       }
     } catch {
       showToast('Could not switch sheet', 'error');
@@ -686,10 +696,14 @@ export default function App() {
       setComparisonWb(updated);
       await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, updated);
       if (referenceWb) {
-        const auto = autoMapColumns(referenceWb.headers, updated.headers);
-        setMappings(auto);
-        await saveToIDB(StorageKeys.COLUMN_MAPPINGS, auto);
-        handleExecuteMatching(referenceWb, updated, auto);
+        const kept = mappings.filter(
+          (m) => referenceWb.headers.includes(m.mainCol) && updated.headers.includes(m.comparisonCol)
+        );
+        setMappings(kept);
+        await saveToIDB(StorageKeys.COLUMN_MAPPINGS, kept);
+        if (kept.length > 0) {
+          handleExecuteMatching(referenceWb, updated, kept);
+        }
       }
     } catch {
       showToast('Could not switch sheet', 'error');
@@ -800,14 +814,7 @@ export default function App() {
       return;
     }
 
-    let effectiveMappings = customMappings || mappings;
-    if (effectiveMappings.length === 0) {
-      effectiveMappings = autoMapColumns(ref.headers, comp.headers);
-      if (effectiveMappings.length > 0) {
-        setMappings(effectiveMappings);
-        saveToIDB(StorageKeys.COLUMN_MAPPINGS, effectiveMappings);
-      }
-    }
+    const effectiveMappings = customMappings || mappings;
 
     if (effectiveMappings.length === 0) {
       showToast(t.toastMappingRequired, 'error');
