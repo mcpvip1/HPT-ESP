@@ -40,7 +40,7 @@ import {
   ColumnConfigItem,
 } from '../types';
 import { translations } from '../translations';
-import { exportStyledExcel, exportCsv } from '../utils/excel';
+import { exportStyledExcel, exportCsv, generateAuditSummaryText } from '../utils/excel';
 import type { User } from '@supabase/supabase-js';
 import { saveToIDB, StorageKeys } from '../utils/storage';
 import { RowDetailModal } from './RowDetailModal';
@@ -804,6 +804,53 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     }
   };
 
+  const [copiedSummary, setCopiedSummary] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCopySummary = async () => {
+    try {
+      const baseName = comparisonWb?.name || 'Excel Dataset';
+      const summaryText = generateAuditSummaryText(stats, baseName);
+      await navigator.clipboard.writeText(summaryText);
+      setCopiedSummary(true);
+      setTimeout(() => setCopiedSummary(false), 2200);
+      onShowToast(
+        language === 'my'
+          ? 'စစ်ဆေးမှုအကျဉ်းချုပ်ကို ကူးယူပြီးပါပြီ!'
+          : language === 'th'
+          ? 'คัดลอกสรุปการตรวจสอบแล้ว!'
+          : language === 'zh'
+          ? '审计摘要已复制到剪贴板！'
+          : 'Audit summary copied to clipboard!',
+        'success'
+      );
+    } catch {
+      onShowToast('Could not copy summary to clipboard', 'error');
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Focus search: / or Cmd/Ctrl + K
+      if (
+        (e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k')) &&
+        document.activeElement?.tagName !== 'INPUT' &&
+        document.activeElement?.tagName !== 'TEXTAREA'
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+      // Quick Export Excel: Cmd/Ctrl + E
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        handleExportExcel();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleExportExcel]);
+
   const getSolidBadge = (color: ResultColor | 'none') => {
     switch (color) {
       case 'green':
@@ -968,9 +1015,40 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           {/* Right: Export group */}
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 ml-auto">
             <button
+              onClick={handleCopySummary}
+              className="tbtn"
+              title="Copy executive audit summary report to clipboard (Markdown / Plain Text)"
+            >
+              <span className="tbtn__icon">
+                {copiedSummary ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5 shrink-0" />
+                )}
+              </span>
+              <span>
+                {copiedSummary
+                  ? language === 'my'
+                    ? 'ကူးယူပြီး'
+                    : language === 'th'
+                    ? 'คัดลอกแล้ว'
+                    : language === 'zh'
+                    ? '已复制'
+                    : 'Copied!'
+                  : language === 'my'
+                  ? 'အကျဉ်းချုပ် ကူးယူရန်'
+                  : language === 'th'
+                  ? 'คัดลอกสรุป'
+                  : language === 'zh'
+                  ? '复制摘要'
+                  : 'Copy Summary'}
+              </span>
+            </button>
+
+            <button
               onClick={handleExportExcel}
               className="tbtn tbtn--excel"
-              title={t.dashExportExcelTitle}
+              title={`${t.dashExportExcelTitle} (Ctrl+E)`}
             >
               <span className="tbtn__icon">
                 <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
@@ -999,6 +1077,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             <div className="relative flex-1 min-w-[140px]">
               <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchTerm}
                 onChange={(e) => {
@@ -1006,7 +1085,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   setSearchTerm(val);
                   setPage(1);
                 }}
-                placeholder={t.dashSearchPlaceholder}
+                placeholder={`${t.dashSearchPlaceholder} (/ or ⌘K)`}
                 className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-xl pl-9 pr-8 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all font-mono shadow-xs"
               />
               {searchTerm && (

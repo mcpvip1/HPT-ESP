@@ -1577,9 +1577,171 @@ export function exportStyledExcel(
 
   XLSXStyle.utils.book_append_sheet(wb, wsData, 'Evaluated Results');
 
+  // 2. Executive Summary Sheet
+  if (_stats) {
+    const total = _stats.totalIncoming || results.length || 1;
+    const pct = (n: number) => `${((n / total) * 100).toFixed(1)}%`;
+    const summaryRows = [
+      { Metric: 'Total Records Evaluated', Count: total, Percentage: '100.0%', Details: 'Full comparison dataset scope' },
+      { Metric: 'Master Reference Matched', Count: _stats.matchedCount, Percentage: pct(_stats.matchedCount), Details: 'Successfully matched against master reference' },
+      { Metric: 'Unmatched / Discrepancy', Count: _stats.unmatchedCount, Percentage: pct(_stats.unmatchedCount), Details: 'Missing from reference or key mismatch' },
+      { Metric: 'Passed / Accepted (Green)', Count: _stats.greenCount, Percentage: pct(_stats.greenCount), Details: 'All decision conditions met' },
+      { Metric: 'Review Required (Amber)', Count: _stats.yellowCount, Percentage: pct(_stats.yellowCount), Details: 'Needs supervisor review or secondary check' },
+      { Metric: 'Rejected / Discrepant (Red)', Count: _stats.redCount, Percentage: pct(_stats.redCount), Details: 'Violates quality or business rule' },
+      { Metric: 'On Hold (Blue)', Count: _stats.blueCount, Percentage: pct(_stats.blueCount), Details: 'Temporarily quarantined or hold key' },
+      { Metric: 'Evaluation Date', Count: new Date().toLocaleDateString(), Percentage: '', Details: new Date().toISOString() },
+      { Metric: 'Source File', Count: baseFilename, Percentage: '', Details: 'ExcelMatch Pro Enterprise Engine' },
+    ];
+
+    const wsSummary = XLSXStyle.utils.json_to_sheet(summaryRows);
+    wsSummary['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 16 }, { wch: 45 }];
+
+    ['A1', 'B1', 'C1', 'D1'].forEach((cellRef) => {
+      if (wsSummary[cellRef]) {
+        wsSummary[cellRef].s = {
+          font: { name: 'Calibri', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+          fill: { patternType: 'solid', fgColor: { rgb: '1E293B' } },
+          alignment: { vertical: 'center', horizontal: 'left' },
+          border: thinBorder('0F172A'),
+        };
+      }
+    });
+
+    summaryRows.forEach((r, idx) => {
+      const rowNum = idx + 2;
+      const metric = r.Metric;
+      let fontColor = '0F172A';
+      let bgColor = idx % 2 === 0 ? 'F8FAFC' : 'FFFFFF';
+      let isBold = false;
+
+      if (metric.includes('Passed')) {
+        fontColor = '065F46';
+        bgColor = 'D1FAE5';
+        isBold = true;
+      } else if (metric.includes('Review')) {
+        fontColor = '92400E';
+        bgColor = 'FEF3C7';
+        isBold = true;
+      } else if (metric.includes('Rejected')) {
+        fontColor = '991B1B';
+        bgColor = 'FEE2E2';
+        isBold = true;
+      } else if (metric.includes('On Hold')) {
+        fontColor = '1E40AF';
+        bgColor = 'DBEAFE';
+        isBold = true;
+      }
+
+      ['A', 'B', 'C', 'D'].forEach((colLetter) => {
+        const cellRef = `${colLetter}${rowNum}`;
+        if (wsSummary[cellRef]) {
+          wsSummary[cellRef].s = {
+            font: { name: 'Calibri', sz: 10, bold: isBold, color: { rgb: fontColor } },
+            fill: { patternType: 'solid', fgColor: { rgb: bgColor } },
+            alignment: { vertical: 'center', horizontal: colLetter === 'B' || colLetter === 'C' ? 'center' : 'left' },
+            border: thinBorder('E2E8F0'),
+          };
+        }
+      });
+    });
+
+    XLSXStyle.utils.book_append_sheet(wb, wsSummary, 'Executive Summary');
+  }
+
+  // 3. Dedicated Unmatched Exceptions Sheet (if any unmatched rows exist)
+  const unmatchedRows = results.filter((r) => !r.isMatched);
+  if (unmatchedRows.length > 0) {
+    const excRows = unmatchedRows.map((u) => ({
+      'Row #': u.rowIndex,
+      'Primary Identifier': u.unmatchedInfo?.primaryIdentifier || u.matchKey || 'N/A',
+      'Diagnostic Reason': u.unmatchedInfo?.reason || 'Record not found in Reference Dataset',
+      'Match Type': u.unmatchedInfo?.matchType || 'Unmatched',
+      'Closest Reference Match': u.unmatchedInfo?.closestReferenceRow
+        ? Object.entries(u.unmatchedInfo.closestReferenceRow)
+            .slice(0, 3)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(' | ')
+        : 'None',
+      ...u.comparisonRow,
+    }));
+
+    const wsExc = XLSXStyle.utils.json_to_sheet(excRows);
+    const excHeaders = Object.keys(excRows[0] || {});
+    wsExc['!cols'] = excHeaders.map((h) => ({ wch: Math.max(h.length + 4, 18) }));
+
+    excHeaders.forEach((_, cIdx) => {
+      const cellRef = XLSXStyle.utils.encode_cell({ r: 0, c: cIdx });
+      if (wsExc[cellRef]) {
+        wsExc[cellRef].s = {
+          font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: 'FFFFFF' } },
+          fill: { patternType: 'solid', fgColor: { rgb: 'B45309' } },
+          alignment: { vertical: 'center', horizontal: 'left' },
+          border: thinBorder('78350F'),
+        };
+      }
+    });
+
+    unmatchedRows.forEach((_, idx) => {
+      const rowNum = idx + 1;
+      for (let cIdx = 0; cIdx < excHeaders.length; cIdx++) {
+        const cellRef = XLSXStyle.utils.encode_cell({ r: rowNum, c: cIdx });
+        if (wsExc[cellRef]) {
+          wsExc[cellRef].s = {
+            font: { name: 'Calibri', sz: 9.5, color: { rgb: '78350F' } },
+            fill: { patternType: 'solid', fgColor: { rgb: idx % 2 === 0 ? 'FEF3C7' : 'FFFBEB' } },
+            alignment: { vertical: 'center', horizontal: 'left' },
+            border: thinBorder('FDE68A'),
+          };
+        }
+      }
+    });
+
+    wsExc['!autofilter'] = {
+      ref: XLSXStyle.utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: { r: unmatchedRows.length, c: Math.max(0, excHeaders.length - 1) },
+      }),
+    };
+    wsExc['!views'] = [{ state: 'frozen', ySplit: 1 }];
+
+    XLSXStyle.utils.book_append_sheet(wb, wsExc, 'Unmatched Exceptions');
+  }
+
   const cleanName = baseFilename.replace(/\.[^/.]+$/, '');
   const outName = `${cleanName}_Evaluated_${new Date().toISOString().slice(0, 10)}.xlsx`;
   XLSXStyle.writeFile(wb, outName);
+}
+
+/**
+ * Generate formatted executive audit summary string for clipboard or report sharing
+ */
+export function generateAuditSummaryText(
+  stats: MatchingStats,
+  baseFilename: string = 'Excel Dataset'
+): string {
+  const total = stats.totalIncoming || 0;
+  const pct = (n: number) => (total > 0 ? `${((n / total) * 100).toFixed(1)}%` : '0.0%');
+  const dateStr = new Date().toLocaleString();
+
+  return [
+    `==================================================`,
+    `EXCELMATCH PRO — AUDIT SUMMARY REPORT`,
+    `File: ${baseFilename}`,
+    `Generated: ${dateStr}`,
+    `==================================================`,
+    `• Total Rows Evaluated:  ${total.toLocaleString()}`,
+    `• Reference Matched:     ${stats.matchedCount.toLocaleString()} (${pct(stats.matchedCount)})`,
+    `• Unmatched Exceptions:  ${stats.unmatchedCount.toLocaleString()} (${pct(stats.unmatchedCount)})`,
+    `• Match Rate:            ${stats.matchRate.toFixed(1)}%`,
+    ``,
+    `DECISION EVALUATION BREAKDOWN:`,
+    `✔ Passed / Accepted (Green):  ${stats.greenCount.toLocaleString()} (${pct(stats.greenCount)})`,
+    `▲ Review Required (Yellow):   ${stats.yellowCount.toLocaleString()} (${pct(stats.yellowCount)})`,
+    `✖ Rejected / Failed (Red):    ${stats.redCount.toLocaleString()} (${pct(stats.redCount)})`,
+    `⏸ On Hold (Blue):             ${stats.blueCount.toLocaleString()} (${pct(stats.blueCount)})`,
+    `==================================================`,
+    `Generated by ExcelMatch Pro Enterprise Decision Engine`,
+  ].join('\n');
 }
 
 /**

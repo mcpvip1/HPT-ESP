@@ -9,6 +9,7 @@ import {
   Sun,
   Moon,
   Sparkles,
+  Keyboard,
 } from 'lucide-react';
 import { LOGO_DATA_URL } from '../assets/logo';
 import { CountryFlag } from './CountryFlag';
@@ -24,6 +25,7 @@ interface HeaderProps {
   onLanguageChange: (lang: Language) => void;
   onOpenRulesSetting: () => void;
   onOpenRestoreConfirm?: () => void;
+  onOpenShortcuts?: () => void;
   hasRefFile: boolean;
   hasCompFile: boolean;
   hasResults: boolean;
@@ -46,6 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLanguageChange,
   onOpenRulesSetting,
   onOpenRestoreConfirm,
+  onOpenShortcuts,
   hasRefFile,
   hasResults,
   supabaseUser,
@@ -167,6 +170,21 @@ export const Header: React.FC<HeaderProps> = ({
                   <Sparkles className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                 </span>
                 <span className="hidden sm:inline">Updates</span>
+              </button>
+            )}
+
+            {/* Keyboard Shortcuts Button */}
+            {onOpenShortcuts && (
+              <button
+                onClick={onOpenShortcuts}
+                title="Keyboard Shortcuts Guide (Press ?)"
+                className="tbtn tbtn--neutral !h-9 !px-2.5 sm:!px-3"
+                aria-label="Keyboard Shortcuts"
+              >
+                <span className="tbtn__icon">
+                  <Keyboard className="w-3.5 h-3.5 shrink-0" />
+                </span>
+                <span className="hidden md:inline text-xs font-semibold">Shortcuts</span>
               </button>
             )}
 

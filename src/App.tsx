@@ -36,6 +36,8 @@ import { SplashScreen, SplashSyncState } from './components/SplashScreen';
 import { UpdateModal } from './components/UpdateModal';
 import { SupabaseConfigModal } from './components/SupabaseConfigModal';
 import { SyncHistoryModal } from './components/SyncHistoryModal';
+import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
+import { playSuccessChime, playNotifyChime } from './utils/audioFeedback';
 import {
   getRunningVersionInfo,
   formatBuildDisplay,
@@ -75,6 +77,7 @@ export default function App() {
   const [isRestoring, setIsRestoring] = useState(false);
   const [isSupabaseConfigOpen, setIsSupabaseConfigOpen] = useState(false);
   const [isSyncHistoryOpen, setIsSyncHistoryOpen] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
   // Auto-Update & Animated Splash Screen State
   const [isSplashVisible, setIsSplashVisible] = useState(true);
@@ -853,6 +856,7 @@ export default function App() {
         }
 
         if (notifySuccess) {
+          playSuccessChime();
           showToast(
             t.toastEvaluatedSummary
               .replace('{total}', String(evaluatedStats.totalIncoming))
@@ -875,6 +879,69 @@ export default function App() {
       }
     }, 150);
   };
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName;
+      const isInputActive =
+        activeTag === 'INPUT' ||
+        activeTag === 'TEXTAREA' ||
+        (document.activeElement as HTMLElement)?.isContentEditable;
+
+      // Close modal on Escape
+      if (e.key === 'Escape') {
+        if (isShortcutsOpen) {
+          setIsShortcutsOpen(false);
+          return;
+        }
+        if (isRulesModalOpen) {
+          setIsRulesModalOpen(false);
+          return;
+        }
+        if (isSupabaseConfigOpen) {
+          setIsSupabaseConfigOpen(false);
+          return;
+        }
+        if (isSyncHistoryOpen) {
+          setIsSyncHistoryOpen(false);
+          return;
+        }
+      }
+
+      // Open Shortcuts Guide: '?' (Shift + /)
+      if (e.key === '?' && !isInputActive) {
+        e.preventDefault();
+        setIsShortcutsOpen((prev) => !prev);
+        return;
+      }
+
+      // Open / Toggle Rules: Ctrl/Cmd + M
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'm' && !isInputActive) {
+        e.preventDefault();
+        setIsRulesModalOpen((prev) => !prev);
+        return;
+      }
+
+      // Run Matching: Ctrl/Cmd + Enter
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (referenceWb && comparisonWb) {
+          handleExecuteMatching();
+        }
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [
+    isShortcutsOpen,
+    isRulesModalOpen,
+    isSupabaseConfigOpen,
+    isSyncHistoryOpen,
+    referenceWb,
+    comparisonWb,
+  ]);
 
   const handleSupabaseSignOut = async () => {
     await signOutSupabase();
@@ -1028,6 +1095,7 @@ export default function App() {
     if (!res.success) {
       throw new Error(res.error || 'Failed to sync to Supabase');
     }
+    playNotifyChime();
   };
 
   const handleTriggerManualPull = async () => {
@@ -1124,6 +1192,7 @@ export default function App() {
         onLanguageChange={handleLanguageChange}
         onOpenRulesSetting={() => setIsRulesModalOpen(true)}
         onOpenRestoreConfirm={() => setIsRestoreModalOpen(true)}
+        onOpenShortcuts={() => setIsShortcutsOpen(true)}
         hasRefFile={!!referenceWb}
         hasCompFile={!!comparisonWb}
         hasResults={results.length > 0}
@@ -1298,6 +1367,13 @@ export default function App() {
         isSupabaseConnected={isSupabaseConnected}
         onOpenSupabaseConfig={() => setIsSupabaseConfigOpen(true)}
         onShowToast={showToast}
+      />
+
+      {/* Keyboard Shortcuts Reference Modal */}
+      <KeyboardShortcutsModal
+        isOpen={isShortcutsOpen}
+        onClose={() => setIsShortcutsOpen(false)}
+        language={language}
       />
 
       {/* Toast Notifications */}
