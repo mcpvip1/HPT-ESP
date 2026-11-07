@@ -82,8 +82,8 @@ function isCompressedWorkbook(value: unknown): value is CompressedWorkbook {
   );
 }
 
-/** Below this JSON size compression is not worth its CPU cost. */
-const COMPRESSION_THRESHOLD_BYTES = 256 * 1024;
+/** Below this JSON size compression is not worth its CPU cost (32 KB). */
+const COMPRESSION_THRESHOLD_BYTES = 32 * 1024;
 
 let compressionWorker: Worker | null = null;
 let workerMsgId = 0;
@@ -121,7 +121,7 @@ export async function compressStringAsync(str: string): Promise<string> {
       const timeout = setTimeout(() => {
         workerCallbacks.delete(id);
         resolve(LZString.compressToBase64(str));
-      }, 5000);
+      }, 30000);
       workerCallbacks.set(id, (res) => {
         clearTimeout(timeout);
         if (res.success && typeof res.result === 'string') {
@@ -145,7 +145,7 @@ export async function decompressStringAsync(data: string): Promise<string | null
       const timeout = setTimeout(() => {
         workerCallbacks.delete(id);
         resolve(LZString.decompressFromBase64(data));
-      }, 5000);
+      }, 30000);
       workerCallbacks.set(id, (res) => {
         clearTimeout(timeout);
         if (res.success && res.result !== undefined) {
@@ -166,11 +166,7 @@ export async function decompressStringAsync(data: string): Promise<string | null
  * prevent UI freezing on large datasets.
  */
 export async function compressWorkbookForSync(wb: WorkbookData): Promise<WorkbookData | CompressedWorkbook> {
-  // Fast check: avoid JSON serialization if workbook is obviously small
-  const estimatedBytes = (wb.rows?.length || 0) * 150 + 1024;
-  if (estimatedBytes < COMPRESSION_THRESHOLD_BYTES) return wb;
-
-  // Small event-loop yield
+  // Small event-loop yield to keep UI responsive
   await new Promise((r) => setTimeout(r, 0));
 
   let json: string;
@@ -179,7 +175,9 @@ export async function compressWorkbookForSync(wb: WorkbookData): Promise<Workboo
   } catch {
     return wb;
   }
+  // If actual JSON size is under 32 KB, plain storage is fine
   if (json.length < COMPRESSION_THRESHOLD_BYTES) return wb;
+
   try {
     const compressed = await compressStringAsync(json);
     if (!compressed || compressed.length >= json.length) return wb;
@@ -462,7 +460,11 @@ export async function syncWorkspaceToSupabase(
       updatePayload.comparison_wb =
         payload.comparisonWb === null ? null : await compressWorkbookForSync(payload.comparisonWb);
     }
-    if (payload.results !== undefined) updatePayload.results = payload.results;
+    if (payload.results !== undefined) {
+      updatePayload.results = payload.results
+        ? payload.results.map(({ searchBlob: _unused, ...rest }) => rest)
+        : null;
+    }
     if (payload.stats !== undefined) updatePayload.stats = payload.stats;
     if (payload.settings !== undefined) updatePayload.settings = payload.settings;
 
@@ -529,6 +531,69 @@ export async function syncWorkspaceToSupabase(
     // A network failure that survived the retry goes to the outer catch so
     // it is recorded in history exactly like any other sync failure.
     if (upsertError && isNetworkError(upsertError)) throw upsertError;
+
+    // Fallback: If PostgreSQL statement timeout occurred (e.g. huge payloads exceeding query limits),
+    // update columns individually so no single transaction exceeds the server timeout.
+    if (
+      upsertError &&
+      (String(upsertError.message || '').toLowerCase().includes('statement timeout') ||
+       String(upsertError.message || '').toLowerCase().includes('timeout'))
+    ) {
+      updateSyncProgress({
+        progressPercent: 75,
+        phase: 'uploading',
+        title: 'Retrying with individual column stream to prevent timeout...',
+        bytesUploaded: Math.round(byteCount * 0.75),
+      });
+
+      try {
+        // 1. Ensure row exists with metadata & lightweight settings
+        const baseUpdate: Record<string, any> = {
+          user_id: userId,
+          updated_at: new Date().toISOString(),
+        };
+        if (updatePayload.stats !== undefined) baseUpdate.stats = updatePayload.stats;
+        if (updatePayload.settings !== undefined) baseUpdate.settings = updatePayload.settings;
+
+        const { error: baseErr } = await client
+          .from('workspaces')
+          .upsert(baseUpdate, { onConflict: 'user_id' });
+
+        if (!baseErr) {
+          let stepFailed = false;
+          // 2. Stream reference_wb separately
+          if (updatePayload.reference_wb !== undefined) {
+            const { error: refErr } = await client
+              .from('workspaces')
+              .update({ reference_wb: updatePayload.reference_wb, updated_at: new Date().toISOString() })
+              .eq('user_id', userId);
+            if (refErr) stepFailed = true;
+          }
+          // 3. Stream comparison_wb separately
+          if (!stepFailed && updatePayload.comparison_wb !== undefined) {
+            const { error: compErr } = await client
+              .from('workspaces')
+              .update({ comparison_wb: updatePayload.comparison_wb, updated_at: new Date().toISOString() })
+              .eq('user_id', userId);
+            if (compErr) stepFailed = true;
+          }
+          // 4. Stream results separately
+          if (!stepFailed && updatePayload.results !== undefined) {
+            const { error: resErr } = await client
+              .from('workspaces')
+              .update({ results: updatePayload.results, updated_at: new Date().toISOString() })
+              .eq('user_id', userId);
+            if (resErr) stepFailed = true;
+          }
+          if (!stepFailed) {
+            upsertError = null;
+          }
+        }
+      } catch (streamErr: any) {
+        console.warn('Individual column fallback failed:', streamErr);
+      }
+    }
+
     const error = upsertError;
 
     // 3. Verifying Phase

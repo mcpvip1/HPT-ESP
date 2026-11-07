@@ -1438,7 +1438,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       id={`row-${row.id}`}
                       data-row-id={row.id}
                       title="Click to copy"
-                      className={`results-table-row group/row transition-colors duration-150 border-b border-[var(--border-light)] ${
+                      className={`results-table-row group/row transition-all duration-150 border-b border-[var(--border-light)] ${
                         isGreen
                           ? 'bg-[#f0fdf4] hover:bg-[#dcfce7] dark:bg-emerald-950/25 dark:hover:bg-emerald-900/40 border-l-[4px] border-l-emerald-500'
                           : isYellow
