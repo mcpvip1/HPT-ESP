@@ -1017,8 +1017,29 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             </button>
           </div>
 
-          {/* Right: Export group */}
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 ml-auto">
+          {/* Right: Show Row Count + Export group */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0 ml-auto">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[var(--bg-surface-alt)] border border-[var(--border)] text-xs text-[var(--text-secondary)] shrink-0 whitespace-nowrap">
+              <span>{t.showingRows}</span>
+              <strong className="text-[var(--text-primary)] font-mono tabular-nums">
+                {filteredRows.length > 0 ? (page - 1) * pageSize + 1 : 0}
+              </strong>
+              <span>-</span>
+              <strong className="text-[var(--text-primary)] font-mono tabular-nums">
+                {Math.min(page * pageSize, filteredRows.length)}
+              </strong>
+              <span>{t.of}</span>
+              <strong className="text-[var(--text-primary)] font-mono tabular-nums">
+                {filteredRows.length.toLocaleString()}
+              </strong>
+              <span>{t.dashRowsUnit}</span>
+              {searchTerm.trim() && (
+                <span className="text-[var(--text-muted)] ml-1">
+                  {t.dashFilteredFromTotal.replace('{count}', results.length.toLocaleString())}
+                </span>
+              )}
+            </div>
+
             <button
               onClick={handleCopySummary}
               className="tbtn"
@@ -1290,6 +1311,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                           <div className="relative">
                             <button
                               type="button"
+                              data-filter-trigger={col.id}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -1805,28 +1827,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         </div>
 
         {/* 5. Table Pagination Footer */}
-        <div className="px-6 py-3.5 border-t border-[var(--border)] bg-[var(--bg-surface-alt)] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--text-secondary)]">
-          <div>
-            {t.showingRows}{' '}
-            <strong className="text-[var(--text-primary)] font-mono tabular-nums">
-              {filteredRows.length > 0 ? (page - 1) * pageSize + 1 : 0}
-            </strong>{' '}
-            -{' '}
-            <strong className="text-[var(--text-primary)] font-mono tabular-nums">
-              {Math.min(page * pageSize, filteredRows.length)}
-            </strong>{' '}
-            {t.of}{' '}
-            <strong className="text-[var(--text-primary)] font-mono tabular-nums">
-              {filteredRows.length.toLocaleString()}
-            </strong>{' '}
-            {t.dashRowsUnit}
-            {searchTerm.trim() && (
-              <span className="text-[var(--text-muted)] ml-2">
-                {t.dashFilteredFromTotal.replace('{count}', results.length.toLocaleString())}
-              </span>
-            )}
-          </div>
-
+        <div className="px-6 py-3.5 border-t border-[var(--border)] bg-[var(--bg-surface-alt)] flex items-center justify-end gap-3 text-xs text-[var(--text-secondary)]">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}

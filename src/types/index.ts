@@ -126,6 +126,12 @@ export interface MatchingStats {
   blueCount: number;
   otherCount: number;
   unmatchedItems?: { rowIndex: number; identifier: string; reason: string }[];
+  evaluatedAt?: number;
+  evaluatedRefId?: string;
+  evaluatedRefSheet?: string;
+  evaluatedCompId?: string;
+  evaluatedCompSheet?: string;
+  evaluatedSettingsAt?: number;
 }
 
 export interface ColumnConfigItem {

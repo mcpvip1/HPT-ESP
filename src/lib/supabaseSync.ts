@@ -1222,6 +1222,60 @@ const SETTINGS_FIELD_LABELS: { key: SettingsField; label: string }[] = [
   { key: 'decisionPresets', label: 'Decision presets' },
 ];
 
+export function getWorkbookTimestamp(wb?: WorkbookData | null): number {
+  if (!wb) return 0;
+  if (typeof wb.uploadedAt === 'number' && wb.uploadedAt > 0) return wb.uploadedAt;
+  if (typeof wb.id === 'string') {
+    const m = wb.id.match(/^wb_(\d+)_/);
+    if (m) {
+      const parsed = Number(m[1]);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+  }
+  return typeof wb.lastModified === 'number' && wb.lastModified > 0 ? wb.lastModified : 0;
+}
+
+export function areCloudResultsFresh(
+  referenceWb?: WorkbookData | null,
+  comparisonWb?: WorkbookData | null,
+  settings?: Partial<WorkspaceSettings> | null,
+  stats?: MatchingStats | null
+): boolean {
+  if (!stats) return false;
+  if (stats.evaluatedRefId && referenceWb?.id && stats.evaluatedRefId !== referenceWb.id) {
+    return false;
+  }
+  if (
+    stats.evaluatedRefSheet &&
+    referenceWb?.activeSheet &&
+    stats.evaluatedRefSheet !== referenceWb.activeSheet
+  ) {
+    return false;
+  }
+  if (stats.evaluatedCompId && comparisonWb?.id && stats.evaluatedCompId !== comparisonWb.id) {
+    return false;
+  }
+  if (
+    stats.evaluatedCompSheet &&
+    comparisonWb?.activeSheet &&
+    stats.evaluatedCompSheet !== comparisonWb.activeSheet
+  ) {
+    return false;
+  }
+  if (
+    typeof stats.evaluatedSettingsAt === 'number' &&
+    typeof settings?.updatedAt === 'number' &&
+    settings.updatedAt > stats.evaluatedSettingsAt
+  ) {
+    return false;
+  }
+  if (typeof stats.evaluatedAt === 'number') {
+    if (referenceWb?.uploadedAt && referenceWb.uploadedAt > stats.evaluatedAt) return false;
+    if (comparisonWb?.uploadedAt && comparisonWb.uploadedAt > stats.evaluatedAt) return false;
+  }
+  return true;
+}
+
 export function mergeWorkspacePresence(
   local: LocalWorkspaceSnapshot,
   cloud: FullWorkspacePayload | undefined,
@@ -1235,13 +1289,37 @@ export function mergeWorkspacePresence(
     return true;
   };
 
+  const isSameWorkbook = (a?: WorkbookData | null, b?: WorkbookData | null): boolean => {
+    if (!a || !b) return false;
+    const sameIdentity = (a.id && b.id && a.id === b.id) || a.name === b.name;
+    if (!sameIdentity) return false;
+    return (
+      (a.activeSheet ?? '') === (b.activeSheet ?? '') &&
+      (a.rows?.length ?? 0) === (b.rows?.length ?? 0) &&
+      (a.headers?.length ?? 0) === (b.headers?.length ?? 0)
+    );
+  };
+
   const pulled: string[] = [];
   let settingsPulled = false;
   let filesPulled = false;
   let pushBackNeeded = false;
 
   let referenceWb: WorkbookData | undefined;
-  if (hasValue(local.referenceWb)) {
+  if (hasValue(local.referenceWb) && hasValue(cloud?.referenceWb)) {
+    const localRef = local.referenceWb as WorkbookData;
+    const cloudRef = cloud?.referenceWb as WorkbookData;
+    if (isSameWorkbook(localRef, cloudRef)) {
+      referenceWb = localRef;
+    } else if (getWorkbookTimestamp(cloudRef) >= getWorkbookTimestamp(localRef)) {
+      referenceWb = cloudRef;
+      pulled.push('Reference Workbook');
+      filesPulled = true;
+    } else {
+      referenceWb = localRef;
+      pushBackNeeded = true;
+    }
+  } else if (hasValue(local.referenceWb)) {
     referenceWb = local.referenceWb as WorkbookData;
     if (!hasValue(cloud?.referenceWb)) pushBackNeeded = true;
   } else if (hasValue(cloud?.referenceWb)) {
@@ -1251,7 +1329,20 @@ export function mergeWorkspacePresence(
   }
 
   let comparisonWb: WorkbookData | undefined;
-  if (hasValue(local.comparisonWb)) {
+  if (hasValue(local.comparisonWb) && hasValue(cloud?.comparisonWb)) {
+    const localComp = local.comparisonWb as WorkbookData;
+    const cloudComp = cloud?.comparisonWb as WorkbookData;
+    if (isSameWorkbook(localComp, cloudComp)) {
+      comparisonWb = localComp;
+    } else if (getWorkbookTimestamp(cloudComp) >= getWorkbookTimestamp(localComp)) {
+      comparisonWb = cloudComp;
+      pulled.push('Comparison Workbook');
+      filesPulled = true;
+    } else {
+      comparisonWb = localComp;
+      pushBackNeeded = true;
+    }
+  } else if (hasValue(local.comparisonWb)) {
     comparisonWb = local.comparisonWb as WorkbookData;
     if (!hasValue(cloud?.comparisonWb)) pushBackNeeded = true;
   } else if (hasValue(cloud?.comparisonWb)) {
@@ -1305,29 +1396,21 @@ export function mergeWorkspacePresence(
       pushBackNeeded = true;
     }
   }
+  if (hasCommittedCloudSettings && cloudSettings?.updatedAt) {
+    mergedSettings.updatedAt = cloudSettings.updatedAt;
+  }
   const settings = Object.keys(mergedSettings).length > 0 ? mergedSettings : undefined;
 
   let results: MatchedRow[] | undefined;
   let stats: MatchingStats | undefined;
 
-  const isSameWorkbook = (a?: WorkbookData | null, b?: WorkbookData | null): boolean => {
-    if (!a || !b) return false;
-    return (
-      (a.id && b.id && a.id === b.id) ||
-      (a.name === b.name &&
-        a.activeSheet === b.activeSheet &&
-        (a.rows?.length ?? 0) === (b.rows?.length ?? 0))
-    );
-  };
-
   if (hasValue(cloud?.results) && hasValue(cloud?.stats)) {
-    const refAligned =
-      !hasValue(local.referenceWb) || isSameWorkbook(local.referenceWb, cloud?.referenceWb);
-    const compAligned =
-      !hasValue(local.comparisonWb) || isSameWorkbook(local.comparisonWb, cloud?.comparisonWb);
+    const refAligned = !referenceWb || isSameWorkbook(referenceWb, cloud?.referenceWb);
+    const compAligned = !comparisonWb || isSameWorkbook(comparisonWb, cloud?.comparisonWb);
     const settingsAligned = Object.keys(localOnlySettings).length === 0;
+    const freshResults = areCloudResultsFresh(referenceWb, comparisonWb, mergedSettings, cloud?.stats);
 
-    if (refAligned && compAligned && settingsAligned) {
+    if (refAligned && compAligned && settingsAligned && freshResults) {
       results = cloud?.results as MatchedRow[];
       stats = cloud?.stats as MatchingStats;
       if (!hasValue(local.referenceWb) || filesPulled || settingsPulled) {
@@ -1361,12 +1444,12 @@ export function mergeWorkspacePresence(
         : undefined;
     pushBack = {
       referenceWb:
-        hasValue(local.referenceWb) && !hasValue(cloud?.referenceWb)
-          ? (local.referenceWb as WorkbookData)
+        referenceWb && (!hasValue(cloud?.referenceWb) || !isSameWorkbook(referenceWb, cloud?.referenceWb))
+          ? referenceWb
           : undefined,
       comparisonWb:
-        hasValue(local.comparisonWb) && !hasValue(cloud?.comparisonWb)
-          ? (local.comparisonWb as WorkbookData)
+        comparisonWb && (!hasValue(cloud?.comparisonWb) || !isSameWorkbook(comparisonWb, cloud?.comparisonWb))
+          ? comparisonWb
           : undefined,
       settings: pushSettings,
     };

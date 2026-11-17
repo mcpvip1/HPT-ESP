@@ -34,11 +34,14 @@ interface RulesLogicModalProps {
   onUpdateMappings: (mappings: ColumnMapping[]) => void;
   onUpdateNormalization: (norm: NormalizationRules) => void;
   onUpdateLayers: (layers: DecisionLayer[]) => void;
-  onSaveSettings: (holdOverrides?: {
-    holdColumn?: string;
-    holdValues?: string[];
-    holdReason?: string;
-  }) => Promise<void> | void;
+  onSaveSettings: (
+    holdOverrides?: {
+      holdColumn?: string;
+      holdValues?: string[];
+      holdReason?: string;
+    },
+    options?: { skipReevaluate?: boolean; skipCloudSync?: boolean }
+  ) => Promise<void> | void;
   onExecuteMatching: (holdOverrides?: {
     holdColumn?: string;
     holdValues?: string[];
@@ -165,7 +168,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
 
   const handleSaveAndApply = async () => {
     const overrides = flushHoldDrafts();
-    await onSaveSettings(overrides);
+    await onSaveSettings(overrides, { skipReevaluate: true, skipCloudSync: true });
     onClose();
     onExecuteMatching({
       holdColumn: overrides.holdColumn,

@@ -32,6 +32,7 @@ interface ExcelColumnFilterProps {
 }
 
 export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
+  columnId,
   columnLabel,
   uniqueValues,
   selectedValues,
@@ -45,6 +46,8 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
 }) => {
   const t = translations[language];
   const popoverRef = useRef<HTMLDivElement>(null);
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  const firstCheckedItemRef = useRef<HTMLLabelElement>(null);
   const [filterSearch, setFilterSearch] = useState('');
   
   // Local state for checkboxes in the popover
@@ -61,12 +64,37 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
     }
   }, [isOpen, selectedValues, allValuesList]);
 
+  // Automatically scroll the checklist to show the first checked item when reopened with an active filter
+  const hasPartialSelection =
+    selectedValues !== undefined &&
+    selectedValues.length > 0 &&
+    selectedValues.length < allValuesList.length;
+
+  useEffect(() => {
+    if (!isOpen || !hasPartialSelection) return;
+    const rafId = requestAnimationFrame(() => {
+      const container = listContainerRef.current;
+      const target = firstCheckedItemRef.current;
+      if (container && target) {
+        const desiredScroll =
+          target.offsetTop - container.clientHeight / 2 + target.offsetHeight / 2;
+        container.scrollTop = Math.max(0, desiredScroll);
+      }
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [isOpen, columnId, hasPartialSelection]);
+
   // Click outside, escape, or window scroll to close
   useEffect(() => {
     if (!isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+      const targetEl = e.target as HTMLElement | null;
+      if (popoverRef.current && !popoverRef.current.contains(targetEl)) {
+        // Let filter trigger buttons handle their own toggle/switch click without double-firing
+        if (targetEl?.closest?.('[data-filter-trigger]')) {
+          return;
+        }
         onClose();
       }
     };
@@ -261,7 +289,10 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
       </div>
 
       {/* Checklist of distinct values */}
-      <div className="p-2 max-h-48 overflow-y-auto space-y-0.5 font-mono text-xs">
+      <div
+        ref={listContainerRef}
+        className="relative p-2 max-h-48 overflow-y-auto space-y-0.5 font-mono text-xs"
+      >
         {/* Select All */}
         <label className="flex items-center justify-between gap-2 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-soft)] cursor-pointer text-[var(--text-secondary)] select-none">
           <div className="flex items-center gap-2">
@@ -285,39 +316,51 @@ export const ExcelColumnFilter: React.FC<ExcelColumnFilterProps> = ({
             {t.filterNoMatchingValues}
           </div>
         ) : (
-          filteredItems.map((item) => {
-            const isChecked = localSelected.includes(item.value);
-            return (
-              <label
-                key={item.value}
-                className="flex items-center justify-between gap-2 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-soft)] cursor-pointer select-none group"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => handleToggleItem(item.value)}
-                    className="w-3.5 h-3.5 rounded border-[var(--border)] text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                  />
-                  <span
-                    className={`truncate text-xs ${
-                      item.value === t.dashValueBlanks || item.value === t.dashValueEmpty
-                        ? 'text-[var(--text-faint)] italic'
-                        : isChecked
-                        ? 'text-[var(--text-primary)] font-semibold'
-                        : 'text-[var(--text-secondary)]'
-                    }`}
-                    title={item.value}
-                  >
-                    {item.value}
+          (() => {
+            const firstCheckedVal = hasPartialSelection
+              ? filteredItems.find((item) => localSelected.includes(item.value))?.value
+              : undefined;
+            return filteredItems.map((item) => {
+              const isChecked = localSelected.includes(item.value);
+              const isFirstCheckedTarget =
+                firstCheckedVal !== undefined && item.value === firstCheckedVal;
+              return (
+                <label
+                  key={item.value}
+                  ref={isFirstCheckedTarget ? firstCheckedItemRef : undefined}
+                  className={`flex items-center justify-between gap-2 px-2 py-1 rounded-md cursor-pointer select-none group transition-colors ${
+                    isChecked && hasPartialSelection
+                      ? 'bg-blue-50/75 dark:bg-blue-950/35 hover:bg-blue-100/70 dark:hover:bg-blue-950/55'
+                      : 'hover:bg-[var(--bg-surface-soft)]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => handleToggleItem(item.value)}
+                      className="w-3.5 h-3.5 rounded border-[var(--border)] text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <span
+                      className={`truncate text-xs ${
+                        item.value === t.dashValueBlanks || item.value === t.dashValueEmpty
+                          ? 'text-[var(--text-faint)] italic'
+                          : isChecked
+                          ? 'text-[var(--text-primary)] font-semibold'
+                          : 'text-[var(--text-secondary)]'
+                      }`}
+                      title={item.value}
+                    >
+                      {item.value}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] bg-[var(--bg-surface-alt)] border border-[var(--border)] px-1.5 py-0.2 rounded shrink-0 tabular-nums font-mono">
+                    {item.count}
                   </span>
-                </div>
-                <span className="text-[10px] text-[var(--text-muted)] bg-[var(--bg-surface-alt)] border border-[var(--border)] px-1.5 py-0.2 rounded shrink-0 tabular-nums font-mono">
-                  {item.count}
-                </span>
-              </label>
-            );
-          })
+                </label>
+              );
+            });
+          })()
         )}
       </div>
 

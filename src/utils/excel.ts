@@ -211,6 +211,7 @@ export async function parseExcelFile(
     name: file.name,
     size: file.size,
     lastModified: file.lastModified,
+    uploadedAt: Date.now(),
     headers: activeData.headers,
     rows: activeData.rows,
     sheetNames,
@@ -228,6 +229,7 @@ export function changeWorkbookSheet(wb: WorkbookData, targetSheet: string): Work
     return {
       ...wb,
       activeSheet: targetSheet,
+      uploadedAt: Date.now(),
     };
   }
 
@@ -236,12 +238,14 @@ export function changeWorkbookSheet(wb: WorkbookData, targetSheet: string): Work
     return {
       ...wb,
       activeSheet: targetSheet,
+      uploadedAt: Date.now(),
     };
   }
 
   return {
     ...wb,
     activeSheet: targetSheet,
+    uploadedAt: Date.now(),
     headers: sheetData.headers,
     rows: sheetData.rows,
   };
