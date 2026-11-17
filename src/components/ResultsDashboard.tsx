@@ -144,8 +144,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const [sortColumn, setSortColumn] = useState<string>('rowIndex');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRow, setSelectedRow] = useState<MatchedRow | null>(null);
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [copiedCellId, setCopiedCellId] = useState<string | null>(null);
   const lastToastTimeRef = useRef<{ time: number; text: string }>({ time: 0, text: '' });
+
+  useEffect(() => {
+    setSelectedRowId(null);
+  }, [results]);
 
   const [releaseTarget, setReleaseTarget] = useState<{ key: string; count: number } | null>(null);
   const [supervisorConfirmed, setSupervisorConfirmed] = useState(false);
@@ -1017,9 +1022,12 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             </button>
           </div>
 
-          {/* Right: Show Row Count + Export group */}
+          {/* Right: Top Row Count Display alongside Copy Summary & Export actions */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0 ml-auto">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[var(--bg-surface-alt)] border border-[var(--border)] text-xs text-[var(--text-secondary)] shrink-0 whitespace-nowrap">
+            <div
+              data-testid="results-row-count"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface-alt)] border border-[var(--border)] text-xs text-[var(--text-secondary)] shrink-0 whitespace-nowrap shadow-2xs"
+            >
               <span>{t.showingRows}</span>
               <strong className="text-[var(--text-primary)] font-mono tabular-nums">
                 {filteredRows.length > 0 ? (page - 1) * pageSize + 1 : 0}
@@ -1033,11 +1041,12 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 {filteredRows.length.toLocaleString()}
               </strong>
               <span>{t.dashRowsUnit}</span>
-              {searchTerm.trim() && (
-                <span className="text-[var(--text-muted)] ml-1">
-                  {t.dashFilteredFromTotal.replace('{count}', results.length.toLocaleString())}
-                </span>
-              )}
+              {(searchTerm.trim() || Object.keys(columnFilters).length > 0 || activeFilter !== 'all') &&
+                filteredRows.length !== results.length && (
+                  <span className="text-[var(--text-muted)] ml-1">
+                    {t.dashFilteredFromTotal.replace('{count}', results.length.toLocaleString())}
+                  </span>
+                )}
             </div>
 
             <button
@@ -1448,8 +1457,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   const isYellow = row.decisionColor === 'yellow';
                   const isRed = row.decisionColor === 'red';
                   const isBlue = row.decisionColor === 'blue';
+                  const isRowSelected = selectedRowId === row.id;
                   // Opaque background for the frozen columns (must cover scrolled content cleanly)
-                  const frozenBg = isGreen
+                  const frozenBg = isRowSelected
+                    ? 'bg-indigo-100 dark:bg-[#1e1b4b] text-indigo-950 dark:text-indigo-100'
+                    : isGreen
                     ? 'bg-[#f0fdf4] dark:bg-[#062e24] text-emerald-900 dark:text-emerald-200'
                     : isYellow
                     ? 'bg-[#fefce8] dark:bg-[#2a1f05] text-amber-900 dark:text-amber-200'
@@ -1464,16 +1476,31 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       key={row.id}
                       id={`row-${row.id}`}
                       data-row-id={row.id}
-                      title="Click to copy"
+                      data-selected={isRowSelected ? 'true' : undefined}
+                      aria-selected={isRowSelected}
+                      onClick={() => setSelectedRowId((prev) => (prev === row.id ? null : row.id))}
+                      title={isRowSelected ? 'Click again to deselect row' : 'Click to select row & copy cell'}
                       className={`results-table-row group/row transition-all duration-150 border-b border-[var(--border-light)] ${
+                        isRowSelected ? 'is-selected border-l-[4px] border-l-indigo-600 dark:border-l-indigo-400 ' : ''
+                      }${
                         isGreen
-                          ? 'bg-[#f0fdf4] hover:bg-[#dcfce7] dark:bg-emerald-950/25 dark:hover:bg-emerald-900/40 border-l-[4px] border-l-emerald-500'
+                          ? isRowSelected
+                            ? 'bg-indigo-50/90 hover:bg-indigo-100/80 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60'
+                            : 'bg-[#f0fdf4] hover:bg-[#dcfce7] dark:bg-emerald-950/25 dark:hover:bg-emerald-900/40 border-l-[4px] border-l-emerald-500'
                           : isYellow
-                          ? 'bg-[#fefce8] hover:bg-[#fef9c3] dark:bg-amber-950/25 dark:hover:bg-amber-900/40 border-l-[4px] border-l-amber-500'
+                          ? isRowSelected
+                            ? 'bg-indigo-50/90 hover:bg-indigo-100/80 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60'
+                            : 'bg-[#fefce8] hover:bg-[#fef9c3] dark:bg-amber-950/25 dark:hover:bg-amber-900/40 border-l-[4px] border-l-amber-500'
                           : isRed
-                          ? 'bg-[#fff1f2] hover:bg-[#ffe4e6] dark:bg-rose-950/25 dark:hover:bg-rose-900/40 border-l-[4px] border-l-rose-500'
+                          ? isRowSelected
+                            ? 'bg-indigo-50/90 hover:bg-indigo-100/80 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60'
+                            : 'bg-[#fff1f2] hover:bg-[#ffe4e6] dark:bg-rose-950/25 dark:hover:bg-rose-900/40 border-l-[4px] border-l-rose-500'
                           : isBlue
-                          ? 'bg-[#eff6ff] hover:bg-[#dbeafe] dark:bg-blue-950/25 dark:hover:bg-blue-900/40 border-l-[4px] border-l-blue-600'
+                          ? isRowSelected
+                            ? 'bg-indigo-50/90 hover:bg-indigo-100/80 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60'
+                            : 'bg-[#eff6ff] hover:bg-[#dbeafe] dark:bg-blue-950/25 dark:hover:bg-blue-900/40 border-l-[4px] border-l-blue-600'
+                          : isRowSelected
+                          ? 'bg-indigo-50/90 hover:bg-indigo-100/80 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60'
                           : 'bg-white even:bg-slate-50/60 hover:bg-slate-100/70 dark:bg-transparent dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 border-l-[4px] border-l-transparent'
                       }`}
                     >
@@ -1491,6 +1518,12 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                               title="Click to copy"
                             >
                               <div className="flex items-center justify-center gap-1">
+                                {isRowSelected && (
+                                  <span
+                                    className="w-2 h-2 rounded-full bg-indigo-600 dark:bg-indigo-400 shrink-0 shadow-2xs"
+                                    aria-hidden="true"
+                                  />
+                                )}
                                 <span>{highlightText(row.rowIndex, deferredSearchTerm)}</span>
                                 {isCopied ? (
                                   <Check className="w-3 h-3 text-emerald-600 stroke-[3] shrink-0" />
