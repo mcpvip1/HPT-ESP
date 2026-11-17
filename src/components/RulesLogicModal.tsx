@@ -45,6 +45,7 @@ interface RulesLogicModalProps {
   onExecuteMatching: (holdOverrides?: {
     holdColumn?: string;
     holdValues?: string[];
+    holdReason?: string;
   }) => void;
   isProcessing: boolean;
   language: Language;
@@ -173,6 +174,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
     onExecuteMatching({
       holdColumn: overrides.holdColumn,
       holdValues: overrides.holdValues,
+      holdReason: overrides.holdReason,
     });
   };
 

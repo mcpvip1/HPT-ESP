@@ -48,6 +48,8 @@ export interface FullWorkspacePayload {
   results?: MatchedRow[] | null;
   stats?: MatchingStats | null;
   settings?: WorkspaceSettings | null;
+  updatedAt?: number;
+  cloudExists?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -815,6 +817,10 @@ export async function syncWorkspaceToSupabase(
       target: 'supabase',
     });
 
+    try {
+      await saveToIDB(StorageKeys.LAST_CLOUD_SYNC_AT, Date.now());
+    } catch {}
+
     return { success: true };
   } catch (err: any) {
     const durationMs = Date.now() - startTime;
@@ -914,6 +920,7 @@ export async function fetchWorkspaceFromSupabase(
       return { success: true, data: undefined };
     }
 
+    const parsedUpdatedAt = data.updated_at ? Date.parse(String(data.updated_at)) : NaN;
     // New rows store workbooks & large results compressed; legacy rows store them plain.
     // Both shapes load through the same path (null = no data stored).
     const payload: FullWorkspacePayload = {
@@ -922,6 +929,8 @@ export async function fetchWorkspaceFromSupabase(
       results: (await decompressResultsFromSync(data.results)) ?? undefined,
       stats: data.stats,
       settings: data.settings,
+      updatedAt: Number.isFinite(parsedUpdatedAt) && parsedUpdatedAt > 0 ? parsedUpdatedAt : undefined,
+      cloudExists: true,
     };
 
     const { sizeFormatted, itemCount } = estimatePayloadDetails(payload);
@@ -1026,6 +1035,8 @@ export async function fetchWorkspaceColumns(
   const total = WORKSPACE_COLUMNS.length;
   const columns: Partial<FullWorkspacePayload> = {};
   const failed: string[] = [];
+  let cloudExists = false;
+  let updatedAt: number | undefined;
 
   updateSyncProgress({
     isSyncing: true,
@@ -1053,9 +1064,10 @@ export async function fetchWorkspaceColumns(
     onProgress({ item: label, done: i, total, percent: Math.round((i / total) * 100) });
     let timerId: ReturnType<typeof setTimeout> | undefined;
     try {
+      const selectClause = column === 'stats' ? 'stats, updated_at' : column;
       const fetchPromise = client
         .from('workspaces')
-        .select(column)
+        .select(selectClause)
         .eq('user_id', userId)
         .maybeSingle();
       const timeout = new Promise<never>((_, reject) => {
@@ -1064,7 +1076,16 @@ export async function fetchWorkspaceColumns(
       const { data, error } = await Promise.race([fetchPromise, timeout]);
       if (timerId) clearTimeout(timerId);
       if (error) throw new Error(error.message);
-      const value = (data as Record<string, unknown> | null)?.[column];
+      const rowData = data as unknown as Record<string, unknown> | null;
+      if (rowData) {
+        cloudExists = true;
+        const rowUpdated = rowData.updated_at;
+        if (rowUpdated) {
+          const parsed = Date.parse(String(rowUpdated));
+          if (Number.isFinite(parsed) && parsed > 0) updatedAt = parsed;
+        }
+      }
+      const value = rowData?.[column];
       if (value !== undefined && value !== null) {
         if (workbook) {
           (columns as Record<string, unknown>)[field] = await decompressWorkbookFromSync(value);
@@ -1094,6 +1115,13 @@ export async function fetchWorkspaceColumns(
       total,
       percent: Math.round(((i + 1) / total) * 100),
     });
+  }
+
+  if (cloudExists) {
+    columns.cloudExists = true;
+    if (updatedAt) columns.updatedAt = updatedAt;
+  } else if (failed.length === 0) {
+    columns.cloudExists = false;
   }
 
   const durationMs = Date.now() - startTime;
@@ -1177,6 +1205,7 @@ export interface LocalWorkspaceSnapshot {
   columnConfigs?: StoredColumnSettings | null;
   mappingPresets?: SavedMappingPreset[] | null;
   decisionPresets?: SavedDecisionPreset[] | null;
+  lastCloudSyncedAt?: number | null;
 }
 
 export interface MergedWorkspace {
@@ -1190,7 +1219,7 @@ export interface MergedWorkspace {
   pulled: string[];
   /** True when any settings field was pulled (caller re-runs matching). */
   settingsPulled: boolean;
-  /** True when a workbook file was pulled. */
+  /** True when a workbook file was pulled or removed by cloud. */
   filesPulled: boolean;
   /** Upload payload for local-only data, or null when the cloud already
    *  has everything local has. */
@@ -1208,6 +1237,15 @@ type SettingsField =
   | 'columnConfigs'
   | 'mappingPresets'
   | 'decisionPresets';
+
+const MATCHING_AFFECTING_SETTINGS = new Set<SettingsField>([
+  'normalization',
+  'layers',
+  'mappings',
+  'holdColumn',
+  'holdValues',
+  'releasedRowIds',
+]);
 
 const SETTINGS_FIELD_LABELS: { key: SettingsField; label: string }[] = [
   { key: 'normalization', label: 'Normalization rules' },
@@ -1239,9 +1277,19 @@ export function areCloudResultsFresh(
   referenceWb?: WorkbookData | null,
   comparisonWb?: WorkbookData | null,
   settings?: Partial<WorkspaceSettings> | null,
-  stats?: MatchingStats | null
+  stats?: MatchingStats | null,
+  resultsCount?: number
 ): boolean {
   if (!stats) return false;
+  if (comparisonWb) {
+    const expectedRows = comparisonWb.rows?.length ?? 0;
+    if (typeof stats.totalIncoming === 'number' && stats.totalIncoming !== expectedRows) {
+      return false;
+    }
+    if (typeof resultsCount === 'number' && resultsCount !== expectedRows) {
+      return false;
+    }
+  }
   if (stats.evaluatedRefId && referenceWb?.id && stats.evaluatedRefId !== referenceWb.id) {
     return false;
   }
@@ -1262,16 +1310,19 @@ export function areCloudResultsFresh(
   ) {
     return false;
   }
-  if (
-    typeof stats.evaluatedSettingsAt === 'number' &&
-    typeof settings?.updatedAt === 'number' &&
-    settings.updatedAt > stats.evaluatedSettingsAt
-  ) {
-    return false;
+  if (typeof settings?.updatedAt === 'number' && settings.updatedAt > 0) {
+    if (typeof stats.evaluatedSettingsAt !== 'number') {
+      return false;
+    }
+    if (settings.updatedAt > stats.evaluatedSettingsAt) {
+      return false;
+    }
   }
   if (typeof stats.evaluatedAt === 'number') {
     if (referenceWb?.uploadedAt && referenceWb.uploadedAt > stats.evaluatedAt) return false;
     if (comparisonWb?.uploadedAt && comparisonWb.uploadedAt > stats.evaluatedAt) return false;
+  } else if (referenceWb?.uploadedAt || comparisonWb?.uploadedAt) {
+    return false;
   }
   return true;
 }
@@ -1300,6 +1351,13 @@ export function mergeWorkspacePresence(
     );
   };
 
+  const wasRemovedInCloud = (localWb: WorkbookData): boolean => {
+    if (cloud?.cloudExists !== true) return false;
+    if (typeof local.lastCloudSyncedAt !== 'number' || local.lastCloudSyncedAt <= 0) return false;
+    const localTs = getWorkbookTimestamp(localWb);
+    return localTs > 0 && localTs <= local.lastCloudSyncedAt;
+  };
+
   const pulled: string[] = [];
   let settingsPulled = false;
   let filesPulled = false;
@@ -1320,8 +1378,15 @@ export function mergeWorkspacePresence(
       pushBackNeeded = true;
     }
   } else if (hasValue(local.referenceWb)) {
-    referenceWb = local.referenceWb as WorkbookData;
-    if (!hasValue(cloud?.referenceWb)) pushBackNeeded = true;
+    const localRef = local.referenceWb as WorkbookData;
+    if (wasRemovedInCloud(localRef)) {
+      referenceWb = undefined;
+      pulled.push('Reference Workbook (removed)');
+      filesPulled = true;
+    } else {
+      referenceWb = localRef;
+      pushBackNeeded = true;
+    }
   } else if (hasValue(cloud?.referenceWb)) {
     referenceWb = cloud?.referenceWb as WorkbookData;
     pulled.push('Reference Workbook');
@@ -1343,8 +1408,15 @@ export function mergeWorkspacePresence(
       pushBackNeeded = true;
     }
   } else if (hasValue(local.comparisonWb)) {
-    comparisonWb = local.comparisonWb as WorkbookData;
-    if (!hasValue(cloud?.comparisonWb)) pushBackNeeded = true;
+    const localComp = local.comparisonWb as WorkbookData;
+    if (wasRemovedInCloud(localComp)) {
+      comparisonWb = undefined;
+      pulled.push('Comparison Workbook (removed)');
+      filesPulled = true;
+    } else {
+      comparisonWb = localComp;
+      pushBackNeeded = true;
+    }
   } else if (hasValue(cloud?.comparisonWb)) {
     comparisonWb = cloud?.comparisonWb as WorkbookData;
     pulled.push('Comparison Workbook');
@@ -1405,12 +1477,20 @@ export function mergeWorkspacePresence(
   let stats: MatchingStats | undefined;
 
   if (hasValue(cloud?.results) && hasValue(cloud?.stats)) {
-    const refAligned = !referenceWb || isSameWorkbook(referenceWb, cloud?.referenceWb);
-    const compAligned = !comparisonWb || isSameWorkbook(comparisonWb, cloud?.comparisonWb);
-    const settingsAligned = Object.keys(localOnlySettings).length === 0;
-    const freshResults = areCloudResultsFresh(referenceWb, comparisonWb, mergedSettings, cloud?.stats);
+    const refAligned = Boolean(referenceWb && isSameWorkbook(referenceWb, cloud?.referenceWb));
+    const compAligned = Boolean(comparisonWb && isSameWorkbook(comparisonWb, cloud?.comparisonWb));
+    const matchingLocalOnly = (Object.keys(localOnlySettings) as SettingsField[]).some((k) =>
+      MATCHING_AFFECTING_SETTINGS.has(k)
+    );
+    const freshResults = areCloudResultsFresh(
+      referenceWb,
+      comparisonWb,
+      mergedSettings,
+      cloud?.stats,
+      Array.isArray(cloud?.results) ? cloud.results.length : undefined
+    );
 
-    if (refAligned && compAligned && settingsAligned && freshResults) {
+    if (refAligned && compAligned && !matchingLocalOnly && freshResults) {
       results = cloud?.results as MatchedRow[];
       stats = cloud?.stats as MatchingStats;
       if (!hasValue(local.referenceWb) || filesPulled || settingsPulled) {
@@ -1508,6 +1588,12 @@ export async function wipeSupabaseWorkspace(
       error: error?.message,
       target: 'supabase',
     });
+
+    if (!error) {
+      try {
+        await deleteFromIDB(StorageKeys.LAST_CLOUD_SYNC_AT);
+      } catch {}
+    }
 
     return !error;
   } catch {

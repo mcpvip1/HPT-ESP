@@ -21,9 +21,8 @@ import {
 } from './utils/storage';
 import {
   processMatching,
-  generateSampleDatasets,
-  autoMapColumns,
   changeWorkbookSheet,
+  ensureResultsSearchBlob,
 } from './utils/excel';
 import { Header } from './components/Header';
 import { FilesManagement } from './components/FilesManagement';
@@ -179,19 +178,73 @@ export default function App() {
 
   // Startup sequence: App owns it, SplashScreen only renders it.
   // Order: update check -> local scan -> cloud download (real per-column
-  // progress) -> compare -> apply. An update found pauses the sequence:
+  // progress) -> compare -> reconcile & apply. An update found pauses the sequence:
   // the modal opens, and the merge runs after the user dismisses it.
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   const startupRunRef = useRef(0);
+  const reconcileSeqRef = useRef(0);
   const mergePendingRef = useRef(false);
   const mergeDoneRef = useRef(false);
   const errorDecisionRef = useRef<((decision: 'retry' | 'continue') => void) | null>(null);
+  const settingsUpdatedAtRef = useRef<number>(Date.now());
+  const latestStateRef = useRef({
+    referenceWb,
+    comparisonWb,
+    mappings,
+    normalization,
+    layers,
+    holdColumn,
+    holdValues,
+    holdReason,
+    releasedRowIds,
+    studioColumnConfigs,
+  });
+  latestStateRef.current = {
+    referenceWb,
+    comparisonWb,
+    mappings,
+    normalization,
+    layers,
+    holdColumn,
+    holdValues,
+    holdReason,
+    releasedRowIds,
+    studioColumnConfigs,
+  };
   const [syncState, setSyncState] = useState<SplashSyncState>({
     phase: 'checking-update',
     percent: 5,
     messageKey: 'checkingUpdate',
   });
-  const [needsReevaluate, setNeedsReevaluate] = useState(false);
+
+  const buildStoredColConfigs = (
+    configs: ColumnConfigItem[] | undefined
+  ): StoredColumnSettings | undefined =>
+    configs
+      ? {
+          order: configs.map((c) => c.id),
+          visibility: configs.reduce(
+            (acc, c) => ({ ...acc, [c.id]: { table: c.showInTable, export: c.showInExport } }),
+            {} as Record<string, { table: boolean; export: boolean }>
+          ),
+          updatedAt: Date.now(),
+        }
+      : undefined;
+
+  const stampEvaluatedStats = (
+    baseStats: MatchingStats,
+    ref: WorkbookData,
+    comp: WorkbookData,
+    settingsTimestamp?: number
+  ): MatchingStats => ({
+    ...baseStats,
+    evaluatedAt: Date.now(),
+    evaluatedRefId: ref.id,
+    evaluatedRefSheet: ref.activeSheet,
+    evaluatedCompId: comp.id,
+    evaluatedCompSheet: comp.activeSheet,
+    evaluatedSettingsAt: settingsTimestamp ?? settingsUpdatedAtRef.current,
+  });
 
   const readLocalSnapshot = async (): Promise<LocalWorkspaceSnapshot> => {
     const [
@@ -207,6 +260,7 @@ export default function App() {
       savedColConfigs,
       savedMappingPresets,
       savedDecisionPresets,
+      savedLastCloudSyncAt,
     ] = await Promise.all([
       getFromIDB<WorkbookData>(StorageKeys.REFERENCE_WORKBOOK),
       getFromIDB<WorkbookData>(StorageKeys.COMPARISON_WORKBOOK),
@@ -220,6 +274,7 @@ export default function App() {
       getFromIDB<StoredColumnSettings>(StorageKeys.COLUMN_CONFIGS),
       getFromIDB<SavedMappingPreset[]>(StorageKeys.SAVED_MAPPING_PRESETS),
       getFromIDB<SavedDecisionPreset[]>(StorageKeys.SAVED_DECISION_PRESETS),
+      getFromIDB<number>(StorageKeys.LAST_CLOUD_SYNC_AT),
     ]);
     return {
       referenceWb: savedRef ?? null,
@@ -234,93 +289,221 @@ export default function App() {
       columnConfigs: savedColConfigs ?? null,
       mappingPresets: savedMappingPresets ?? null,
       decisionPresets: savedDecisionPresets ?? null,
+      lastCloudSyncedAt: savedLastCloudSyncAt ?? null,
     };
   };
 
-  /** Applies merged state + IDB. Never pushes to the cloud (see runMerge). */
-  const applyMergedState = async (merged: {
-    referenceWb?: WorkbookData;
-    comparisonWb?: WorkbookData;
-    settings?: Partial<WorkspaceSettings>;
-    results?: MatchedRow[];
-    stats?: MatchingStats;
-    settingsPulled: boolean;
-    filesPulled: boolean;
-  }) => {
-    if (merged.referenceWb) {
-      setReferenceWb(merged.referenceWb);
-      await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, merged.referenceWb);
-    }
-    if (merged.comparisonWb) {
-      setComparisonWb(merged.comparisonWb);
-      await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, merged.comparisonWb);
-    }
-    if (merged.settings) {
-      const s = merged.settings;
-      if (typeof s.updatedAt === 'number' && s.updatedAt > 0) {
-        settingsUpdatedAtRef.current = s.updatedAt;
-      }
-      if (s.normalization) {
-        setNormalization(s.normalization);
-        await saveToIDB(StorageKeys.NORMALIZATION_RULES, s.normalization);
-      }
-      if (s.layers) {
-        setLayers(s.layers);
-        await saveToIDB(StorageKeys.DECISION_LAYERS, s.layers);
-      }
-      if (s.mappings) {
-        setMappings(s.mappings);
-        await saveToIDB(StorageKeys.COLUMN_MAPPINGS, s.mappings);
-      }
-      if (typeof s.holdColumn === 'string') {
-        setHoldColumn(s.holdColumn);
-        await saveToIDB(StorageKeys.HOLD_COLUMN, s.holdColumn);
-      }
-      if (s.holdValues) {
-        setHoldValues(s.holdValues);
-        await saveToIDB(StorageKeys.HOLD_VALUES, s.holdValues);
-      }
-      if (typeof s.holdReason === 'string') {
-        setHoldReason(s.holdReason);
-        await saveToIDB(StorageKeys.HOLD_REASON, s.holdReason);
-      }
-      if (s.releasedRowIds) {
-        setReleasedRowIds(s.releasedRowIds);
-        await saveToIDB(StorageKeys.RELEASED_ROWS, s.releasedRowIds);
-      }
-      if (s.columnConfigs && Array.isArray(s.columnConfigs.order)) {
-        const cfg = s.columnConfigs;
-        const restored: ColumnConfigItem[] = cfg.order.map((id: string) => ({
+  /**
+   * Reconciles local IndexedDB, localStorage column layout, React state, and
+   * matching results atomically in one pass so UI never requires secondary
+   * clicks ("Save & Show Results" / repeated pulls) to show current results.
+   */
+  const commitReconciledWorkspace = async (input: {
+    source: 'startup' | 'pull';
+    referenceWb?: WorkbookData | null;
+    comparisonWb?: WorkbookData | null;
+    settings?: Partial<WorkspaceSettings> | null;
+    cloudResults?: MatchedRow[] | null;
+    cloudStats?: MatchingStats | null;
+    clearMissingKeys?: boolean;
+    bumpStudioSession?: boolean;
+  }): Promise<{
+    finalResults: MatchedRow[];
+    finalStats: MatchingStats | null;
+    recomputedResults: boolean;
+    effRef: WorkbookData | null;
+    effComp: WorkbookData | null;
+  }> => {
+    const cur = latestStateRef.current;
+    const s = input.settings ?? undefined;
+
+    const effRef =
+      input.referenceWb !== undefined
+        ? input.referenceWb
+        : input.clearMissingKeys
+        ? null
+        : cur.referenceWb;
+    const effComp =
+      input.comparisonWb !== undefined
+        ? input.comparisonWb
+        : input.clearMissingKeys
+        ? null
+        : cur.comparisonWb;
+
+    const effNorm =
+      s?.normalization ?? (input.clearMissingKeys ? defaultNormalizationRules : cur.normalization);
+    const effLayers =
+      s?.layers ?? (input.clearMissingKeys ? defaultDecisionLayers : cur.layers);
+    const effMappings = Array.isArray(s?.mappings)
+      ? s.mappings
+      : input.clearMissingKeys
+      ? []
+      : cur.mappings;
+    const effHoldCol =
+      typeof s?.holdColumn === 'string'
+        ? s.holdColumn
+        : input.clearMissingKeys
+        ? ''
+        : cur.holdColumn;
+    const effHoldVals = Array.isArray(s?.holdValues)
+      ? s.holdValues
+      : input.clearMissingKeys
+      ? []
+      : cur.holdValues;
+    const effHoldReason =
+      typeof s?.holdReason === 'string'
+        ? s.holdReason
+        : input.clearMissingKeys
+        ? ''
+        : cur.holdReason;
+    const effReleased = Array.isArray(s?.releasedRowIds)
+      ? s.releasedRowIds
+      : input.clearMissingKeys
+      ? []
+      : cur.releasedRowIds;
+
+    const effSettingsTs =
+      typeof s?.updatedAt === 'number' && s.updatedAt > 0
+        ? s.updatedAt
+        : input.clearMissingKeys
+        ? Date.now()
+        : settingsUpdatedAtRef.current;
+
+    const hasValidColConfigs = Boolean(s?.columnConfigs && Array.isArray(s.columnConfigs.order));
+    const effColConfigRaw: StoredColumnSettings | undefined = hasValidColConfigs
+      ? (s!.columnConfigs as StoredColumnSettings)
+      : input.clearMissingKeys
+      ? undefined
+      : buildStoredColConfigs(cur.studioColumnConfigs);
+
+    const restoredColConfigs: ColumnConfigItem[] | undefined = effColConfigRaw
+      ? effColConfigRaw.order.map((id: string) => ({
           id,
           label: id,
           category: 'data',
-          showInTable: cfg.visibility?.[id]?.table !== false,
-          showInExport: cfg.visibility?.[id]?.export !== false,
-        }));
-        setStudioColumnConfigs(restored);
-        await saveToIDB(StorageKeys.COLUMN_CONFIGS, cfg);
-      }
-      if (Array.isArray(s.mappingPresets)) {
-        await saveToIDB(StorageKeys.SAVED_MAPPING_PRESETS, s.mappingPresets);
-      }
-      if (Array.isArray(s.decisionPresets)) {
-        await saveToIDB(StorageKeys.SAVED_DECISION_PRESETS, s.decisionPresets);
+          showInTable: effColConfigRaw.visibility?.[id]?.table !== false,
+          showInExport: effColConfigRaw.visibility?.[id]?.export !== false,
+        }))
+      : undefined;
+
+    let finalResults: MatchedRow[] = [];
+    let finalStats: MatchingStats | null = null;
+    let recomputedResults = false;
+
+    const canUseCloudResults =
+      Boolean(input.cloudResults && input.cloudStats && effRef && effComp) &&
+      areCloudResultsFresh(
+        effRef,
+        effComp,
+        { updatedAt: effSettingsTs },
+        input.cloudStats,
+        input.cloudResults?.length
+      );
+
+    if (canUseCloudResults && input.cloudResults && input.cloudStats) {
+      finalResults = ensureResultsSearchBlob([...input.cloudResults]);
+      finalStats = input.cloudStats;
+    } else if (effRef && effComp && effMappings.length > 0) {
+      try {
+        const evaluated = processMatching(
+          effRef,
+          effComp,
+          effMappings,
+          effNorm,
+          effLayers,
+          effHoldVals,
+          effReleased,
+          effHoldCol
+        );
+        finalResults = evaluated.results;
+        finalStats = stampEvaluatedStats(evaluated.stats, effRef, effComp, effSettingsTs);
+        recomputedResults = true;
+      } catch (e) {
+        console.warn('Immediate reconciliation matching failed:', e);
       }
     }
-    if (merged.results && merged.stats) {
-      setResults(merged.results);
-      setStats(merged.stats);
+
+    const syncTimestamp = Date.now();
+    const idbWrites: Promise<void>[] = [
+      effRef
+        ? saveToIDB(StorageKeys.REFERENCE_WORKBOOK, effRef)
+        : deleteFromIDB(StorageKeys.REFERENCE_WORKBOOK),
+      effComp
+        ? saveToIDB(StorageKeys.COMPARISON_WORKBOOK, effComp)
+        : deleteFromIDB(StorageKeys.COMPARISON_WORKBOOK),
+      saveToIDB(StorageKeys.NORMALIZATION_RULES, effNorm),
+      saveToIDB(StorageKeys.DECISION_LAYERS, effLayers),
+      saveToIDB(StorageKeys.COLUMN_MAPPINGS, effMappings),
+      saveToIDB(StorageKeys.HOLD_COLUMN, effHoldCol),
+      saveToIDB(StorageKeys.HOLD_VALUES, effHoldVals),
+      saveToIDB(StorageKeys.HOLD_REASON, effHoldReason),
+      saveToIDB(StorageKeys.RELEASED_ROWS, effReleased),
+      saveToIDB(StorageKeys.LAST_CLOUD_SYNC_AT, syncTimestamp),
+    ];
+
+    if (effColConfigRaw) {
+      idbWrites.push(saveToIDB(StorageKeys.COLUMN_CONFIGS, effColConfigRaw));
+    } else if (input.clearMissingKeys) {
+      idbWrites.push(deleteFromIDB(StorageKeys.COLUMN_CONFIGS));
     }
-    // Re-run matching automatically whenever both files + mappings exist but results
-    // were absent or invalidated by newer settings/files.
-    if (
-      merged.referenceWb &&
-      merged.comparisonWb &&
-      (merged.settings?.mappings?.length ?? 0) > 0 &&
-      !(merged.results && merged.stats)
-    ) {
-      setNeedsReevaluate(true);
+
+    if (Array.isArray(s?.mappingPresets)) {
+      idbWrites.push(saveToIDB(StorageKeys.SAVED_MAPPING_PRESETS, s.mappingPresets));
+    } else if (input.clearMissingKeys) {
+      idbWrites.push(deleteFromIDB(StorageKeys.SAVED_MAPPING_PRESETS));
     }
+
+    if (Array.isArray(s?.decisionPresets)) {
+      idbWrites.push(saveToIDB(StorageKeys.SAVED_DECISION_PRESETS, s.decisionPresets));
+    } else if (input.clearMissingKeys) {
+      idbWrites.push(deleteFromIDB(StorageKeys.SAVED_DECISION_PRESETS));
+    }
+
+    await Promise.all(idbWrites);
+
+    try {
+      if (effColConfigRaw) {
+        const serialized = JSON.stringify(effColConfigRaw);
+        localStorage.setItem('excelmatch_column_settings_v2', serialized);
+        localStorage.setItem('emp_column_configs', serialized);
+      } else if (input.clearMissingKeys) {
+        localStorage.removeItem('excelmatch_column_settings_v2');
+        localStorage.removeItem('emp_column_configs');
+      }
+    } catch {}
+
+    reconcileSeqRef.current += 1;
+    settingsUpdatedAtRef.current = effSettingsTs;
+    latestStateRef.current = {
+      referenceWb: effRef,
+      comparisonWb: effComp,
+      mappings: effMappings,
+      normalization: effNorm,
+      layers: effLayers,
+      holdColumn: effHoldCol,
+      holdValues: effHoldVals,
+      holdReason: effHoldReason,
+      releasedRowIds: effReleased,
+      studioColumnConfigs: restoredColConfigs,
+    };
+
+    setReferenceWb(effRef);
+    setComparisonWb(effComp);
+    setNormalization(effNorm);
+    setLayers(effLayers);
+    setMappings(effMappings);
+    setHoldColumn(effHoldCol);
+    setHoldValues(effHoldVals);
+    setHoldReason(effHoldReason);
+    setReleasedRowIds(effReleased);
+    setStudioColumnConfigs(restoredColConfigs);
+    setResults(finalResults);
+    setStats(finalStats);
+    if (input.bumpStudioSession) {
+      setStudioSession((n) => n + 1);
+    }
+
+    return { finalResults, finalStats, recomputedResults, effRef, effComp };
   };
 
   const runMerge = async (runId: number, startedAt: number): Promise<void> => {
@@ -368,7 +551,16 @@ export default function App() {
         // Continue with local data: merge what did download, never push —
         // a failed column is unknown, not absent.
         const merged = mergeWorkspacePresence(local, columns, { allowPushBack: false });
-        await applyMergedState(merged);
+        await commitReconciledWorkspace({
+          source: 'startup',
+          referenceWb: merged.referenceWb ?? null,
+          comparisonWb: merged.comparisonWb ?? null,
+          settings: merged.settings ?? null,
+          cloudResults: merged.results ?? null,
+          cloudStats: merged.stats ?? null,
+          clearMissingKeys: true,
+          bumpStudioSession: merged.filesPulled || merged.settingsPulled || !merged.results,
+        });
         setSyncState({ phase: 'complete', percent: 100, messageKey: 'continuedLocal' });
         await ensureMinTime();
         if (!isCurrent()) return;
@@ -377,51 +569,64 @@ export default function App() {
         return;
       }
 
-      const hasCloudData = Object.keys(columns).length > 0;
+      const hasCloudData = Boolean(
+        columns.cloudExists ||
+          columns.referenceWb ||
+          columns.comparisonWb ||
+          columns.settings ||
+          columns.results ||
+          columns.stats
+      );
       const merged = mergeWorkspacePresence(local, hasCloudData ? columns : undefined);
-      if (merged.pulled.length === 0 && !merged.pushBack) {
-        if (merged.results && merged.stats) {
-          setResults(merged.results);
-          setStats(merged.stats);
-        } else if (
-          merged.referenceWb &&
-          merged.comparisonWb &&
-          (merged.settings?.mappings?.length ?? local.mappings?.length ?? 0) > 0
-        ) {
-          setNeedsReevaluate(true);
-        }
-        setSyncState({ phase: 'complete', percent: 100, messageKey: 'scanComplete' });
-      } else {
-        if (merged.pulled.length > 0) {
-          setSyncState({ phase: 'found-missing', percent: 85, messageKey: 'foundMissing' });
-        } else {
-          setSyncState({ phase: 'uploading', percent: 85, messageKey: 'uploading' });
-        }
-        await sleep(700);
+
+      if (merged.pulled.length > 0) {
+        setSyncState({ phase: 'found-missing', percent: 85, messageKey: 'foundMissing' });
+        await sleep(400);
         if (!isCurrent()) return;
-        if (merged.pulled.length > 0) {
-          setSyncState({ phase: 'applying', percent: 92, messageKey: 'applying' });
-          await applyMergedState(merged);
-        } else if (merged.results && merged.stats) {
-          setResults(merged.results);
-          setStats(merged.stats);
-        } else if (
-          merged.referenceWb &&
-          merged.comparisonWb &&
-          (merged.settings?.mappings?.length ?? local.mappings?.length ?? 0) > 0
-        ) {
-          setNeedsReevaluate(true);
-        }
-        if (merged.pushBack) {
-          setSyncState({ phase: 'uploading', percent: 92, messageKey: 'uploading' });
-          await syncWorkspaceToSupabase(
-            getEffectiveWorkspaceId(),
-            merged.pushBack,
-            'Startup sync: local data missing in cloud'
-          );
-        }
-        setSyncState({ phase: 'complete', percent: 100, messageKey: 'syncComplete' });
+        setSyncState({ phase: 'applying', percent: 92, messageKey: 'applying' });
+      } else if (merged.pushBack) {
+        setSyncState({ phase: 'uploading', percent: 85, messageKey: 'uploading' });
       }
+
+      const committed = await commitReconciledWorkspace({
+        source: 'startup',
+        referenceWb: merged.referenceWb ?? null,
+        comparisonWb: merged.comparisonWb ?? null,
+        settings: merged.settings ?? null,
+        cloudResults: merged.results ?? null,
+        cloudStats: merged.stats ?? null,
+        clearMissingKeys: true,
+        bumpStudioSession: merged.pulled.length > 0 || !merged.results,
+      });
+      if (!isCurrent()) return;
+
+      const shouldSyncRecomputedResults =
+        committed.recomputedResults &&
+        committed.finalResults.length > 0 &&
+        Boolean(committed.finalStats) &&
+        !merged.results;
+
+      if (merged.pushBack || (shouldSyncRecomputedResults && (hasCloudData || committed.effRef))) {
+        const pushPayload: FullWorkspacePayload = merged.pushBack ? { ...merged.pushBack } : {};
+        if (shouldSyncRecomputedResults && committed.finalStats) {
+          pushPayload.results = committed.finalResults;
+          pushPayload.stats = committed.finalStats;
+        }
+        setSyncState({ phase: 'uploading', percent: 94, messageKey: 'uploading' });
+        await syncWorkspaceToSupabase(
+          getEffectiveWorkspaceId(),
+          pushPayload,
+          merged.pushBack
+            ? 'Startup sync: local data missing in cloud'
+            : 'Startup sync: cached fresh matching results'
+        );
+      }
+
+      setSyncState({
+        phase: 'complete',
+        percent: 100,
+        messageKey: merged.pulled.length > 0 || merged.pushBack ? 'syncComplete' : 'scanComplete',
+      });
       await ensureMinTime();
       if (!isCurrent()) return;
       mergeDoneRef.current = true;
@@ -485,6 +690,10 @@ export default function App() {
   useEffect(() => {
     const wasConnected = prevConnectedRef.current;
     prevConnectedRef.current = isSupabaseConnected;
+    if (!isSupabaseConnected) {
+      mergeDoneRef.current = false;
+      return;
+    }
     if (!wasConnected && isSupabaseConnected && !mergeDoneRef.current && !isUpdateModalOpen) {
       runStartup({ skipCheck: true });
     }
@@ -517,9 +726,12 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableUpdate]);
 
-  // Initial Load: restore from local IndexedDB first for instant rendering
+  // Initial Load: restore from local IndexedDB first for fast UI rendering,
+  // guarded by reconcileSeqRef so cloud startup reconciliation cannot be
+  // overwritten if IndexedDB settles afterwards.
   useEffect(() => {
     let isMounted = true;
+    const seqAtStart = reconcileSeqRef.current;
     (async () => {
       try {
         const [
@@ -549,8 +761,23 @@ export default function App() {
         ]);
 
         if (!isMounted) return;
-
         if (savedLang) setLanguage(savedLang);
+
+        // If cloud reconciliation or user mutation already committed newer state, do not overwrite.
+        if (reconcileSeqRef.current !== seqAtStart) return;
+
+        let restoredColConfigs: ColumnConfigItem[] | undefined;
+        if (savedColConfigs && Array.isArray(savedColConfigs.order)) {
+          restoredColConfigs = savedColConfigs.order.map((id: string) => ({
+            id,
+            label: id,
+            category: 'data',
+            showInTable: savedColConfigs.visibility?.[id]?.table !== false,
+            showInExport: savedColConfigs.visibility?.[id]?.export !== false,
+          }));
+          setStudioColumnConfigs(restoredColConfigs);
+        }
+
         if (savedRef) setReferenceWb(savedRef);
         if (savedComp) setComparisonWb(savedComp);
         if (savedMappings) setMappings(savedMappings);
@@ -561,18 +788,20 @@ export default function App() {
         if (typeof savedHoldReason === 'string') setHoldReason(savedHoldReason);
         if (savedReleased) setReleasedRowIds(savedReleased);
 
-        if (savedColConfigs && Array.isArray(savedColConfigs.order)) {
-          const configs: ColumnConfigItem[] = savedColConfigs.order.map((id: string) => ({
-            id,
-            label: id,
-            category: 'data',
-            showInTable: savedColConfigs.visibility?.[id]?.table !== false,
-            showInExport: savedColConfigs.visibility?.[id]?.export !== false,
-          }));
-          setStudioColumnConfigs(configs);
-        }
+        latestStateRef.current = {
+          referenceWb: savedRef ?? null,
+          comparisonWb: savedComp ?? null,
+          mappings: savedMappings ?? [],
+          normalization: savedNorm || defaultNormalizationRules,
+          layers: savedLayers || defaultDecisionLayers,
+          holdColumn: typeof savedHoldCol === 'string' ? savedHoldCol : '',
+          holdValues: savedHoldVals || [],
+          holdReason: typeof savedHoldReason === 'string' ? savedHoldReason : '',
+          releasedRowIds: savedReleased || [],
+          studioColumnConfigs: restoredColConfigs,
+        };
 
-        // Auto-run matching if files and rules were previously loaded and Supabase is not handling startup reconciliation
+        // Auto-run matching if files and rules were previously loaded and Supabase is offline
         if (savedRef && savedComp && savedMappings && savedMappings.length > 0 && !isSupabaseConfigured()) {
           try {
             const { results: evaluated, stats: evStats } = processMatching(
@@ -586,7 +815,7 @@ export default function App() {
               savedHoldCol || ''
             );
             setResults(evaluated);
-            setStats(evStats);
+            setStats(stampEvaluatedStats(evStats, savedRef, savedComp));
           } catch (e) {
             console.warn('Auto evaluation error on init', e);
           }
@@ -606,7 +835,6 @@ export default function App() {
 
   // Coalescing cloud sync queue: merges concurrent payloads within a short window
   // so uploading Reference + Comparison + Results never drops earlier fields.
-  const settingsUpdatedAtRef = useRef<number>(Date.now());
   const pendingSyncRef = useRef<{
     userId: string;
     payload: FullWorkspacePayload;
@@ -696,45 +924,41 @@ export default function App() {
       holdReason?: string;
       releasedRowIds?: string[];
       columnConfigs?: ColumnConfigItem[];
+      normalization?: NormalizationRules;
+      layers?: DecisionLayer[];
     }
   ): Promise<WorkspaceSettings> => {
-    const [savedMapPresets, savedDecPresets] = await Promise.all([
+    const cur = latestStateRef.current;
+    const [savedMapPresets, savedDecPresets, savedColConfigs] = await Promise.all([
       getFromIDB<SavedMappingPreset[]>(StorageKeys.SAVED_MAPPING_PRESETS),
       getFromIDB<SavedDecisionPreset[]>(StorageKeys.SAVED_DECISION_PRESETS),
+      getFromIDB<StoredColumnSettings>(StorageKeys.COLUMN_CONFIGS),
     ]);
     const now = Date.now();
     settingsUpdatedAtRef.current = now;
+    const colConfigs =
+      overrides?.columnConfigs || cur.studioColumnConfigs
+        ? buildStoredColConfigs(overrides?.columnConfigs ?? cur.studioColumnConfigs)
+        : savedColConfigs ?? undefined;
+
     return {
-      normalization,
-      layers,
+      normalization: overrides?.normalization ?? cur.normalization,
+      layers: overrides?.layers ?? cur.layers,
       mappings: nextMappings,
-      holdColumn: overrides?.holdColumn ?? holdColumn,
-      holdValues: overrides?.holdValues ?? holdValues,
-      holdReason: overrides?.holdReason ?? holdReason,
-      releasedRowIds: overrides?.releasedRowIds ?? releasedRowIds,
+      holdColumn: overrides?.holdColumn ?? cur.holdColumn,
+      holdValues: overrides?.holdValues ?? cur.holdValues,
+      holdReason: overrides?.holdReason ?? cur.holdReason,
+      releasedRowIds: overrides?.releasedRowIds ?? cur.releasedRowIds,
       mappingPresets: savedMapPresets ?? undefined,
       decisionPresets: savedDecPresets ?? undefined,
-      columnConfigs: buildStoredColConfigs(overrides?.columnConfigs ?? studioColumnConfigs),
+      columnConfigs: colConfigs,
       updatedAt: now,
     };
   };
 
-  const stampEvaluatedStats = (
-    baseStats: MatchingStats,
-    ref: WorkbookData,
-    comp: WorkbookData,
-    settingsTimestamp?: number
-  ): MatchingStats => ({
-    ...baseStats,
-    evaluatedAt: Date.now(),
-    evaluatedRefId: ref.id,
-    evaluatedRefSheet: ref.activeSheet,
-    evaluatedCompId: comp.id,
-    evaluatedCompSheet: comp.activeSheet,
-    evaluatedSettingsAt: settingsTimestamp ?? settingsUpdatedAtRef.current,
-  });
-
   const handleSetReferenceWb = async (wb: WorkbookData | null) => {
+    reconcileSeqRef.current += 1;
+    latestStateRef.current.referenceWb = wb;
     setReferenceWb(wb);
     if (wb) {
       await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, wb);
@@ -745,15 +969,18 @@ export default function App() {
       setStudioSession((n) => n + 1);
     }
 
-    if (wb && comparisonWb) {
-      const kept = mappings.filter(
-        (m) => wb.headers.includes(m.mainCol) && comparisonWb.headers.includes(m.comparisonCol)
+    const curComp = latestStateRef.current.comparisonWb;
+    const curMappings = latestStateRef.current.mappings;
+    if (wb && curComp) {
+      const kept = curMappings.filter(
+        (m) => wb.headers.includes(m.mainCol) && curComp.headers.includes(m.comparisonCol)
       );
+      latestStateRef.current.mappings = kept;
       setMappings(kept);
       await saveToIDB(StorageKeys.COLUMN_MAPPINGS, kept);
       const completeSettings = await buildCompleteSettings(kept);
       if (kept.length > 0) {
-        handleExecuteMatching(wb, comparisonWb, kept, false, undefined, undefined, undefined, {
+        handleExecuteMatching(wb, curComp, kept, false, undefined, undefined, undefined, {
           referenceWb: wb,
           settings: completeSettings,
         });
@@ -783,6 +1010,8 @@ export default function App() {
   };
 
   const handleSetComparisonWb = async (wb: WorkbookData | null) => {
+    reconcileSeqRef.current += 1;
+    latestStateRef.current.comparisonWb = wb;
     setComparisonWb(wb);
     if (wb) {
       await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, wb);
@@ -793,15 +1022,18 @@ export default function App() {
       setStudioSession((n) => n + 1);
     }
 
-    if (referenceWb && wb) {
-      const kept = mappings.filter(
-        (m) => referenceWb.headers.includes(m.mainCol) && wb.headers.includes(m.comparisonCol)
+    const curRef = latestStateRef.current.referenceWb;
+    const curMappings = latestStateRef.current.mappings;
+    if (curRef && wb) {
+      const kept = curMappings.filter(
+        (m) => curRef.headers.includes(m.mainCol) && wb.headers.includes(m.comparisonCol)
       );
+      latestStateRef.current.mappings = kept;
       setMappings(kept);
       await saveToIDB(StorageKeys.COLUMN_MAPPINGS, kept);
       const completeSettings = await buildCompleteSettings(kept);
       if (kept.length > 0) {
-        handleExecuteMatching(referenceWb, wb, kept, false, undefined, undefined, undefined, {
+        handleExecuteMatching(curRef, wb, kept, false, undefined, undefined, undefined, {
           comparisonWb: wb,
           settings: completeSettings,
         });
@@ -831,20 +1063,26 @@ export default function App() {
   };
 
   const handleSelectReferenceSheet = async (sheetName: string) => {
-    if (!referenceWb) return;
+    const curRef = latestStateRef.current.referenceWb;
+    if (!curRef) return;
     try {
-      const updated = changeWorkbookSheet(referenceWb, sheetName);
+      const updated = changeWorkbookSheet(curRef, sheetName);
+      reconcileSeqRef.current += 1;
+      latestStateRef.current.referenceWb = updated;
       setReferenceWb(updated);
       await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, updated);
-      if (comparisonWb) {
-        const kept = mappings.filter(
-          (m) => updated.headers.includes(m.mainCol) && comparisonWb.headers.includes(m.comparisonCol)
+      const curComp = latestStateRef.current.comparisonWb;
+      const curMappings = latestStateRef.current.mappings;
+      if (curComp) {
+        const kept = curMappings.filter(
+          (m) => updated.headers.includes(m.mainCol) && curComp.headers.includes(m.comparisonCol)
         );
+        latestStateRef.current.mappings = kept;
         setMappings(kept);
         await saveToIDB(StorageKeys.COLUMN_MAPPINGS, kept);
         const completeSettings = await buildCompleteSettings(kept);
         if (kept.length > 0) {
-          handleExecuteMatching(updated, comparisonWb, kept, false, undefined, undefined, undefined, {
+          handleExecuteMatching(updated, curComp, kept, false, undefined, undefined, undefined, {
             referenceWb: updated,
             settings: completeSettings,
           });
@@ -874,20 +1112,26 @@ export default function App() {
   };
 
   const handleSelectComparisonSheet = async (sheetName: string) => {
-    if (!comparisonWb) return;
+    const curComp = latestStateRef.current.comparisonWb;
+    if (!curComp) return;
     try {
-      const updated = changeWorkbookSheet(comparisonWb, sheetName);
+      const updated = changeWorkbookSheet(curComp, sheetName);
+      reconcileSeqRef.current += 1;
+      latestStateRef.current.comparisonWb = updated;
       setComparisonWb(updated);
       await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, updated);
-      if (referenceWb) {
-        const kept = mappings.filter(
-          (m) => referenceWb.headers.includes(m.mainCol) && updated.headers.includes(m.comparisonCol)
+      const curRef = latestStateRef.current.referenceWb;
+      const curMappings = latestStateRef.current.mappings;
+      if (curRef) {
+        const kept = curMappings.filter(
+          (m) => curRef.headers.includes(m.mainCol) && updated.headers.includes(m.comparisonCol)
         );
+        latestStateRef.current.mappings = kept;
         setMappings(kept);
         await saveToIDB(StorageKeys.COLUMN_MAPPINGS, kept);
         const completeSettings = await buildCompleteSettings(kept);
         if (kept.length > 0) {
-          handleExecuteMatching(referenceWb, updated, kept, false, undefined, undefined, undefined, {
+          handleExecuteMatching(curRef, updated, kept, false, undefined, undefined, undefined, {
             comparisonWb: updated,
             settings: completeSettings,
           });
@@ -918,21 +1162,31 @@ export default function App() {
 
   // Rule Handlers
   const handleUpdateMappings = async (newMappings: ColumnMapping[]) => {
+    reconcileSeqRef.current += 1;
+    latestStateRef.current.mappings = newMappings;
     setMappings(newMappings);
     await saveToIDB(StorageKeys.COLUMN_MAPPINGS, newMappings);
   };
 
   const handleUpdateNormalization = async (newNorm: NormalizationRules) => {
+    reconcileSeqRef.current += 1;
+    latestStateRef.current.normalization = newNorm;
     setNormalization(newNorm);
     await saveToIDB(StorageKeys.NORMALIZATION_RULES, newNorm);
   };
 
   const handleUpdateLayers = async (newLayers: DecisionLayer[]) => {
+    reconcileSeqRef.current += 1;
+    latestStateRef.current.layers = newLayers;
     setLayers(newLayers);
     await saveToIDB(StorageKeys.DECISION_LAYERS, newLayers);
   };
 
   const handleHoldSettingsChange = async (col: string, vals: string[], reason: string) => {
+    reconcileSeqRef.current += 1;
+    latestStateRef.current.holdColumn = col;
+    latestStateRef.current.holdValues = vals;
+    latestStateRef.current.holdReason = reason;
     setHoldColumn(col);
     setHoldValues(vals);
     setHoldReason(reason);
@@ -944,8 +1198,11 @@ export default function App() {
   };
 
   const handleReleaseHoldKey = async (key: string): Promise<{ key: string; green: number; yellow: number; total: number }> => {
+    const cur = latestStateRef.current;
     const keyLower = key.trim().toLowerCase();
-    const nextHoldValues = holdValues.filter((v) => v.trim().toLowerCase() !== keyLower);
+    const nextHoldValues = cur.holdValues.filter((v) => v.trim().toLowerCase() !== keyLower);
+    reconcileSeqRef.current += 1;
+    latestStateRef.current.holdValues = nextHoldValues;
     setHoldValues(nextHoldValues);
     await saveToIDB(StorageKeys.HOLD_VALUES, nextHoldValues);
 
@@ -954,30 +1211,31 @@ export default function App() {
         if (r.decisionColor !== 'blue') return false;
         if (r.holdKey && r.holdKey.trim().toLowerCase() === keyLower) return true;
         if (r.matchKey && r.matchKey.trim().toLowerCase() === keyLower) return true;
-        if (holdColumn && String(r.comparisonRow[holdColumn] ?? '').trim().toLowerCase() === keyLower) return true;
+        if (cur.holdColumn && String(r.comparisonRow[cur.holdColumn] ?? '').trim().toLowerCase() === keyLower) return true;
         return false;
       })
       .map((r) => r.id);
 
     const targetSet = new Set(targetRowIds);
-    const nextReleased = Array.from(new Set([...releasedRowIds, ...targetRowIds]));
+    const nextReleased = Array.from(new Set([...cur.releasedRowIds, ...targetRowIds]));
+    latestStateRef.current.releasedRowIds = nextReleased;
     setReleasedRowIds(nextReleased);
     await saveToIDB(StorageKeys.RELEASED_ROWS, nextReleased);
 
     let green = 0;
     let yellow = 0;
-    if (referenceWb && comparisonWb && mappings.length > 0) {
+    if (cur.referenceWb && cur.comparisonWb && cur.mappings.length > 0) {
       const { results: evaluatedResults, stats: evaluatedStats } = processMatching(
-        referenceWb,
-        comparisonWb,
-        mappings,
-        normalization,
-        layers,
+        cur.referenceWb,
+        cur.comparisonWb,
+        cur.mappings,
+        cur.normalization,
+        cur.layers,
         nextHoldValues,
         nextReleased,
-        holdColumn
+        cur.holdColumn
       );
-      const stampedStats = stampEvaluatedStats(evaluatedStats, referenceWb, comparisonWb);
+      const stampedStats = stampEvaluatedStats(evaluatedStats, cur.referenceWb, cur.comparisonWb);
       setResults(evaluatedResults);
       setStats(stampedStats);
 
@@ -989,7 +1247,7 @@ export default function App() {
       }
 
       if (isSupabaseConnected) {
-        const completeSettings = await buildCompleteSettings(mappings, {
+        const completeSettings = await buildCompleteSettings(cur.mappings, {
           holdValues: nextHoldValues,
           releasedRowIds: nextReleased,
         });
@@ -1013,21 +1271,27 @@ export default function App() {
     },
     options?: { skipReevaluate?: boolean; skipCloudSync?: boolean }
   ) => {
-    const effHoldCol = holdOverrides?.holdColumn ?? holdColumn;
-    const effHoldVals = holdOverrides?.holdValues ?? holdValues;
-    const effHoldReason = holdOverrides?.holdReason ?? holdReason;
+    const cur = latestStateRef.current;
+    const effHoldCol = holdOverrides?.holdColumn ?? cur.holdColumn;
+    const effHoldVals = holdOverrides?.holdValues ?? cur.holdValues;
+    const effHoldReason = holdOverrides?.holdReason ?? cur.holdReason;
+
+    reconcileSeqRef.current += 1;
+    latestStateRef.current.holdColumn = effHoldCol;
+    latestStateRef.current.holdValues = effHoldVals;
+    latestStateRef.current.holdReason = effHoldReason;
 
     await Promise.all([
-      saveToIDB(StorageKeys.COLUMN_MAPPINGS, mappings),
-      saveToIDB(StorageKeys.NORMALIZATION_RULES, normalization),
-      saveToIDB(StorageKeys.DECISION_LAYERS, layers),
+      saveToIDB(StorageKeys.COLUMN_MAPPINGS, cur.mappings),
+      saveToIDB(StorageKeys.NORMALIZATION_RULES, cur.normalization),
+      saveToIDB(StorageKeys.DECISION_LAYERS, cur.layers),
       saveToIDB(StorageKeys.HOLD_COLUMN, effHoldCol),
       saveToIDB(StorageKeys.HOLD_VALUES, effHoldVals),
       saveToIDB(StorageKeys.HOLD_REASON, effHoldReason),
-      saveToIDB(StorageKeys.RELEASED_ROWS, releasedRowIds),
+      saveToIDB(StorageKeys.RELEASED_ROWS, cur.releasedRowIds),
     ]);
 
-    const settingsPayload = await buildCompleteSettings(mappings, {
+    const settingsPayload = await buildCompleteSettings(cur.mappings, {
       holdColumn: effHoldCol,
       holdValues: effHoldVals,
       holdReason: effHoldReason,
@@ -1036,23 +1300,23 @@ export default function App() {
     let evaluatedResults: MatchedRow[] | undefined;
     let evaluatedStats: MatchingStats | undefined;
 
-    if (!options?.skipReevaluate && referenceWb && comparisonWb && mappings.length > 0) {
+    if (!options?.skipReevaluate && cur.referenceWb && cur.comparisonWb && cur.mappings.length > 0) {
       try {
         const res = processMatching(
-          referenceWb,
-          comparisonWb,
-          mappings,
-          normalization,
-          layers,
+          cur.referenceWb,
+          cur.comparisonWb,
+          cur.mappings,
+          cur.normalization,
+          cur.layers,
           effHoldVals,
-          releasedRowIds,
+          cur.releasedRowIds,
           effHoldCol
         );
         evaluatedResults = res.results;
         evaluatedStats = stampEvaluatedStats(
           res.stats,
-          referenceWb,
-          comparisonWb,
+          cur.referenceWb,
+          cur.comparisonWb,
           settingsPayload.updatedAt
         );
         setResults(evaluatedResults);
@@ -1076,7 +1340,7 @@ export default function App() {
       const res = await syncWorkspaceToSupabase(
         getEffectiveWorkspaceId(),
         syncPayload,
-        `Updated ${layers.length} decision layers & ${mappings.length} column mappings`
+        `Updated ${cur.layers.length} decision layers & ${cur.mappings.length} column mappings`
       );
       if (res.success) {
         showToast(`${t.toastRulesSaved} (Synced to Supabase)`, 'success');
@@ -1107,17 +1371,19 @@ export default function App() {
       comparisonWb?: WorkbookData | null;
       settings?: WorkspaceSettings;
     },
-    skipCloudSync = false
+    skipCloudSync = false,
+    customHoldReason?: string
   ) => {
-    const ref = customRef !== undefined ? customRef : referenceWb;
-    const comp = customComp !== undefined ? customComp : comparisonWb;
+    const cur = latestStateRef.current;
+    const ref = customRef !== undefined ? customRef : cur.referenceWb;
+    const comp = customComp !== undefined ? customComp : cur.comparisonWb;
 
     if (!ref || !comp) {
       showToast(t.toastBothFilesRequired, 'error');
       return;
     }
 
-    const effectiveMappings = customMappings || mappings;
+    const effectiveMappings = customMappings || cur.mappings;
 
     if (effectiveMappings.length === 0) {
       showToast(t.toastMappingRequired, 'error');
@@ -1129,16 +1395,18 @@ export default function App() {
 
     setTimeout(async () => {
       try {
-        const effHoldVals = customHoldValues !== undefined ? customHoldValues : holdValues;
-        const effReleased = customReleasedRowIds !== undefined ? customReleasedRowIds : releasedRowIds;
-        const effHoldCol = customHoldColumn !== undefined ? customHoldColumn : holdColumn;
+        const latest = latestStateRef.current;
+        const effHoldVals = customHoldValues !== undefined ? customHoldValues : latest.holdValues;
+        const effReleased = customReleasedRowIds !== undefined ? customReleasedRowIds : latest.releasedRowIds;
+        const effHoldCol = customHoldColumn !== undefined ? customHoldColumn : latest.holdColumn;
+        const effHoldReason = customHoldReason !== undefined ? customHoldReason : latest.holdReason;
 
         const { results: evaluatedResults, stats: evaluatedStats } = processMatching(
           ref,
           comp,
           effectiveMappings,
-          normalization,
-          layers,
+          latest.normalization,
+          latest.layers,
           effHoldVals,
           effReleased,
           effHoldCol
@@ -1149,6 +1417,7 @@ export default function App() {
           syncSettings = await buildCompleteSettings(effectiveMappings, {
             holdColumn: effHoldCol,
             holdValues: effHoldVals,
+            holdReason: effHoldReason,
             releasedRowIds: effReleased,
           });
         }
@@ -1310,6 +1579,7 @@ export default function App() {
         StorageKeys.COLUMN_CONFIGS,
         StorageKeys.SAVED_MAPPING_PRESETS,
         StorageKeys.SAVED_DECISION_PRESETS,
+        StorageKeys.LAST_CLOUD_SYNC_AT,
       ]) {
         try { await deleteFromIDB(k); } catch {}
       }
@@ -1323,6 +1593,19 @@ export default function App() {
         }
       } catch {}
 
+      reconcileSeqRef.current += 1;
+      latestStateRef.current = {
+        referenceWb: null,
+        comparisonWb: null,
+        mappings: [],
+        normalization: defaultNormalizationRules,
+        layers: defaultDecisionLayers,
+        holdColumn: '',
+        holdValues: [],
+        holdReason: '',
+        releasedRowIds: [],
+        studioColumnConfigs: undefined,
+      };
       setReferenceWb(null);
       setComparisonWb(null);
       setResults([]);
@@ -1346,38 +1629,15 @@ export default function App() {
     }
   };
 
-  // Column view settings (StoredColumnSettings) shared by every settings sync.
-  const buildStoredColConfigs = (
-    configs: ColumnConfigItem[] | undefined
-  ): StoredColumnSettings | undefined =>
-    configs
-      ? {
-          order: configs.map((c) => c.id),
-          visibility: configs.reduce(
-            (acc, c) => ({ ...acc, [c.id]: { table: c.showInTable, export: c.showInExport } }),
-            {} as Record<string, { table: boolean; export: boolean }>
-          ),
-          updatedAt: Date.now(),
-        }
-      : undefined;
-
-  // Re-run matching once after startup reconciliation pulled newer settings
-  // or files (results computed from older settings would otherwise linger).
-  useEffect(() => {
-    if (!needsReevaluate) return;
-    if (!referenceWb || !comparisonWb || mappings.length === 0) {
-      setNeedsReevaluate(false);
-      return;
-    }
-    setNeedsReevaluate(false);
-    handleExecuteMatching(undefined, undefined, undefined, false, undefined, undefined, undefined, undefined, true);
-  }, [needsReevaluate, referenceWb, comparisonWb, mappings]);
-
   // Column view changes sync to the cloud like any other setting.
   const handleSaveColumnConfigs = async (configs: ColumnConfigItem[]) => {
+    reconcileSeqRef.current += 1;
+    latestStateRef.current.studioColumnConfigs = configs;
     setStudioColumnConfigs(configs);
     if (isSupabaseConnected) {
-      const settingsPayload = await buildCompleteSettings(mappings, { columnConfigs: configs });
+      const settingsPayload = await buildCompleteSettings(latestStateRef.current.mappings, {
+        columnConfigs: configs,
+      });
       debouncedSyncToSupabase(
         getEffectiveWorkspaceId(),
         { settings: settingsPayload },
@@ -1393,10 +1653,11 @@ export default function App() {
     }
 
     clearPendingSync();
-    const settingsPayload = await buildCompleteSettings(mappings);
+    const cur = latestStateRef.current;
+    const settingsPayload = await buildCompleteSettings(cur.mappings);
     const payload = {
-      referenceWb,
-      comparisonWb,
+      referenceWb: cur.referenceWb,
+      comparisonWb: cur.comparisonWb,
       results,
       stats,
       settings: settingsPayload,
@@ -1425,111 +1686,20 @@ export default function App() {
     if (!success) {
       throw new Error(error || 'Failed to fetch from Supabase');
     }
-    if (data) {
-      const nextRef = data.referenceWb ?? referenceWb;
-      const nextComp = data.comparisonWb ?? comparisonWb;
-      const nextNorm = data.settings?.normalization ?? normalization;
-      const nextLayers = data.settings?.layers ?? layers;
-      const nextMappings = data.settings?.mappings ?? mappings;
-      const nextHoldCol =
-        typeof data.settings?.holdColumn === 'string' ? data.settings.holdColumn : holdColumn;
-      const nextHoldVals = data.settings?.holdValues ?? holdValues;
-      const nextHoldReason =
-        typeof data.settings?.holdReason === 'string' ? data.settings.holdReason : holdReason;
-      const nextReleased = data.settings?.releasedRowIds ?? releasedRowIds;
-
-      if (data.referenceWb) {
-        setReferenceWb(data.referenceWb);
-        await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, data.referenceWb);
-      }
-      if (data.comparisonWb) {
-        setComparisonWb(data.comparisonWb);
-        await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, data.comparisonWb);
-      }
-      if (data.settings) {
-        if (typeof data.settings.updatedAt === 'number') {
-          settingsUpdatedAtRef.current = data.settings.updatedAt;
-        }
-        if (data.settings.normalization) {
-          setNormalization(data.settings.normalization);
-          await saveToIDB(StorageKeys.NORMALIZATION_RULES, data.settings.normalization);
-        }
-        if (data.settings.layers) {
-          setLayers(data.settings.layers);
-          await saveToIDB(StorageKeys.DECISION_LAYERS, data.settings.layers);
-        }
-        if (data.settings.mappings) {
-          setMappings(data.settings.mappings);
-          await saveToIDB(StorageKeys.COLUMN_MAPPINGS, data.settings.mappings);
-        }
-        if (typeof data.settings.holdColumn === 'string') {
-          setHoldColumn(data.settings.holdColumn);
-          await saveToIDB(StorageKeys.HOLD_COLUMN, data.settings.holdColumn);
-        }
-        if (data.settings.holdValues) {
-          setHoldValues(data.settings.holdValues);
-          await saveToIDB(StorageKeys.HOLD_VALUES, data.settings.holdValues);
-        }
-        if (typeof data.settings.holdReason === 'string') {
-          setHoldReason(data.settings.holdReason);
-          await saveToIDB(StorageKeys.HOLD_REASON, data.settings.holdReason);
-        }
-        if (data.settings.releasedRowIds) {
-          setReleasedRowIds(data.settings.releasedRowIds);
-          await saveToIDB(StorageKeys.RELEASED_ROWS, data.settings.releasedRowIds);
-        }
-        if (Array.isArray(data.settings.mappingPresets)) {
-          await saveToIDB(StorageKeys.SAVED_MAPPING_PRESETS, data.settings.mappingPresets);
-        }
-        if (Array.isArray(data.settings.decisionPresets)) {
-          await saveToIDB(StorageKeys.SAVED_DECISION_PRESETS, data.settings.decisionPresets);
-        }
-        if (data.settings.columnConfigs && Array.isArray(data.settings.columnConfigs.order)) {
-          const cfg = data.settings.columnConfigs;
-          const restored: ColumnConfigItem[] = cfg.order.map((id: string) => ({
-            id,
-            label: id,
-            category: 'data',
-            showInTable: cfg.visibility?.[id]?.table !== false,
-            showInExport: cfg.visibility?.[id]?.export !== false,
-          }));
-          setStudioColumnConfigs(restored);
-          await saveToIDB(StorageKeys.COLUMN_CONFIGS, cfg);
-        }
-      }
-
-      const freshFromCloud =
-        Boolean(data.results && data.stats) &&
-        areCloudResultsFresh(nextRef, nextComp, data.settings, data.stats);
-
-      if (freshFromCloud && data.results && data.stats) {
-        setResults(data.results);
-        setStats(data.stats);
-      } else if (nextRef && nextComp && nextMappings.length > 0) {
-        const { results: recomputed, stats: recomputedStats } = processMatching(
-          nextRef,
-          nextComp,
-          nextMappings,
-          nextNorm,
-          nextLayers,
-          nextHoldVals,
-          nextReleased,
-          nextHoldCol
-        );
-        setResults(recomputed);
-        setStats(
-          stampEvaluatedStats(
-            recomputedStats,
-            nextRef,
-            nextComp,
-            data.settings?.updatedAt ?? settingsUpdatedAtRef.current
-          )
-        );
-      } else if (data.results && data.stats) {
-        setResults(data.results);
-        setStats(data.stats);
-      }
+    if (!data) {
+      throw new Error('No cloud workspace snapshot found in Supabase yet.');
     }
+
+    await commitReconciledWorkspace({
+      source: 'pull',
+      referenceWb: data.referenceWb ?? null,
+      comparisonWb: data.comparisonWb ?? null,
+      settings: data.settings ?? null,
+      cloudResults: data.results ?? null,
+      cloudStats: data.stats ?? null,
+      clearMissingKeys: true,
+      bumpStudioSession: true,
+    });
   };
 
   // 1. Startup Splash Screen: App owns the sequence, SplashScreen renders it.
@@ -1644,7 +1814,10 @@ export default function App() {
             true,
             holdOverrides?.holdValues,
             undefined,
-            holdOverrides?.holdColumn
+            holdOverrides?.holdColumn,
+            undefined,
+            false,
+            holdOverrides?.holdReason
           )
         }
         isProcessing={isProcessing}

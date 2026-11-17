@@ -204,6 +204,7 @@ export const StorageKeys = {
   RESULTS_STATE: 'results_state',
   SYNC_HISTORY: 'sync_history',
   COLUMN_CONFIGS: 'column_configs',
+  LAST_CLOUD_SYNC_AT: 'last_cloud_sync_at',
 };
 
 export const defaultNormalizationRules: NormalizationRules = {

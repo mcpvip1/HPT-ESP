@@ -838,6 +838,41 @@ export function analyzeUnmatchedRow(
   };
 }
 
+export function buildRowSearchBlob(r: MatchedRow): string {
+  const searchTokens: string[] = [
+    String(r.rowIndex),
+    r.matchKey || '',
+    r.decisionColor,
+    r.decisionReason || '',
+    r.isMatched ? 'matched' : 'unmatched new',
+    r.isHold ? `hold on hold ${r.holdKey || ''}` : '',
+    r.releasedFromHold ? 'released from hold' : '',
+  ];
+  if (r.comparisonRow) {
+    for (const k in r.comparisonRow) {
+      const v = r.comparisonRow[k];
+      if (v !== undefined && v !== null && v !== '') searchTokens.push(String(v));
+    }
+  }
+  if (r.matchedMainRow) {
+    for (const k in r.matchedMainRow) {
+      const v = r.matchedMainRow[k];
+      if (v !== undefined && v !== null && v !== '') searchTokens.push(String(v));
+    }
+  }
+  return searchTokens.join(' ').toLowerCase();
+}
+
+export function ensureResultsSearchBlob(results: MatchedRow[]): MatchedRow[] {
+  if (!Array.isArray(results) || results.length === 0) return results;
+  for (const r of results) {
+    if (!r.searchBlob) {
+      r.searchBlob = buildRowSearchBlob(r);
+    }
+  }
+  return results;
+}
+
 /**
  * Main comparison and matching engine
  */
@@ -1271,26 +1306,7 @@ export function processMatching(
   otherCount = 0;
   let finalMatchedCount = 0;
   for (const r of results) {
-    const searchTokens: string[] = [
-      String(r.rowIndex),
-      r.matchKey || '',
-      r.decisionColor,
-      r.decisionReason || '',
-      r.isMatched ? 'matched' : 'unmatched new',
-      r.isHold ? `hold on hold ${r.holdKey || ''}` : '',
-      r.releasedFromHold ? 'released from hold' : '',
-    ];
-    for (const k in r.comparisonRow) {
-      const v = r.comparisonRow[k];
-      if (v !== undefined && v !== null && v !== '') searchTokens.push(String(v));
-    }
-    if (r.matchedMainRow) {
-      for (const k in r.matchedMainRow) {
-        const v = r.matchedMainRow[k];
-        if (v !== undefined && v !== null && v !== '') searchTokens.push(String(v));
-      }
-    }
-    r.searchBlob = searchTokens.join(' ').toLowerCase();
+    r.searchBlob = buildRowSearchBlob(r);
 
     if (r.isMatched) finalMatchedCount++;
     if (r.decisionColor === 'green') greenCount++;
