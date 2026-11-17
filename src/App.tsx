@@ -206,6 +206,8 @@ export default function App() {
       savedHoldReason,
       savedReleased,
       savedColConfigs,
+      savedMappingPresets,
+      savedDecisionPresets,
     ] = await Promise.all([
       getFromIDB<WorkbookData>(StorageKeys.REFERENCE_WORKBOOK),
       getFromIDB<WorkbookData>(StorageKeys.COMPARISON_WORKBOOK),
@@ -217,6 +219,8 @@ export default function App() {
       getFromIDB<string>(StorageKeys.HOLD_REASON),
       getFromIDB<string[]>(StorageKeys.RELEASED_ROWS),
       getFromIDB<StoredColumnSettings>(StorageKeys.COLUMN_CONFIGS),
+      getFromIDB<SavedMappingPreset[]>(StorageKeys.SAVED_MAPPING_PRESETS),
+      getFromIDB<SavedDecisionPreset[]>(StorageKeys.SAVED_DECISION_PRESETS),
     ]);
     return {
       referenceWb: savedRef ?? null,
@@ -229,6 +233,8 @@ export default function App() {
       holdReason: savedHoldReason ?? null,
       releasedRowIds: savedReleased ?? null,
       columnConfigs: savedColConfigs ?? null,
+      mappingPresets: savedMappingPresets ?? null,
+      decisionPresets: savedDecisionPresets ?? null,
     };
   };
 
@@ -291,6 +297,12 @@ export default function App() {
         }));
         setStudioColumnConfigs(restored);
         await saveToIDB(StorageKeys.COLUMN_CONFIGS, cfg);
+      }
+      if (Array.isArray(s.mappingPresets)) {
+        await saveToIDB(StorageKeys.SAVED_MAPPING_PRESETS, s.mappingPresets);
+      }
+      if (Array.isArray(s.decisionPresets)) {
+        await saveToIDB(StorageKeys.SAVED_DECISION_PRESETS, s.decisionPresets);
       }
     }
     if (merged.results && merged.stats) {
@@ -599,17 +611,34 @@ export default function App() {
   // with the file and the fresh results in one combined sync — the
   // debounced sync only fires the last call in its window, so a separate
   // file/settings sync here would be swallowed by the results sync.
-  const buildCompleteSettings = (nextMappings: ColumnMapping[]): WorkspaceSettings => ({
-    normalization,
-    layers,
-    mappings: nextMappings,
-    holdColumn,
-    holdValues,
-    holdReason,
-    releasedRowIds,
-    columnConfigs: buildStoredColConfigs(studioColumnConfigs),
-    updatedAt: Date.now(),
-  });
+  const buildCompleteSettings = async (
+    nextMappings: ColumnMapping[],
+    overrides?: {
+      holdColumn?: string;
+      holdValues?: string[];
+      holdReason?: string;
+      releasedRowIds?: string[];
+      columnConfigs?: ColumnConfigItem[];
+    }
+  ): Promise<WorkspaceSettings> => {
+    const [savedMapPresets, savedDecPresets] = await Promise.all([
+      getFromIDB<SavedMappingPreset[]>(StorageKeys.SAVED_MAPPING_PRESETS),
+      getFromIDB<SavedDecisionPreset[]>(StorageKeys.SAVED_DECISION_PRESETS),
+    ]);
+    return {
+      normalization,
+      layers,
+      mappings: nextMappings,
+      holdColumn: overrides?.holdColumn ?? holdColumn,
+      holdValues: overrides?.holdValues ?? holdValues,
+      holdReason: overrides?.holdReason ?? holdReason,
+      releasedRowIds: overrides?.releasedRowIds ?? releasedRowIds,
+      mappingPresets: savedMapPresets ?? undefined,
+      decisionPresets: savedDecPresets ?? undefined,
+      columnConfigs: buildStoredColConfigs(overrides?.columnConfigs ?? studioColumnConfigs),
+      updatedAt: Date.now(),
+    };
+  };
 
   const handleSetReferenceWb = async (wb: WorkbookData | null) => {
     setReferenceWb(wb);
@@ -617,6 +646,9 @@ export default function App() {
       await saveToIDB(StorageKeys.REFERENCE_WORKBOOK, wb);
     } else {
       await deleteFromIDB(StorageKeys.REFERENCE_WORKBOOK);
+      setResults([]);
+      setStats(null);
+      setStudioSession((n) => n + 1);
     }
 
     if (wb && comparisonWb) {
@@ -625,19 +657,34 @@ export default function App() {
       );
       setMappings(kept);
       await saveToIDB(StorageKeys.COLUMN_MAPPINGS, kept);
+      const completeSettings = await buildCompleteSettings(kept);
       if (kept.length > 0) {
         handleExecuteMatching(wb, comparisonWb, kept, false, undefined, undefined, undefined, {
           referenceWb: wb,
-          settings: buildCompleteSettings(kept),
+          settings: completeSettings,
         });
       } else {
+        setResults([]);
+        setStats(null);
+        setStudioSession((n) => n + 1);
         showToast(t.toastMappingRequired, 'info');
+        if (isSupabaseConnected) {
+          debouncedSyncToSupabase(
+            getEffectiveWorkspaceId(),
+            { referenceWb: wb, results: null, stats: null, settings: completeSettings },
+            `Reference Workbook loaded: '${wb.name || wb.activeSheet || 'File'}' (mapping required)`
+          );
+        }
       }
     } else if (isSupabaseConnected) {
       const reason = wb
         ? `Reference Workbook loaded: '${wb.name || wb.activeSheet || 'File'}' (${wb.rows?.length || 0} rows)`
         : 'Reference Workbook removed';
-      debouncedSyncToSupabase(getEffectiveWorkspaceId(), { referenceWb: wb }, reason);
+      debouncedSyncToSupabase(
+        getEffectiveWorkspaceId(),
+        wb ? { referenceWb: wb } : { referenceWb: null, results: null, stats: null },
+        reason
+      );
     }
   };
 
@@ -647,6 +694,9 @@ export default function App() {
       await saveToIDB(StorageKeys.COMPARISON_WORKBOOK, wb);
     } else {
       await deleteFromIDB(StorageKeys.COMPARISON_WORKBOOK);
+      setResults([]);
+      setStats(null);
+      setStudioSession((n) => n + 1);
     }
 
     if (referenceWb && wb) {
@@ -655,19 +705,34 @@ export default function App() {
       );
       setMappings(kept);
       await saveToIDB(StorageKeys.COLUMN_MAPPINGS, kept);
+      const completeSettings = await buildCompleteSettings(kept);
       if (kept.length > 0) {
         handleExecuteMatching(referenceWb, wb, kept, false, undefined, undefined, undefined, {
           comparisonWb: wb,
-          settings: buildCompleteSettings(kept),
+          settings: completeSettings,
         });
       } else {
+        setResults([]);
+        setStats(null);
+        setStudioSession((n) => n + 1);
         showToast(t.toastMappingRequired, 'info');
+        if (isSupabaseConnected) {
+          debouncedSyncToSupabase(
+            getEffectiveWorkspaceId(),
+            { comparisonWb: wb, results: null, stats: null, settings: completeSettings },
+            `Comparison Workbook loaded: '${wb.name || wb.activeSheet || 'File'}' (mapping required)`
+          );
+        }
       }
     } else if (isSupabaseConnected) {
       const reason = wb
         ? `Comparison Workbook loaded: '${wb.name || wb.activeSheet || 'File'}' (${wb.rows?.length || 0} rows)`
         : 'Comparison Workbook removed';
-      debouncedSyncToSupabase(getEffectiveWorkspaceId(), { comparisonWb: wb }, reason);
+      debouncedSyncToSupabase(
+        getEffectiveWorkspaceId(),
+        wb ? { comparisonWb: wb } : { comparisonWb: null, results: null, stats: null },
+        reason
+      );
     }
   };
 
@@ -683,9 +748,31 @@ export default function App() {
         );
         setMappings(kept);
         await saveToIDB(StorageKeys.COLUMN_MAPPINGS, kept);
+        const completeSettings = await buildCompleteSettings(kept);
         if (kept.length > 0) {
-          handleExecuteMatching(updated, comparisonWb, kept);
+          handleExecuteMatching(updated, comparisonWb, kept, false, undefined, undefined, undefined, {
+            referenceWb: updated,
+            settings: completeSettings,
+          });
+        } else {
+          setResults([]);
+          setStats(null);
+          setStudioSession((n) => n + 1);
+          showToast(t.toastMappingRequired, 'info');
+          if (isSupabaseConnected) {
+            debouncedSyncToSupabase(
+              getEffectiveWorkspaceId(),
+              { referenceWb: updated, results: null, stats: null, settings: completeSettings },
+              `Switched Reference sheet to '${sheetName}' (mapping required)`
+            );
+          }
         }
+      } else if (isSupabaseConnected) {
+        debouncedSyncToSupabase(
+          getEffectiveWorkspaceId(),
+          { referenceWb: updated },
+          `Switched Reference sheet to '${sheetName}'`
+        );
       }
     } catch {
       showToast('Could not switch sheet', 'error');
@@ -704,9 +791,31 @@ export default function App() {
         );
         setMappings(kept);
         await saveToIDB(StorageKeys.COLUMN_MAPPINGS, kept);
+        const completeSettings = await buildCompleteSettings(kept);
         if (kept.length > 0) {
-          handleExecuteMatching(referenceWb, updated, kept);
+          handleExecuteMatching(referenceWb, updated, kept, false, undefined, undefined, undefined, {
+            comparisonWb: updated,
+            settings: completeSettings,
+          });
+        } else {
+          setResults([]);
+          setStats(null);
+          setStudioSession((n) => n + 1);
+          showToast(t.toastMappingRequired, 'info');
+          if (isSupabaseConnected) {
+            debouncedSyncToSupabase(
+              getEffectiveWorkspaceId(),
+              { comparisonWb: updated, results: null, stats: null, settings: completeSettings },
+              `Switched Comparison sheet to '${sheetName}' (mapping required)`
+            );
+          }
         }
+      } else if (isSupabaseConnected) {
+        debouncedSyncToSupabase(
+          getEffectiveWorkspaceId(),
+          { comparisonWb: updated },
+          `Switched Comparison sheet to '${sheetName}'`
+        );
       }
     } catch {
       showToast('Could not switch sheet', 'error');
@@ -741,51 +850,103 @@ export default function App() {
   };
 
   const handleReleaseHoldKey = async (key: string): Promise<{ key: string; green: number; yellow: number; total: number }> => {
-    const nextHoldValues = holdValues.filter((v) => v !== key);
+    const keyLower = key.trim().toLowerCase();
+    const nextHoldValues = holdValues.filter((v) => v.trim().toLowerCase() !== keyLower);
     setHoldValues(nextHoldValues);
     await saveToIDB(StorageKeys.HOLD_VALUES, nextHoldValues);
 
     const targetRowIds = results
-      .filter((r) => r.decisionColor === 'blue' && (r.matchKey === key || r.comparisonRow[holdColumn] === key))
+      .filter((r) => {
+        if (r.decisionColor !== 'blue') return false;
+        if (r.holdKey && r.holdKey.trim().toLowerCase() === keyLower) return true;
+        if (r.matchKey && r.matchKey.trim().toLowerCase() === keyLower) return true;
+        if (holdColumn && String(r.comparisonRow[holdColumn] ?? '').trim().toLowerCase() === keyLower) return true;
+        return false;
+      })
       .map((r) => r.id);
 
+    const targetSet = new Set(targetRowIds);
     const nextReleased = Array.from(new Set([...releasedRowIds, ...targetRowIds]));
     setReleasedRowIds(nextReleased);
     await saveToIDB(StorageKeys.RELEASED_ROWS, nextReleased);
 
-    handleExecuteMatching(referenceWb, comparisonWb, mappings, false, nextHoldValues, nextReleased);
-    return { key, green: 0, yellow: 0, total: targetRowIds.length };
+    let green = 0;
+    let yellow = 0;
+    if (referenceWb && comparisonWb && mappings.length > 0) {
+      const { results: evaluatedResults, stats: evaluatedStats } = processMatching(
+        referenceWb,
+        comparisonWb,
+        mappings,
+        normalization,
+        layers,
+        nextHoldValues,
+        nextReleased,
+        holdColumn
+      );
+      setResults(evaluatedResults);
+      setStats(evaluatedStats);
+
+      for (const r of evaluatedResults) {
+        if (targetSet.has(r.id)) {
+          if (r.decisionColor === 'green') green++;
+          else yellow++;
+        }
+      }
+
+      if (isSupabaseConnected) {
+        const completeSettings = await buildCompleteSettings(mappings, {
+          holdValues: nextHoldValues,
+          releasedRowIds: nextReleased,
+        });
+        debouncedSyncToSupabase(
+          getEffectiveWorkspaceId(),
+          { results: evaluatedResults, stats: evaluatedStats, settings: completeSettings },
+          `Released hold key "${key}" (${targetRowIds.length} rows: ${green} green, ${yellow} yellow)`
+        );
+      }
+    }
+
+    return { key, green, yellow, total: targetRowIds.length };
   };
 
-  const handleSaveAllSettingsExplicit = async () => {
+  const handleSaveAllSettingsExplicit = async (holdOverrides?: {
+    holdColumn?: string;
+    holdValues?: string[];
+    holdReason?: string;
+  }) => {
+    const effHoldCol = holdOverrides?.holdColumn ?? holdColumn;
+    const effHoldVals = holdOverrides?.holdValues ?? holdValues;
+    const effHoldReason = holdOverrides?.holdReason ?? holdReason;
+
     await Promise.all([
       saveToIDB(StorageKeys.COLUMN_MAPPINGS, mappings),
       saveToIDB(StorageKeys.NORMALIZATION_RULES, normalization),
       saveToIDB(StorageKeys.DECISION_LAYERS, layers),
-      saveToIDB(StorageKeys.HOLD_COLUMN, holdColumn),
-      saveToIDB(StorageKeys.HOLD_VALUES, holdValues),
-      saveToIDB(StorageKeys.HOLD_REASON, holdReason),
+      saveToIDB(StorageKeys.HOLD_COLUMN, effHoldCol),
+      saveToIDB(StorageKeys.HOLD_VALUES, effHoldVals),
+      saveToIDB(StorageKeys.HOLD_REASON, effHoldReason),
       saveToIDB(StorageKeys.RELEASED_ROWS, releasedRowIds),
     ]);
 
     if (isSupabaseConnected) {
-      const settingsPayload: WorkspaceSettings = {
-        normalization,
-        layers,
-        mappings,
-        holdColumn,
-        holdValues,
-        holdReason,
-        releasedRowIds,
-        columnConfigs: buildStoredColConfigs(studioColumnConfigs),
-        updatedAt: Date.now(),
-      };
-      await syncSettingsToSupabase(
+      const settingsPayload = await buildCompleteSettings(mappings, {
+        holdColumn: effHoldCol,
+        holdValues: effHoldVals,
+        holdReason: effHoldReason,
+      });
+      const res = await syncSettingsToSupabase(
         getEffectiveWorkspaceId(),
         settingsPayload,
         `Updated ${layers.length} decision layers & ${mappings.length} column mappings`
       );
-      showToast(`${t.toastRulesSaved} (Synced to Supabase)`, 'success');
+      if (res.success) {
+        showToast(`${t.toastRulesSaved} (Synced to Supabase)`, 'success');
+      } else {
+        showToast(
+          `${t.toastRulesSaved} (Cloud sync warning: ${res.error || 'Unknown error'})`,
+          'error'
+        );
+      }
     } else {
       showToast(t.toastRulesSaved, 'success');
     }
@@ -880,6 +1041,9 @@ export default function App() {
     }, 150);
   };
 
+  const executeMatchingRef = useRef(handleExecuteMatching);
+  executeMatchingRef.current = handleExecuteMatching;
+
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       const activeTag = document.activeElement?.tagName;
@@ -894,6 +1058,10 @@ export default function App() {
           setIsShortcutsOpen(false);
           return;
         }
+        if (previewModal.isOpen) {
+          setPreviewModal({ isOpen: false, workbook: null, title: '' });
+          return;
+        }
         if (isRulesModalOpen) {
           setIsRulesModalOpen(false);
           return;
@@ -904,6 +1072,10 @@ export default function App() {
         }
         if (isSyncHistoryOpen) {
           setIsSyncHistoryOpen(false);
+          return;
+        }
+        if (isRestoreModalOpen && !isRestoring) {
+          setIsRestoreModalOpen(false);
           return;
         }
       }
@@ -926,7 +1098,7 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
         if (referenceWb && comparisonWb) {
-          handleExecuteMatching();
+          executeMatchingRef.current();
         }
         return;
       }
@@ -936,9 +1108,12 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [
     isShortcutsOpen,
+    previewModal.isOpen,
     isRulesModalOpen,
     isSupabaseConfigOpen,
     isSyncHistoryOpen,
+    isRestoreModalOpen,
+    isRestoring,
     referenceWb,
     comparisonWb,
   ]);
@@ -1038,24 +1213,13 @@ export default function App() {
   }, [needsReevaluate, referenceWb, comparisonWb, mappings]);
 
   // Column view changes sync to the cloud like any other setting.
-  const handleSaveColumnConfigs = (configs: ColumnConfigItem[]) => {
+  const handleSaveColumnConfigs = async (configs: ColumnConfigItem[]) => {
     setStudioColumnConfigs(configs);
     if (isSupabaseConnected) {
+      const settingsPayload = await buildCompleteSettings(mappings, { columnConfigs: configs });
       debouncedSyncToSupabase(
         getEffectiveWorkspaceId(),
-        {
-          settings: {
-            normalization,
-            layers,
-            mappings,
-            holdColumn,
-            holdValues,
-            holdReason,
-            releasedRowIds,
-            columnConfigs: buildStoredColConfigs(configs),
-            updatedAt: Date.now(),
-          },
-        },
+        { settings: settingsPayload },
         'Column view settings updated'
       );
     }
@@ -1067,19 +1231,7 @@ export default function App() {
       return;
     }
 
-    const storedColConfigs = buildStoredColConfigs(studioColumnConfigs);
-
-    const settingsPayload: WorkspaceSettings = {
-      normalization,
-      layers,
-      mappings,
-      holdColumn,
-      holdValues,
-      holdReason,
-      releasedRowIds,
-      columnConfigs: storedColConfigs,
-      updatedAt: Date.now(),
-    };
+    const settingsPayload = await buildCompleteSettings(mappings);
     const payload = {
       referenceWb,
       comparisonWb,
@@ -1148,6 +1300,12 @@ export default function App() {
           setReleasedRowIds(data.settings.releasedRowIds);
           await saveToIDB(StorageKeys.RELEASED_ROWS, data.settings.releasedRowIds);
         }
+        if (Array.isArray(data.settings.mappingPresets)) {
+          await saveToIDB(StorageKeys.SAVED_MAPPING_PRESETS, data.settings.mappingPresets);
+        }
+        if (Array.isArray(data.settings.decisionPresets)) {
+          await saveToIDB(StorageKeys.SAVED_DECISION_PRESETS, data.settings.decisionPresets);
+        }
         if (data.settings.columnConfigs && Array.isArray(data.settings.columnConfigs.order)) {
           const cfg = data.settings.columnConfigs;
           const restored: ColumnConfigItem[] = cfg.order.map((id: string) => ({
@@ -1158,6 +1316,7 @@ export default function App() {
             showInExport: cfg.visibility?.[id]?.export !== false,
           }));
           setStudioColumnConfigs(restored);
+          await saveToIDB(StorageKeys.COLUMN_CONFIGS, cfg);
         }
       }
       if (data.results && data.stats) {
@@ -1271,7 +1430,17 @@ export default function App() {
         onUpdateNormalization={handleUpdateNormalization}
         onUpdateLayers={handleUpdateLayers}
         onSaveSettings={handleSaveAllSettingsExplicit}
-        onExecuteMatching={() => handleExecuteMatching()}
+        onExecuteMatching={(holdOverrides) =>
+          handleExecuteMatching(
+            undefined,
+            undefined,
+            undefined,
+            true,
+            holdOverrides?.holdValues,
+            undefined,
+            holdOverrides?.holdColumn
+          )
+        }
         isProcessing={isProcessing}
         language={language}
         onShowToast={showToast}

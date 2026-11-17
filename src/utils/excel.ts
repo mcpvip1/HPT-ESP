@@ -155,10 +155,14 @@ export async function parseExcelFile(
       continue;
     }
 
-    // Header row is index 0
+    // Header row is index 0 — disambiguate duplicate header names so columns never overwrite each other
+    const seenHeaders = new Map<string, number>();
     const headerRow: string[] = (rawRows[0] || []).map((h: any, idx: number) => {
-      const str = h !== undefined && h !== null ? String(h).trim() : '';
-      return str !== '' ? str : `Column_${idx + 1}`;
+      const raw = h !== undefined && h !== null ? String(h).trim() : '';
+      const base = raw !== '' ? raw : `Column_${idx + 1}`;
+      const count = seenHeaders.get(base) || 0;
+      seenHeaders.set(base, count + 1);
+      return count === 0 ? base : `${base} (${count + 1})`;
     });
 
     const totalRaw = rawRows.length;
@@ -254,8 +258,8 @@ export function normalizeValue(val: any, rules: NormalizationRules): string {
     str = str.trim();
   }
 
-  // Strip trailing '.0' or '.00' on numeric integers from Excel/CSV (e.g. '45001.0' -> '45001')
-  if (/^\d+\.0+$/.test(str)) {
+  // Strip trailing '.0' or '.00' on numeric integers from Excel/CSV (e.g. '45001.0' -> '45001', '-10.0' -> '-10')
+  if (/^-?\d+\.0+$/.test(str)) {
     str = str.replace(/\.0+$/, '');
   }
 
@@ -266,8 +270,10 @@ export function normalizeValue(val: any, rules: NormalizationRules): string {
   if (rules.trimPunctuation !== false) {
     // Strip leading/trailing punctuation so 'TH-1099P.' matches 'TH-1099P'.
     // Unicode-aware (\p{L}\p{N}) so Myanmar/Thai/Chinese letters are kept.
-    // Internal punctuation is untouched: '1.5' never becomes '15'.
-    str = str.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    // Preserve leading minus before digits (negative numbers) and whitespace if trimSpaces is false.
+    str = rules.trimSpaces
+      ? str.replace(/^(?:[^\p{L}\p{N}-]+|-(?!\d))+|[^\p{L}\p{N}]+$/gu, '')
+      : str.replace(/^(?:[^\p{L}\p{N}\s-]+|-(?!\d))+|[^\p{L}\p{N}\s]+$/gu, '');
   }
 
   if (rules.removeSpacesAndHyphens) {
@@ -440,22 +446,24 @@ export function resolveColumnValue(
     }
   }
 
-  // Fallback: check if any row key contains the column name
+  // Fallback: check if any row key contains the column name (require >=2 alphanumeric chars to avoid empty wildcard match)
   if (val === undefined || val === '') {
     const rows = [context.compRow, context.mergedRow, context.mainRow].filter(Boolean);
     const targetClean = colName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    for (const r of rows) {
-      for (const [k, v] of Object.entries(r!)) {
-        const kClean = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (kClean.includes(targetClean) || targetClean.includes(kClean)) {
-          if (v !== undefined && v !== '') {
-            val = v;
-            foundCol = k;
-            break;
+    if (targetClean.length >= 2) {
+      for (const r of rows) {
+        for (const [k, v] of Object.entries(r!)) {
+          const kClean = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (kClean.length >= 2 && (kClean.includes(targetClean) || targetClean.includes(kClean))) {
+            if (v !== undefined && v !== '') {
+              val = v;
+              foundCol = k;
+              break;
+            }
           }
         }
+        if (val !== undefined && val !== '') break;
       }
-      if (val !== undefined && val !== '') break;
     }
   }
 
@@ -551,7 +559,27 @@ export function evaluateDecisionLayers(
             : rule.color === 'red'
             ? 'RED (Rejected)'
             : rule.color.toUpperCase();
-        const detailReason = `${matchedCol} ("${matchedVal ?? ''}") contains "${rule.value}" → ${colorLabel}`;
+        const opText =
+          rule.condition === 'equals'
+            ? `equals "${rule.value}"`
+            : rule.condition === 'starts_with'
+            ? `starts with "${rule.value}"`
+            : rule.condition === 'ends_with'
+            ? `ends with "${rule.value}"`
+            : rule.condition === 'is_empty'
+            ? 'is empty'
+            : rule.condition === 'is_not_empty'
+            ? 'is not empty'
+            : rule.condition === 'greater_than'
+            ? `> ${rule.value}`
+            : rule.condition === 'less_than'
+            ? `< ${rule.value}`
+            : `contains "${rule.value}"`;
+        const compoundNote =
+          secondaryCol && rule.secondaryCondition && rule.secondaryValue !== undefined
+            ? ` ${(layer.matchLogic || 'or').toUpperCase()} ${resolvedSecCol || secondaryCol} ("${secondaryVal ?? ''}") ${rule.secondaryCondition.replace(/_/g, ' ')} "${rule.secondaryValue}"`
+            : '';
+        const detailReason = `${matchedCol} ("${matchedVal ?? ''}") ${opText}${compoundNote} → ${colorLabel}`;
 
         return {
           color: rule.color,
@@ -913,25 +941,6 @@ export function processMatching(
     else if (evaluation.color === 'red') redCount++;
     else otherCount++;
 
-    // Generate precomputed lowercase searchBlob for instant, zero-allocation real-time search
-    const searchTokens: string[] = [
-      String(idx + 1),
-      matchKey || '',
-      evaluation.color,
-      evaluation.reason || '',
-      isMatched ? 'matched' : 'unmatched new',
-    ];
-    for (const k in compRow) {
-      const v = compRow[k];
-      if (v !== undefined && v !== null && v !== '') searchTokens.push(String(v));
-    }
-    if (matchedMainRow) {
-      for (const k in matchedMainRow) {
-        const v = matchedMainRow[k];
-        if (v !== undefined && v !== null && v !== '') searchTokens.push(String(v));
-      }
-    }
-
     results.push({
       id: `row_${idx + 1}`,
       rowIndex: idx + 1,
@@ -944,7 +953,7 @@ export function processMatching(
       decisionReason: evaluation.reason,
       decisionLayerName: evaluation.layerName,
       mergedRow,
-      searchBlob: searchTokens.join(' ').toLowerCase(),
+      searchBlob: '',
     });
   }
 
@@ -1054,14 +1063,37 @@ export function processMatching(
         r.isMatched = true;
         r.unmatchedInfo = undefined;
 
+        const isInspectionColName = (colName: string) => {
+          if (holdColumn && colName === holdColumn) return false;
+          const cleanCol = colName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return (
+            cleanCol.includes('inspection') ||
+            cleanCol.includes('status') ||
+            cleanCol.includes('result') ||
+            cleanCol.includes('decision')
+          );
+        };
+
         let origCol = '';
         let origVal = '';
         for (const [colName, val] of Object.entries(r.comparisonRow)) {
+          if (!isInspectionColName(colName)) continue;
           const s = String(val ?? '').toLowerCase();
           if (s.includes('postpone')) {
             origCol = colName;
             origVal = String(val);
             break;
+          }
+        }
+        if (!origCol) {
+          for (const [colName, val] of Object.entries(r.comparisonRow)) {
+            if (holdColumn && colName === holdColumn) continue;
+            const s = String(val ?? '').toLowerCase();
+            if (s.includes('postpone')) {
+              origCol = colName;
+              origVal = String(val);
+              break;
+            }
           }
         }
 
@@ -1084,11 +1116,12 @@ export function processMatching(
           }
         }
 
-        // Replace any postpone status in comparisonRow and mergedRow with Accept
+        // Replace any postpone inspection status in comparisonRow and mergedRow with Accept
         // Clone first: r.comparisonRow references the source workbook row;
         // mutating it would corrupt the user's uploaded data in memory/IDB/cloud.
         r.comparisonRow = { ...r.comparisonRow };
         for (const [colName, val] of Object.entries(r.comparisonRow)) {
+          if (!isInspectionColName(colName)) continue;
           const s = String(val ?? '').toLowerCase();
           if (s.includes('postpone')) {
             r.comparisonRow[colName] = 'Accept';
@@ -1111,8 +1144,13 @@ export function processMatching(
       const anyAccept = groupRows.some((r) => {
         if (r.decisionColor === 'green') return true;
         const inReason = (r.decisionReason || '').toLowerCase();
-        if (inReason.includes('accept') || inReason.includes('waive') || inReason.includes('green') || inReason.includes('pass')) return true;
-        return hasInspectionTerm(r.comparisonRow, 'accept') || hasInspectionTerm(r.matchedMainRow, 'accept');
+        if (inReason.includes('green (accepted)')) return true;
+        return (
+          hasInspectionTerm(r.comparisonRow, 'accept') ||
+          hasInspectionTerm(r.comparisonRow, 'waive') ||
+          hasInspectionTerm(r.matchedMainRow, 'accept') ||
+          hasInspectionTerm(r.matchedMainRow, 'waive')
+        );
       });
 
       if (anyAccept) {
@@ -1132,8 +1170,15 @@ export function processMatching(
             }
             r.comparisonRow = { ...r.comparisonRow };
             for (const [colName, val] of Object.entries(r.comparisonRow)) {
+              if (holdColumn && colName === holdColumn) continue;
+              const cleanCol = colName.toLowerCase().replace(/[^a-z0-9]/g, '');
+              const isInspectionCol =
+                cleanCol.includes('inspection') ||
+                cleanCol.includes('status') ||
+                cleanCol.includes('result') ||
+                cleanCol.includes('decision');
               const s = String(val ?? '').toLowerCase();
-              if (s.includes('postpone') || s.includes('pending') || s.includes('hold')) {
+              if (isInspectionCol && (s.includes('postpone') || s.includes('pending'))) {
                 r.comparisonRow[colName] = 'Accept';
                 if (r.mergedRow) {
                   r.mergedRow[colName] = 'Accept';
@@ -1214,7 +1259,7 @@ export function processMatching(
     }
   }
 
-  // Recalculate stats accurately after duplicate resolution
+  // Rebuild searchBlob & recalculate stats AFTER all overrides (Postpone/Accept, Hold, Supervisor Release)
   greenCount = 0;
   yellowCount = 0;
   redCount = 0;
@@ -1222,6 +1267,27 @@ export function processMatching(
   otherCount = 0;
   let finalMatchedCount = 0;
   for (const r of results) {
+    const searchTokens: string[] = [
+      String(r.rowIndex),
+      r.matchKey || '',
+      r.decisionColor,
+      r.decisionReason || '',
+      r.isMatched ? 'matched' : 'unmatched new',
+      r.isHold ? `hold on hold ${r.holdKey || ''}` : '',
+      r.releasedFromHold ? 'released from hold' : '',
+    ];
+    for (const k in r.comparisonRow) {
+      const v = r.comparisonRow[k];
+      if (v !== undefined && v !== null && v !== '') searchTokens.push(String(v));
+    }
+    if (r.matchedMainRow) {
+      for (const k in r.matchedMainRow) {
+        const v = r.matchedMainRow[k];
+        if (v !== undefined && v !== null && v !== '') searchTokens.push(String(v));
+      }
+    }
+    r.searchBlob = searchTokens.join(' ').toLowerCase();
+
     if (r.isMatched) finalMatchedCount++;
     if (r.decisionColor === 'green') greenCount++;
     else if (r.decisionColor === 'yellow') yellowCount++;
@@ -1278,11 +1344,6 @@ export function exportStyledExcel(
     left: { style: 'thin', color: { rgb: colorHex } },
     right: { style: 'thin', color: { rgb: colorHex } },
   });
-
-  const shouldInclude = (id: string, label: string): boolean => {
-    if (!exportColumnIds || exportColumnIds.length === 0) return true;
-    return exportColumnIds.includes(id) || exportColumnIds.includes(label);
-  };
 
   // Column order mirrors the dashboard's customized column sequence
   // (exportColumnIds), so [Ref] columns land exactly where the user placed
@@ -1434,6 +1495,8 @@ export function exportStyledExcel(
       ? 'FCD34D'
       : isRed
       ? 'FCA5A5'
+      : isBlue
+      ? '93C5FD'
       : 'E2E8F0';
 
     for (let cIdx = 0; cIdx < dataHeaders.length; cIdx++) {
@@ -1466,14 +1529,20 @@ export function exportStyledExcel(
             name: 'Calibri',
             sz: 9,
             bold: true,
-            color: { rgb: isGreen ? '065F46' : isYellow ? '92400E' : isRed ? '991B1B' : '334155' },
+            color: {
+              rgb: isGreen ? '065F46' : isYellow ? '92400E' : isRed ? '991B1B' : isBlue ? '1E40AF' : '334155',
+            },
           },
           fill: {
             patternType: 'solid',
-            fgColor: { rgb: isGreen ? 'D1FAE5' : isYellow ? 'FEF3C7' : isRed ? 'FEE2E2' : 'F1F5F9' },
+            fgColor: {
+              rgb: isGreen ? 'D1FAE5' : isYellow ? 'FEF3C7' : isRed ? 'FEE2E2' : isBlue ? 'DBEAFE' : 'F1F5F9',
+            },
           },
           alignment: { vertical: 'center', horizontal: 'center' },
-          border: thinBorder(isGreen ? '34D399' : isYellow ? 'FBBF24' : isRed ? 'F87171' : 'CBD5E1'),
+          border: thinBorder(
+            isGreen ? '34D399' : isYellow ? 'FBBF24' : isRed ? 'F87171' : isBlue ? '60A5FA' : 'CBD5E1'
+          ),
         };
       }
       else if (colHeader === 'Match Status') {
@@ -1565,12 +1634,14 @@ export function exportStyledExcel(
   });
 
   // Enable Auto-Filter on data headers for immediate interactive Excel sorting
-  wsData['!autofilter'] = {
-    ref: XLSXStyle.utils.encode_range({
-      s: { r: 0, c: 0 },
-      e: { r: results.length, c: Math.max(0, dataHeaders.length - 1) },
-    }),
-  };
+  if (results.length > 0 && dataHeaders.length > 0) {
+    wsData['!autofilter'] = {
+      ref: XLSXStyle.utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: { r: results.length, c: Math.max(0, dataHeaders.length - 1) },
+      }),
+    };
+  }
 
   // Freeze top row for smooth scrolling
   wsData['!views'] = [{ state: 'frozen', ySplit: 1 }];
@@ -1651,19 +1722,26 @@ export function exportStyledExcel(
   // 3. Dedicated Unmatched Exceptions Sheet (if any unmatched rows exist)
   const unmatchedRows = results.filter((r) => !r.isMatched);
   if (unmatchedRows.length > 0) {
-    const excRows = unmatchedRows.map((u) => ({
-      'Row #': u.rowIndex,
-      'Primary Identifier': u.unmatchedInfo?.primaryIdentifier || u.matchKey || 'N/A',
-      'Diagnostic Reason': u.unmatchedInfo?.reason || 'Record not found in Reference Dataset',
-      'Match Type': u.unmatchedInfo?.matchType || 'Unmatched',
-      'Closest Reference Match': u.unmatchedInfo?.closestReferenceRow
-        ? Object.entries(u.unmatchedInfo.closestReferenceRow)
-            .slice(0, 3)
-            .map(([k, v]) => `${k}: ${v}`)
-            .join(' | ')
-        : 'None',
-      ...u.comparisonRow,
-    }));
+    const excRows = unmatchedRows.map((u) => {
+      const rowObj: Record<string, any> = {
+        'Row #': u.rowIndex,
+        'Primary Identifier': u.unmatchedInfo?.primaryIdentifier || u.matchKey || 'N/A',
+        'Diagnostic Reason': u.unmatchedInfo?.reason || 'Record not found in Reference Dataset',
+        'Match Type': u.unmatchedInfo?.matchType || 'Unmatched',
+        'Closest Reference Match': u.unmatchedInfo?.closestReferenceRow
+          ? Object.entries(u.unmatchedInfo.closestReferenceRow)
+              .slice(0, 3)
+              .map(([k, v]) => `${k}: ${v}`)
+              .join(' | ')
+          : 'None',
+      };
+      for (const [k, v] of Object.entries(u.comparisonRow)) {
+        if (!(k in rowObj)) {
+          rowObj[k] = v;
+        }
+      }
+      return rowObj;
+    });
 
     const wsExc = XLSXStyle.utils.json_to_sheet(excRows);
     const excHeaders = Object.keys(excRows[0] || {});
@@ -1757,6 +1835,7 @@ export function exportCsv(
   const csvValueFor = (item: (typeof results)[number], id: string): any => {
     if (id === 'rowIndex') return item.rowIndex;
     if (id === 'decisionStatus') return item.decisionColor.toUpperCase();
+    if (id === 'resultColor') return item.decisionColor.toUpperCase();
     if (id === 'matchStatus') {
       return item.isMatched
         ? 'MATCHED'
@@ -1772,6 +1851,7 @@ export function exportCsv(
   const csvHeaderFor = (id: string): string => {
     if (id === 'rowIndex') return 'Row';
     if (id === 'decisionStatus') return 'Decision Outcome';
+    if (id === 'resultColor') return 'Result Color';
     if (id === 'matchStatus') return 'Reference Match';
     if (id === 'decisionReason') return 'Reason';
     return id;

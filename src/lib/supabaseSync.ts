@@ -62,23 +62,24 @@ export interface FullWorkspacePayload {
 // Small payloads are left untouched, and old plain (uncompressed) rows keep
 // loading because decompression passes anything unmarked straight through.
 
-/** Marker wrapper stored in the jsonb column when a workbook is compressed. */
-interface CompressedWorkbook {
+/** Marker wrapper stored in the jsonb column when a payload is compressed. */
+interface CompressedPayload {
   __hptCompressed: true;
-  algo: 'lz-base64';
-  /** Base64-compressed JSON of the WorkbookData. */
+  algo: 'gzip-base64' | 'lz-base64';
+  /** Base64-compressed JSON of the serialized payload. */
   data: string;
   /** Original uncompressed JSON byte size (for display/diagnostics). */
   originalBytes: number;
 }
 
-function isCompressedWorkbook(value: unknown): value is CompressedWorkbook {
+function isCompressedPayload(value: unknown): value is CompressedPayload {
   return (
     !!value &&
     typeof value === 'object' &&
-    (value as CompressedWorkbook).__hptCompressed === true &&
-    (value as CompressedWorkbook).algo === 'lz-base64' &&
-    typeof (value as CompressedWorkbook).data === 'string'
+    (value as CompressedPayload).__hptCompressed === true &&
+    ((value as CompressedPayload).algo === 'lz-base64' ||
+      (value as CompressedPayload).algo === 'gzip-base64') &&
+    typeof (value as CompressedPayload).data === 'string'
   );
 }
 
@@ -88,6 +89,48 @@ const COMPRESSION_THRESHOLD_BYTES = 32 * 1024;
 let compressionWorker: Worker | null = null;
 let workerMsgId = 0;
 const workerCallbacks = new Map<string, (res: { success: boolean; result?: string | null; error?: string }) => void>();
+
+function supportsNativeGzip(): boolean {
+  return typeof CompressionStream !== 'undefined' && typeof DecompressionStream !== 'undefined';
+}
+
+function uint8ToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToUint8(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function gzipCompressFallback(str: string): Promise<string> {
+  const encoded = new TextEncoder().encode(str);
+  const cs = new CompressionStream('gzip');
+  const writer = cs.writable.getWriter();
+  writer.write(encoded);
+  writer.close();
+  const buf = await new Response(cs.readable).arrayBuffer();
+  return uint8ToBase64(new Uint8Array(buf));
+}
+
+async function gzipDecompressFallback(b64: string): Promise<string> {
+  const bytes = base64ToUint8(b64);
+  const ds = new DecompressionStream('gzip');
+  const writer = ds.writable.getWriter();
+  writer.write(bytes as unknown as BufferSource);
+  writer.close();
+  const buf = await new Response(ds.readable).arrayBuffer();
+  return new TextDecoder().decode(buf);
+}
 
 function getCompressionWorker(): Worker | null {
   if (typeof window === 'undefined' || typeof Worker === 'undefined') return null;
@@ -113,82 +156,192 @@ function getCompressionWorker(): Worker | null {
   return compressionWorker;
 }
 
-export async function compressStringAsync(str: string): Promise<string> {
+export async function compressStringAsync(
+  str: string,
+  algo: 'gzip-base64' | 'lz-base64' = supportsNativeGzip() ? 'gzip-base64' : 'lz-base64'
+): Promise<{ data: string; algo: 'gzip-base64' | 'lz-base64' }> {
+  const runFallback = async (): Promise<{ data: string; algo: 'gzip-base64' | 'lz-base64' }> => {
+    if (algo === 'gzip-base64' && supportsNativeGzip()) {
+      return { data: await gzipCompressFallback(str), algo: 'gzip-base64' };
+    }
+    await new Promise((r) => setTimeout(r, 0));
+    return { data: LZString.compressToBase64(str), algo: 'lz-base64' };
+  };
+
   const worker = getCompressionWorker();
   if (worker) {
     return new Promise((resolve) => {
       const id = `cw_${++workerMsgId}`;
-      const timeout = setTimeout(() => {
+      const timeout = setTimeout(async () => {
         workerCallbacks.delete(id);
-        resolve(LZString.compressToBase64(str));
+        resolve(await runFallback());
       }, 30000);
-      workerCallbacks.set(id, (res) => {
+      workerCallbacks.set(id, async (res) => {
         clearTimeout(timeout);
         if (res.success && typeof res.result === 'string') {
-          resolve(res.result);
+          resolve({ data: res.result, algo });
         } else {
-          resolve(LZString.compressToBase64(str));
+          resolve(await runFallback());
         }
       });
-      worker.postMessage({ id, action: 'compress', data: str });
+      worker.postMessage({ id, action: 'compress', algo, data: str });
     });
   }
-  await new Promise((r) => setTimeout(r, 0));
-  return LZString.compressToBase64(str);
+  return runFallback();
 }
 
-export async function decompressStringAsync(data: string): Promise<string | null> {
+export async function decompressStringAsync(
+  data: string,
+  algo: 'gzip-base64' | 'lz-base64' = 'lz-base64'
+): Promise<string | null> {
+  const runFallback = async (): Promise<string | null> => {
+    if (algo === 'gzip-base64' && typeof DecompressionStream !== 'undefined') {
+      return gzipDecompressFallback(data);
+    }
+    await new Promise((r) => setTimeout(r, 0));
+    return LZString.decompressFromBase64(data);
+  };
+
   const worker = getCompressionWorker();
   if (worker) {
     return new Promise((resolve) => {
       const id = `cw_${++workerMsgId}`;
-      const timeout = setTimeout(() => {
+      const timeout = setTimeout(async () => {
         workerCallbacks.delete(id);
-        resolve(LZString.decompressFromBase64(data));
+        try {
+          resolve(await runFallback());
+        } catch {
+          resolve(null);
+        }
       }, 30000);
-      workerCallbacks.set(id, (res) => {
+      workerCallbacks.set(id, async (res) => {
         clearTimeout(timeout);
         if (res.success && res.result !== undefined) {
           resolve(res.result);
         } else {
-          resolve(LZString.decompressFromBase64(data));
+          try {
+            resolve(await runFallback());
+          } catch {
+            resolve(null);
+          }
         }
       });
-      worker.postMessage({ id, action: 'decompress', data });
+      worker.postMessage({ id, action: 'decompress', algo, data });
     });
   }
-  await new Promise((r) => setTimeout(r, 0));
-  return LZString.decompressFromBase64(data);
+  return runFallback();
 }
 
 /**
- * Compress a workbook for the wire. Offloaded to background Web Worker to
- * prevent UI freezing on large datasets.
+ * Strip duplicated sheets[activeSheet] data on the wire while keeping
+ * lossless restoration on download. Cuts multi-sheet / active-sheet JSON size ~40-50%.
  */
-export async function compressWorkbookForSync(wb: WorkbookData): Promise<WorkbookData | CompressedWorkbook> {
-  // Small event-loop yield to keep UI responsive
+function deduplicateWorkbookForWire(wb: WorkbookData): Record<string, any> {
+  if (!wb.sheets || !wb.activeSheet || !wb.sheets[wb.activeSheet]) {
+    return wb;
+  }
+  const activeEntry = wb.sheets[wb.activeSheet];
+  if (
+    activeEntry &&
+    activeEntry.rows?.length === wb.rows?.length &&
+    activeEntry.headers?.length === wb.headers?.length
+  ) {
+    const { [wb.activeSheet]: _omitted, ...otherSheets } = wb.sheets;
+    return {
+      ...wb,
+      sheets: {
+        ...otherSheets,
+        [wb.activeSheet]: { __hptActiveSheetRef: true },
+      },
+    };
+  }
+  return wb;
+}
+
+function restoreDeduplicatedWorkbook(wb: WorkbookData): WorkbookData {
+  if (!wb || !wb.sheets || !wb.activeSheet) return wb;
+  const activeEntry = wb.sheets[wb.activeSheet] as unknown as { __hptActiveSheetRef?: boolean };
+  if (activeEntry && activeEntry.__hptActiveSheetRef) {
+    return {
+      ...wb,
+      sheets: {
+        ...wb.sheets,
+        [wb.activeSheet]: {
+          headers: wb.headers || [],
+          rows: wb.rows || [],
+        },
+      },
+    };
+  }
+  return wb;
+}
+
+/**
+ * Compress a workbook for the wire. Uses native gzip (falls back to LZString)
+ * inside the background Web Worker to prevent UI freezing and statement timeouts.
+ */
+export async function compressWorkbookForSync(wb: WorkbookData): Promise<WorkbookData | CompressedPayload> {
   await new Promise((r) => setTimeout(r, 0));
 
+  const wireWb = deduplicateWorkbookForWire(wb);
   let json: string;
   try {
-    json = JSON.stringify(wb);
+    json = JSON.stringify(wireWb);
   } catch {
     return wb;
   }
-  // If actual JSON size is under 32 KB, plain storage is fine
-  if (json.length < COMPRESSION_THRESHOLD_BYTES) return wb;
+  if (json.length < COMPRESSION_THRESHOLD_BYTES) return wireWb as WorkbookData;
 
   try {
-    const compressed = await compressStringAsync(json);
-    if (!compressed || compressed.length >= json.length) return wb;
+    const { data: compressed, algo } = await compressStringAsync(json);
+    if (!compressed || compressed.length >= json.length) return wireWb as WorkbookData;
     return {
       __hptCompressed: true,
-      algo: 'lz-base64',
+      algo,
       data: compressed,
       originalBytes: json.length,
     };
   } catch {
-    return wb;
+    return wireWb as WorkbookData;
+  }
+}
+
+export async function compressResultsForSync(
+  results: MatchedRow[]
+): Promise<Omit<MatchedRow, 'searchBlob'>[] | CompressedPayload> {
+  await new Promise((r) => setTimeout(r, 0));
+  const stripped = results.map(({ searchBlob: _unused, ...rest }) => rest);
+  let json: string;
+  try {
+    json = JSON.stringify(stripped);
+  } catch {
+    return stripped;
+  }
+  if (json.length < COMPRESSION_THRESHOLD_BYTES) return stripped;
+
+  try {
+    const { data: compressed, algo } = await compressStringAsync(json);
+    if (!compressed || compressed.length >= json.length) return stripped;
+    return {
+      __hptCompressed: true,
+      algo,
+      data: compressed,
+      originalBytes: json.length,
+    };
+  } catch {
+    return stripped;
+  }
+}
+
+export async function decompressResultsFromSync(value: unknown): Promise<MatchedRow[] | null | undefined> {
+  if (value === null || value === undefined) return value as null | undefined;
+  if (!isCompressedPayload(value)) return value as MatchedRow[];
+  try {
+    const json = await decompressStringAsync(value.data, value.algo);
+    if (!json) return null;
+    return JSON.parse(json) as MatchedRow[];
+  } catch {
+    return null;
   }
 }
 
@@ -199,11 +352,11 @@ export async function compressWorkbookForSync(wb: WorkbookData): Promise<Workboo
  */
 export async function decompressWorkbookFromSync(value: unknown): Promise<WorkbookData | null | undefined> {
   if (value === null || value === undefined) return value as null | undefined;
-  if (!isCompressedWorkbook(value)) return value as WorkbookData;
+  if (!isCompressedPayload(value)) return restoreDeduplicatedWorkbook(value as WorkbookData);
   try {
-    const json = await decompressStringAsync(value.data);
+    const json = await decompressStringAsync(value.data, value.algo);
     if (!json) return null;
-    return JSON.parse(json) as WorkbookData;
+    return restoreDeduplicatedWorkbook(JSON.parse(json) as WorkbookData);
   } catch {
     return null;
   }
@@ -461,9 +614,8 @@ export async function syncWorkspaceToSupabase(
         payload.comparisonWb === null ? null : await compressWorkbookForSync(payload.comparisonWb);
     }
     if (payload.results !== undefined) {
-      updatePayload.results = payload.results
-        ? payload.results.map(({ searchBlob: _unused, ...rest }) => rest)
-        : null;
+      updatePayload.results =
+        payload.results === null ? null : await compressResultsForSync(payload.results);
     }
     if (payload.stats !== undefined) updatePayload.stats = payload.stats;
     if (payload.settings !== undefined) updatePayload.settings = payload.settings;
@@ -485,7 +637,11 @@ export async function syncWorkspaceToSupabase(
       }
     }
     if (updatePayload.results) {
-      byteCount += updatePayload.results.length * 250;
+      if (typeof updatePayload.results.data === 'string') {
+        byteCount += updatePayload.results.data.length;
+      } else if (Array.isArray(updatePayload.results)) {
+        byteCount += updatePayload.results.length * 250;
+      }
     }
     if (byteCount === 0) byteCount = 512;
     sizeFormatted =
@@ -560,34 +716,38 @@ export async function syncWorkspaceToSupabase(
           .upsert(baseUpdate, { onConflict: 'user_id' });
 
         if (!baseErr) {
-          let stepFailed = false;
+          let stepError: { message?: string } | null = null;
           // 2. Stream reference_wb separately
           if (updatePayload.reference_wb !== undefined) {
             const { error: refErr } = await client
               .from('workspaces')
               .update({ reference_wb: updatePayload.reference_wb, updated_at: new Date().toISOString() })
               .eq('user_id', userId);
-            if (refErr) stepFailed = true;
+            if (refErr) stepError = refErr;
           }
           // 3. Stream comparison_wb separately
-          if (!stepFailed && updatePayload.comparison_wb !== undefined) {
+          if (!stepError && updatePayload.comparison_wb !== undefined) {
             const { error: compErr } = await client
               .from('workspaces')
               .update({ comparison_wb: updatePayload.comparison_wb, updated_at: new Date().toISOString() })
               .eq('user_id', userId);
-            if (compErr) stepFailed = true;
+            if (compErr) stepError = compErr;
           }
           // 4. Stream results separately
-          if (!stepFailed && updatePayload.results !== undefined) {
+          if (!stepError && updatePayload.results !== undefined) {
             const { error: resErr } = await client
               .from('workspaces')
               .update({ results: updatePayload.results, updated_at: new Date().toISOString() })
               .eq('user_id', userId);
-            if (resErr) stepFailed = true;
+            if (resErr) stepError = resErr;
           }
-          if (!stepFailed) {
+          if (!stepError) {
             upsertError = null;
+          } else {
+            upsertError = stepError;
           }
+        } else {
+          upsertError = baseErr;
         }
       } catch (streamErr: any) {
         console.warn('Individual column fallback failed:', streamErr);
@@ -754,12 +914,12 @@ export async function fetchWorkspaceFromSupabase(
       return { success: true, data: undefined };
     }
 
-    // New rows store workbooks compressed; legacy rows store them plain.
-    // Both shapes load through the same path (null = no workbook stored).
+    // New rows store workbooks & large results compressed; legacy rows store them plain.
+    // Both shapes load through the same path (null = no data stored).
     const payload: FullWorkspacePayload = {
       referenceWb: (await decompressWorkbookFromSync(data.reference_wb)) ?? undefined,
       comparisonWb: (await decompressWorkbookFromSync(data.comparison_wb)) ?? undefined,
-      results: data.results,
+      results: (await decompressResultsFromSync(data.results)) ?? undefined,
       stats: data.stats,
       settings: data.settings,
     };
@@ -906,13 +1066,21 @@ export async function fetchWorkspaceColumns(
       if (error) throw new Error(error.message);
       const value = (data as Record<string, unknown> | null)?.[column];
       if (value !== undefined && value !== null) {
-        (columns as Record<string, unknown>)[field] = workbook
-          ? await decompressWorkbookFromSync(value)
-          : value;
-        // A workbook column that decompresses to null is corrupt, not empty.
-        if (workbook && (columns as Record<string, unknown>)[field] == null) {
-          delete (columns as Record<string, unknown>)[field];
-          failed.push(label);
+        if (workbook) {
+          (columns as Record<string, unknown>)[field] = await decompressWorkbookFromSync(value);
+          // A workbook column that decompresses to null is corrupt, not empty.
+          if ((columns as Record<string, unknown>)[field] == null) {
+            delete (columns as Record<string, unknown>)[field];
+            failed.push(label);
+          }
+        } else if (field === 'results') {
+          (columns as Record<string, unknown>)[field] = await decompressResultsFromSync(value);
+          if ((columns as Record<string, unknown>)[field] == null) {
+            delete (columns as Record<string, unknown>)[field];
+            failed.push(label);
+          }
+        } else {
+          (columns as Record<string, unknown>)[field] = value;
         }
       }
     } catch (err: any) {
@@ -1092,7 +1260,22 @@ export function mergeWorkspacePresence(
     filesPulled = true;
   }
 
+  const areSettingsEqual = (key: SettingsField, a: unknown, b: unknown): boolean => {
+    try {
+      if (key === 'columnConfigs' && a && b && typeof a === 'object' && typeof b === 'object') {
+        const { updatedAt: _ua, ...restA } = a as Record<string, unknown>;
+        const { updatedAt: _ub, ...restB } = b as Record<string, unknown>;
+        return JSON.stringify(restA) === JSON.stringify(restB);
+      }
+      return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    } catch {
+      return false;
+    }
+  };
+
   const cloudSettings = cloud?.settings ?? undefined;
+  const hasCommittedCloudSettings =
+    !!cloudSettings && typeof cloudSettings.updatedAt === 'number' && cloudSettings.updatedAt > 0;
   const mergedSettings: Partial<WorkspaceSettings> = {};
   const localOnlySettings: Partial<WorkspaceSettings> = {};
 
@@ -1100,12 +1283,21 @@ export function mergeWorkspacePresence(
     const localValue = (local as Record<string, unknown>)[key];
     const cloudValue = (cloudSettings as Record<string, unknown> | undefined)?.[key];
 
-    if (hasValue(cloudValue)) {
+    const cloudExplicitlyCleared =
+      hasCommittedCloudSettings &&
+      cloudValue !== undefined &&
+      cloudValue !== null &&
+      (Array.isArray(cloudValue) || typeof cloudValue === 'string');
+
+    if (hasValue(cloudValue) || cloudExplicitlyCleared) {
       // Cloud is authoritative for the shared workspace:
-      // Adopt cloud settings so all devices converge on what was saved in the cloud
+      // Adopt cloud settings so all devices converge on what was saved in the cloud,
+      // but only flag settingsPulled / pulled[] when local actually differs.
       (mergedSettings as Record<string, unknown>)[key] = cloudValue;
-      pulled.push(label);
-      settingsPulled = true;
+      if (!areSettingsEqual(key, localValue, cloudValue)) {
+        pulled.push(label);
+        settingsPulled = true;
+      }
     } else if (hasValue(localValue)) {
       // Cloud lacks this setting: initialize cloud from local
       (mergedSettings as Record<string, unknown>)[key] = localValue;
@@ -1118,12 +1310,29 @@ export function mergeWorkspacePresence(
   let results: MatchedRow[] | undefined;
   let stats: MatchingStats | undefined;
 
+  const isSameWorkbook = (a?: WorkbookData | null, b?: WorkbookData | null): boolean => {
+    if (!a || !b) return false;
+    return (
+      (a.id && b.id && a.id === b.id) ||
+      (a.name === b.name &&
+        a.activeSheet === b.activeSheet &&
+        (a.rows?.length ?? 0) === (b.rows?.length ?? 0))
+    );
+  };
+
   if (hasValue(cloud?.results) && hasValue(cloud?.stats)) {
-    // If files came from cloud or local files match cloud, adopt pre-calculated cloud results
-    if (filesPulled || !hasValue(local.referenceWb)) {
+    const refAligned =
+      !hasValue(local.referenceWb) || isSameWorkbook(local.referenceWb, cloud?.referenceWb);
+    const compAligned =
+      !hasValue(local.comparisonWb) || isSameWorkbook(local.comparisonWb, cloud?.comparisonWb);
+    const settingsAligned = Object.keys(localOnlySettings).length === 0;
+
+    if (refAligned && compAligned && settingsAligned) {
       results = cloud?.results as MatchedRow[];
       stats = cloud?.stats as MatchingStats;
-      pulled.push('Matching results');
+      if (!hasValue(local.referenceWb) || filesPulled || settingsPulled) {
+        pulled.push('Matching results');
+      }
     }
   }
 

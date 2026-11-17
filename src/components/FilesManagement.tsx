@@ -104,6 +104,9 @@ export const FilesManagement: React.FC<FilesManagementProps> = ({
         setCompProgress({ percent, text });
       }, t);
 
+      setCompProgress({ percent: 95, text: t.filesSavingStorage });
+      await new Promise((r) => setTimeout(r, 20));
+
       // Pass true for autoEvaluate so it jumps straight to Results & Export if reference file exists
       onSetComparisonWb(parsed, true);
       if (!referenceWb) {

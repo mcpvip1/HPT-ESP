@@ -1,6 +1,0 @@
-{
-  "summary": "UI Freeze & Performance Optimization QA Plan:\n- Fix O(N^2) unmatched row diagnosis in excel.ts by adding pre-computed indexed lookups.\n- Offload LZString compression/decompression to a non-blocking Web Worker and eliminate duplicate JSON.stringify calls in supabaseSync.ts.\n- Optimize ResultsDashboard with useDeferredValue, search blobs, deduplicated useEffect hooks, and memoized column filter value computations.",
-  "updatedAt": "2026-11-06T05:42:42.721716266Z",
-  "requestFeedback": true,
-  "userFacing": true
-}

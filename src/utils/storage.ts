@@ -15,16 +15,22 @@ const STORE_NAME = 'app_data';
 // Fast in-memory cache for sandboxed iframes
 const memoryStore = new Map<string, any>();
 
+let dbPromise: Promise<IDBDatabase> | null = null;
+
 function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (dbPromise) return dbPromise;
+
+  dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
     if (typeof window === 'undefined' || !('indexedDB' in window)) {
+      dbPromise = null;
       return reject(new Error('IndexedDB not supported'));
     }
 
-    // Timeout guard: if IndexedDB is blocked or sluggish in sandbox iframe, reject after 1500ms
+    // Timeout guard: if IndexedDB is blocked or sluggish in sandbox iframe, reject after 2000ms
     const timer = setTimeout(() => {
+      dbPromise = null;
       reject(new Error('IndexedDB connection timed out'));
-    }, 1500);
+    }, 2000);
 
     try {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -38,23 +44,41 @@ function openDB(): Promise<IDBDatabase> {
 
       request.onsuccess = () => {
         clearTimeout(timer);
-        resolve(request.result);
+        const db = request.result;
+        db.onclose = () => {
+          dbPromise = null;
+        };
+        db.onerror = () => {
+          dbPromise = null;
+        };
+        db.onversionchange = () => {
+          try {
+            db.close();
+          } catch {}
+          dbPromise = null;
+        };
+        resolve(db);
       };
 
       request.onerror = () => {
         clearTimeout(timer);
+        dbPromise = null;
         reject(request.error);
       };
 
       request.onblocked = () => {
         clearTimeout(timer);
+        dbPromise = null;
         reject(new Error('IndexedDB blocked'));
       };
     } catch (e) {
       clearTimeout(timer);
+      dbPromise = null;
       reject(e);
     }
   });
+
+  return dbPromise;
 }
 
 export async function saveToIDB(key: string, value: any): Promise<void> {
@@ -66,17 +90,12 @@ export async function saveToIDB(key: string, value: any): Promise<void> {
       try {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
-        const req = store.put(value, key);
-        req.onsuccess = () => {
-          db.close();
-          resolve();
-        };
-        req.onerror = () => {
-          db.close();
-          reject(req.error);
-        };
+        store.put(value, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error('IndexedDB write failed'));
+        tx.onabort = () => reject(tx.error || new Error('IndexedDB write aborted'));
       } catch (txErr) {
-        db.close();
+        dbPromise = null;
         reject(txErr);
       }
     });
@@ -115,17 +134,14 @@ export async function getFromIDB<T>(key: string): Promise<T | null> {
         const store = tx.objectStore(STORE_NAME);
         const req = store.get(key);
         req.onsuccess = () => {
-          db.close();
           const result = req.result !== undefined ? req.result : null;
-          if (result) memoryStore.set(key, result);
+          if (result !== null) memoryStore.set(key, result);
           resolve(result);
         };
-        req.onerror = () => {
-          db.close();
-          reject(req.error);
-        };
+        req.onerror = () => reject(req.error);
+        tx.onabort = () => reject(tx.error || new Error('IndexedDB read aborted'));
       } catch (txErr) {
-        db.close();
+        dbPromise = null;
         reject(txErr);
       }
     });
@@ -153,17 +169,12 @@ export async function deleteFromIDB(key: string): Promise<void> {
       try {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
-        const req = store.delete(key);
-        req.onsuccess = () => {
-          db.close();
-          resolve();
-        };
-        req.onerror = () => {
-          db.close();
-          reject(req.error);
-        };
+        store.delete(key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error('IndexedDB delete failed'));
+        tx.onabort = () => reject(tx.error || new Error('IndexedDB delete aborted'));
       } catch (txErr) {
-        db.close();
+        dbPromise = null;
         reject(txErr);
       }
     });

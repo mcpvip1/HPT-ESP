@@ -21,19 +21,19 @@ const styles: Record<
 > = {
   success: {
     bar: 'bg-emerald-500',
-    iconWrap: 'bg-emerald-100 text-emerald-600',
+    iconWrap: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/70 dark:text-emerald-300',
     progress: 'bg-emerald-500',
     Icon: CheckCircle2,
   },
   error: {
     bar: 'bg-rose-500',
-    iconWrap: 'bg-rose-100 text-rose-600',
+    iconWrap: 'bg-rose-100 text-rose-600 dark:bg-rose-950/70 dark:text-rose-300',
     progress: 'bg-rose-500',
     Icon: AlertCircle,
   },
   info: {
     bar: 'bg-sky-500',
-    iconWrap: 'bg-sky-100 text-sky-600',
+    iconWrap: 'bg-sky-100 text-sky-600 dark:bg-sky-950/70 dark:text-sky-300',
     progress: 'bg-sky-500',
     Icon: Info,
   },
@@ -52,7 +52,7 @@ export const Toast: React.FC<ToastProps> = ({ toasts, onDismiss, language = 'en'
           <div
             key={toast.id}
             role="status"
-            className="pointer-events-auto relative overflow-hidden flex items-center gap-3 pl-4 pr-2.5 py-3 rounded-xl bg-white border border-slate-200/80 shadow-xl shadow-slate-900/[0.08] animate-[toast-slide-in_0.28s_cubic-bezier(0.21,1.02,0.73,1)]"
+            className="pointer-events-auto relative overflow-hidden flex items-center gap-3 pl-4 pr-2.5 py-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border)] shadow-[var(--shadow-lg)] animate-[toast-slide-in_0.28s_cubic-bezier(0.21,1.02,0.73,1)]"
           >
             <span className={`absolute left-0 top-0 bottom-0 w-1 ${s.bar}`} aria-hidden="true" />
             <span
@@ -61,12 +61,12 @@ export const Toast: React.FC<ToastProps> = ({ toasts, onDismiss, language = 'en'
             >
               <Icon className="w-4 h-4" />
             </span>
-            <p className="flex-1 min-w-0 text-[13px] font-medium leading-snug text-slate-800">
+            <p className="flex-1 min-w-0 text-[13px] font-medium leading-snug text-[var(--text-primary)]">
               {toast.text}
             </p>
             <button
               onClick={() => onDismiss(toast.id)}
-              className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              className="shrink-0 p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors cursor-pointer"
               aria-label={t.toastDismiss}
             >
               <X className="w-3.5 h-3.5" />

@@ -34,8 +34,15 @@ interface RulesLogicModalProps {
   onUpdateMappings: (mappings: ColumnMapping[]) => void;
   onUpdateNormalization: (norm: NormalizationRules) => void;
   onUpdateLayers: (layers: DecisionLayer[]) => void;
-  onSaveSettings: () => void;
-  onExecuteMatching: () => void;
+  onSaveSettings: (holdOverrides?: {
+    holdColumn?: string;
+    holdValues?: string[];
+    holdReason?: string;
+  }) => Promise<void> | void;
+  onExecuteMatching: (holdOverrides?: {
+    holdColumn?: string;
+    holdValues?: string[];
+  }) => void;
   isProcessing: boolean;
   language: Language;
   onShowToast: (msg: string, type: 'success' | 'error' | 'info') => void;
@@ -121,16 +128,49 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
-    onSaveSettings();
+  const flushHoldDrafts = (): {
+    holdColumn: string;
+    holdValues: string[];
+    holdReason: string;
+  } => {
+    const flushedReason = holdReasonDraft.trim();
+    const flushedValues = holdColumn
+      ? holdValues
+      : Array.from(
+          new Set(
+            holdLegacyDraft
+              .split(/\n/)
+              .map((x) => x.trim())
+              .filter((x) => x.length > 0)
+          )
+        );
+    const valuesChanged =
+      !holdColumn && JSON.stringify(flushedValues) !== JSON.stringify(holdValues);
+    if (flushedReason !== holdReason || valuesChanged) {
+      updateHold(holdColumn, flushedValues, flushedReason);
+    }
+    return {
+      holdColumn,
+      holdValues: flushedValues,
+      holdReason: flushedReason,
+    };
+  };
+
+  const handleSave = async () => {
+    const overrides = flushHoldDrafts();
+    await onSaveSettings(overrides);
     setJustSaved(true);
     setTimeout(() => setJustSaved(false), 2000);
   };
 
-  const handleSaveAndApply = () => {
-    onSaveSettings();
+  const handleSaveAndApply = async () => {
+    const overrides = flushHoldDrafts();
+    await onSaveSettings(overrides);
     onClose();
-    onExecuteMatching();
+    onExecuteMatching({
+      holdColumn: overrides.holdColumn,
+      holdValues: overrides.holdValues,
+    });
   };
 
   return (
@@ -273,20 +313,20 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
           ) : (
             <div className="space-y-5 animate-in fade-in duration-150">
               {/* Hold column picker */}
-              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-xs">
+              <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-4 space-y-3 shadow-xs">
                 <div className="flex items-center gap-2">
-                  <PauseCircle className="w-4 h-4 text-blue-600" />
-                  <h4 className="text-sm font-bold text-slate-900">{t.rulesTabHold}</h4>
+                  <PauseCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <h4 className="text-sm font-bold text-[var(--text-primary)]">{t.rulesTabHold}</h4>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">{t.rulesHoldColumnLabel}</label>
+                  <label className="text-xs font-bold text-[var(--text-secondary)]">{t.rulesHoldColumnLabel}</label>
                   <select
                     value={holdColumn}
                     onChange={(e) => {
                       setHoldValueSearch('');
                       updateHold(e.target.value, [], holdReason);
                     }}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-blue-500"
                   >
                     <option value="">{t.rulesHoldColumnLegacy}</option>
                     {(comparisonWb?.headers || []).map((h) => (
@@ -298,7 +338,7 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
                 {holdColumn ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-700">
+                      <label className="text-xs font-bold text-[var(--text-secondary)]">
                         {t.rulesHoldValuesLabel}
                         {holdValues.length > 0 && (
                           <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-600 text-white font-bold">
@@ -308,70 +348,72 @@ export const RulesLogicModal: React.FC<RulesLogicModalProps> = ({
                       </label>
                       <div className="flex gap-2">
                         <button
+                          type="button"
                           onClick={() => updateHold(holdColumn, holdDistinctValues, holdReason)}
-                          className="text-[11px] font-semibold text-blue-600 hover:underline"
+                          className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
                         >
                           {t.rulesHoldSelectAll}
                         </button>
                         <button
+                          type="button"
                           onClick={() => updateHold(holdColumn, [], holdReason)}
-                          className="text-[11px] font-semibold text-slate-500 hover:underline"
+                          className="text-[11px] font-semibold text-[var(--text-muted)] hover:underline cursor-pointer"
                         >
                           {t.rulesHoldClearSel}
                         </button>
                       </div>
                     </div>
                     <div className="relative">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <Search className="w-3.5 h-3.5 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
                         value={holdValueSearch}
                         onChange={(e) => setHoldValueSearch(e.target.value)}
                         placeholder={t.rulesHoldValuesSearch}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                        className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg pl-9 pr-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500"
                       />
                     </div>
-                    <div className="max-h-56 overflow-y-auto border border-slate-200 rounded-lg bg-slate-50/60 divide-y divide-slate-100">
+                    <div className="max-h-56 overflow-y-auto border border-[var(--border)] rounded-lg bg-[var(--bg-surface-alt)] divide-y divide-[var(--border-light)]">
                       {filteredHoldValues.length === 0 && (
-                        <div className="px-3 py-4 text-xs text-slate-400 text-center">
+                        <div className="px-3 py-4 text-xs text-[var(--text-muted)] text-center">
                           {comparisonWb ? t.rulesHoldNoValues : t.rulesHoldNoData}
                         </div>
                       )}
                       {filteredHoldValues.map((v) => (
                         <label
                           key={v}
-                          className="flex items-center gap-2.5 px-3 py-2 hover:bg-blue-50/60 cursor-pointer transition-colors"
+                          className="flex items-center gap-2.5 px-3 py-2 hover:bg-blue-50/60 dark:hover:bg-blue-950/35 cursor-pointer transition-colors"
                         >
                           <input
                             type="checkbox"
                             checked={holdValues.includes(v)}
                             onChange={() => toggleHoldValue(v)}
-                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            className="rounded border-[var(--border)] text-blue-600 focus:ring-blue-500"
                           />
-                          <span className="text-xs text-slate-800 font-mono truncate">{v}</span>
+                          <span className="text-xs text-[var(--text-primary)] font-mono truncate">{v}</span>
                         </label>
                       ))}
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">{t.rulesHoldLegacyLabel}</label>
-                    <p className="text-[11px] text-slate-500">{t.rulesHoldLegacyDesc}</p>
+                    <label className="text-xs font-bold text-[var(--text-secondary)]">{t.rulesHoldLegacyLabel}</label>
+                    <p className="text-[11px] text-[var(--text-muted)]">{t.rulesHoldLegacyDesc}</p>
                     <textarea
                       value={holdLegacyDraft}
                       onChange={(e) => setHoldLegacyDraft(e.target.value)}
                       onBlur={() => {
                         const vals = holdLegacyDraft.split(/\n/).map((x) => x.trim()).filter((x) => x.length > 0);
-                        updateHold('', Array.from(new Set(vals)), holdReason);
+                        updateHold('', Array.from(new Set(vals)), holdReasonDraft.trim());
                       }}
                       rows={4}
                       placeholder={t.rulesHoldLegacyPlaceholder}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 font-mono"
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500 font-mono"
                     />
                   </div>
                 )}
 
-                <div className="space-y-1.5 pt-1 border-t border-slate-100">
-                  <label className="text-xs font-bold text-slate-700">{t.dashHoldReasonLabel}</label>
+                <div className="space-y-1.5 pt-2 border-t border-[var(--border-light)]">
+                  <label className="text-xs font-bold text-[var(--text-secondary)]">{t.dashHoldReasonLabel}</label>
                   <input
                     value={holdReasonDraft}
                     onChange={(e) => setHoldReasonDraft(e.target.value)}

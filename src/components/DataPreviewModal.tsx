@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { X, Search, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { Language, WorkbookData } from '../types';
 import { translations } from '../translations';
@@ -26,8 +26,20 @@ export const DataPreviewModal: React.FC<DataPreviewModalProps> = ({
   const [page, setPage] = useState(1);
   const pageSize = 20;
 
+  useEffect(() => {
+    if (isOpen && workbook) {
+      setActiveSheetState(workbook.activeSheet || workbook.sheetNames?.[0] || '');
+      setSearchTerm('');
+      setPage(1);
+    }
+  }, [isOpen, workbook?.id, workbook?.activeSheet]);
+
   // Sync or default active sheet
-  const currentSheetName = activeSheetState || workbook?.activeSheet || workbook?.sheetNames?.[0] || '';
+  const currentSheetName =
+    (activeSheetState && workbook?.sheets?.[activeSheetState] ? activeSheetState : '') ||
+    workbook?.activeSheet ||
+    workbook?.sheetNames?.[0] ||
+    '';
 
   const currentSheetData = useMemo(() => {
     if (!workbook) return { headers: [], rows: [] };

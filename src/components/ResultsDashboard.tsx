@@ -277,7 +277,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     );
 
     return items;
-  }, [compHeaders, refHeaders, t.matchedStatus, t.reason]);
+  }, [compHeaders, refHeaders, t.colDecisionStatus, t.matchedStatus, t.reason]);
 
   // Modal & Column Customization State
   const [showColumnModal, setShowColumnModal] = useState(false);
@@ -387,12 +387,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         onSaveColumnConfigs(newConfigs);
       }
       if (!silent) {
-        onShowToast(t.dashSaveView, 'success');
+        onShowToast(t.dashColumnLayoutSaved, 'success');
       }
     } catch (e) {
       console.warn('Failed to save column settings', e);
     }
-    onShowToast(t.dashColumnLayoutSaved, 'success');
   };
 
   const handleResetDefaultColumns = () => {
@@ -602,7 +601,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     if (row.decisionColor === 'green' && typeof val === 'string' && val.toLowerCase().includes('postpone')) {
       val = 'Accept';
     }
-    return val !== undefined && val !== null && String(val).trim() !== '' ? String(val) : '(Blanks)';
+    return val !== undefined && val !== null && String(val).trim() !== '' ? String(val) : t.dashValueBlanks;
   };
 
   // Shared row predicate: status tab + Only Accept + column checklists + search.
@@ -710,7 +709,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   const activeColumnUniqueValues = useMemo(() => {
     if (!openFilterColId) return [];
     return getColumnUniqueValues(openFilterColId);
-  }, [openFilterColId, results, activeFilter, columnFilters, deferredSearchTerm, hideSupersededPostpone]);
+  }, [openFilterColId, results, activeFilter, columnFilters, deferredSearchTerm, searchColumn, hideSupersededPostpone, t]);
 
   // Real-Time Filter & Search Logic (shared predicate above)
   const filteredRows = useMemo(() => {
@@ -768,6 +767,12 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   const currentPageRows = useMemo(() => {
     const start = (page - 1) * pageSize;
     return sortedRows.slice(start, start + pageSize);
@@ -782,7 +787,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = useCallback(() => {
     try {
       const baseName = comparisonWb?.name || 'Excel_Matching_Output';
       const rowsToExport = sortedRows.length > 0 ? sortedRows : results;
@@ -791,7 +796,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     } catch (err: any) {
       onShowToast(err.message || t.dashExportFailed, 'error');
     }
-  };
+  }, [comparisonWb?.name, sortedRows, results, compHeaders, stats, exportColIds, onShowToast, t]);
 
   const handleExportCsv = () => {
     try {
@@ -883,7 +888,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         );
       default:
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold text-slate-600 bg-slate-100">
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800">
             {t.badgeNoRule}
           </span>
         );
@@ -1105,7 +1110,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
             {/* Match Counter Badge */}
             {searchTerm.trim() && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 font-mono whitespace-nowrap">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shrink-0 font-mono whitespace-nowrap">
                 <Filter className="w-3 h-3" />
                 {t.dashRowsFound.replace('{count}', filteredRows.length.toLocaleString())}
               </span>
@@ -1116,26 +1121,26 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 ml-auto shrink-0">
             {/* Quick 1-Click Copy Tip — visible on xl+ to prevent crowding */}
             <span
-              className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-200 shrink-0 select-none whitespace-nowrap"
+              className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-[var(--text-muted)] bg-[var(--bg-surface-alt)] border border-[var(--border)] shrink-0 select-none whitespace-nowrap"
               title="Click any table cell to copy its text to your clipboard"
             >
-              <Copy className="w-3 h-3 text-emerald-600" />
+              <Copy className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
               <span>Click any cell to copy text</span>
             </span>
 
             {/* Currently viewed file + last replaced time: unified into ONE cohesive pill badge */}
             {comparisonWb && (
               <div
-                className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 shrink-0 select-none max-w-full"
+                className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--bg-surface-alt)] border border-[var(--border)] text-xs text-[var(--text-secondary)] shrink-0 select-none max-w-full"
                 title={`${comparisonWb.name}${comparisonWb.uploadedAt ? ' · ' + formatFileDateTime(comparisonWb.uploadedAt, language) : ''}`}
               >
-                <FileText className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="font-semibold text-slate-700 max-w-[130px] sm:max-w-[190px] truncate">
+                <FileText className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="font-semibold text-[var(--text-primary)] max-w-[130px] sm:max-w-[190px] truncate">
                   {comparisonWb.name}
                 </span>
                 {comparisonWb.uploadedAt && (
-                  <span className="inline-flex items-center gap-1 pl-2 border-l border-slate-200 text-[11px] font-mono text-slate-500 whitespace-nowrap shrink-0">
-                    <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                  <span className="inline-flex items-center gap-1 pl-2 border-l border-[var(--border)] text-[11px] font-mono text-[var(--text-muted)] whitespace-nowrap shrink-0">
+                    <Clock className="w-3 h-3 text-[var(--text-muted)] shrink-0" />
                     <span className="hidden sm:inline">
                       {formatFileDateTime(comparisonWb.uploadedAt, language)}
                     </span>
@@ -1148,7 +1153,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             )}
 
             {/* Rows Per Page Selector */}
-            <div className="flex items-center gap-1.5 text-xs text-slate-600 shrink-0 select-none">
+            <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] shrink-0 select-none">
               <span className="whitespace-nowrap">{t.rowsPerPage}:</span>
               <select
                 value={pageSize}
@@ -1156,7 +1161,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   setPageSize(Number(e.target.value));
                   setPage(1);
                 }}
-                className="bg-white border border-slate-200 rounded-md px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-emerald-500 font-mono shadow-xs cursor-pointer"
+                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md px-2 py-1 text-xs text-[var(--text-primary)] focus:outline-none focus:border-emerald-500 font-mono shadow-xs cursor-pointer"
               >
                 <option value={25}>25</option>
                 <option value={50}>50</option>
@@ -1169,8 +1174,8 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
         {/* Active Excel Column Filters Pill Bar */}
         {Object.keys(columnFilters).length > 0 && (
-          <div className="pt-2.5 border-t border-slate-200 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-emerald-700 font-semibold flex items-center gap-1.5 shrink-0">
+          <div className="pt-2.5 border-t border-[var(--border-light)] flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1.5 shrink-0">
               <Filter className="w-3.5 h-3.5" />
               <span>{t.dashActiveColumnFilters}</span>
             </span>
@@ -1180,10 +1185,10 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
               return (
                 <span
                   key={colId}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800 shadow-xs"
                 >
-                  <span className="font-sans font-medium text-slate-700">{label}:</span>
-                  <span className="font-bold text-emerald-700">{t.dashValsSelected.replace('{count}', String(vals.length))}</span>
+                  <span className="font-sans font-medium text-[var(--text-secondary)]">{label}:</span>
+                  <span className="font-bold text-emerald-700 dark:text-emerald-300">{t.dashValsSelected.replace('{count}', String(vals.length))}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -1194,7 +1199,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                       });
                       setPage(1);
                     }}
-                    className="p-0.5 hover:text-slate-900 rounded hover:bg-emerald-100 transition-colors ml-0.5 text-emerald-700"
+                    className="p-0.5 hover:text-[var(--text-primary)] rounded hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors ml-0.5 text-emerald-700 dark:text-emerald-300"
                     title={t.dashClearFilterOn.replace('{label}', label)}
                   >
                     <X className="w-3 h-3" />
@@ -1208,7 +1213,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 setColumnFilters({});
                 setPage(1);
               }}
-              className="text-xs text-rose-600 hover:text-rose-700 underline font-semibold ml-1 transition-colors"
+              className="text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 underline font-semibold ml-1 transition-colors cursor-pointer"
             >
               {t.dashClearAllColumnFilters}
             </button>
@@ -1421,15 +1426,15 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                   const isYellow = row.decisionColor === 'yellow';
                   const isRed = row.decisionColor === 'red';
                   const isBlue = row.decisionColor === 'blue';
-                  // Opaque background for the frozen columns (must cover scrolled content)
+                  // Opaque background for the frozen columns (must cover scrolled content cleanly)
                   const frozenBg = isGreen
-                    ? 'bg-[#f0fdf4] dark:bg-emerald-950/70 text-emerald-900 dark:text-emerald-200'
+                    ? 'bg-[#f0fdf4] dark:bg-[#062e24] text-emerald-900 dark:text-emerald-200'
                     : isYellow
-                    ? 'bg-[#fefce8] dark:bg-amber-950/70 text-amber-900 dark:text-amber-200'
+                    ? 'bg-[#fefce8] dark:bg-[#2a1f05] text-amber-900 dark:text-amber-200'
                     : isRed
-                    ? 'bg-[#fff1f2] dark:bg-rose-950/70 text-rose-900 dark:text-rose-200'
+                    ? 'bg-[#fff1f2] dark:bg-[#2d0c14] text-rose-900 dark:text-rose-200'
                     : isBlue
-                    ? 'bg-[#eff6ff] dark:bg-blue-950/70 text-blue-900 dark:text-blue-200'
+                    ? 'bg-[#eff6ff] dark:bg-[#0b1f44] text-blue-900 dark:text-blue-200'
                     : 'bg-white dark:bg-[#111827] text-[var(--text-primary)]';
 
                   return (
@@ -1543,8 +1548,11 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                     )}
                                     <button
                                       type="button"
-                                      onClick={() => setSelectedRow(row)}
-                                      className="text-[10px] text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 underline font-medium ml-0.5"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedRow(row);
+                                      }}
+                                      className="text-[10px] text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 underline font-medium ml-0.5 cursor-pointer"
                                       title="Open full inspection breakdown"
                                     >
                                       Inspect
@@ -1778,13 +1786,13 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 <tr>
                   <td
                     colSpan={visibleTableColumns.length + 1}
-                    className="py-16 text-center text-slate-500 text-xs space-y-2"
+                    className="py-16 text-center text-[var(--text-muted)] text-xs space-y-2"
                   >
                     <div>{t.noResultsFound}</div>
                     {searchTerm && (
                       <button
                         onClick={() => setSearchTerm('')}
-                        className="text-xs text-emerald-600 hover:underline inline-block mt-1 font-semibold"
+                        className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline inline-block mt-1 font-semibold cursor-pointer"
                       >
                         {t.dashClearSearchFilter.replace('{term}', searchTerm)}
                       </button>
@@ -1797,23 +1805,23 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         </div>
 
         {/* 5. Table Pagination Footer */}
-        <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+        <div className="px-6 py-3.5 border-t border-[var(--border)] bg-[var(--bg-surface-alt)] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--text-secondary)]">
           <div>
             {t.showingRows}{' '}
-            <strong className="text-slate-800 font-mono tabular-nums">
+            <strong className="text-[var(--text-primary)] font-mono tabular-nums">
               {filteredRows.length > 0 ? (page - 1) * pageSize + 1 : 0}
             </strong>{' '}
             -{' '}
-            <strong className="text-slate-800 font-mono tabular-nums">
+            <strong className="text-[var(--text-primary)] font-mono tabular-nums">
               {Math.min(page * pageSize, filteredRows.length)}
             </strong>{' '}
             {t.of}{' '}
-            <strong className="text-slate-800 font-mono tabular-nums">
+            <strong className="text-[var(--text-primary)] font-mono tabular-nums">
               {filteredRows.length.toLocaleString()}
             </strong>{' '}
             {t.dashRowsUnit}
             {searchTerm.trim() && (
-              <span className="text-slate-500 ml-2">
+              <span className="text-[var(--text-muted)] ml-2">
                 {t.dashFilteredFromTotal.replace('{count}', results.length.toLocaleString())}
               </span>
             )}
@@ -1823,18 +1831,18 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-soft)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs cursor-pointer"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               <span>{t.prevPage}</span>
             </button>
-            <span className="px-2 font-mono text-slate-700 font-bold tabular-nums">
+            <span className="px-2 font-mono text-[var(--text-primary)] font-bold tabular-nums">
               {page} / {totalPages}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-soft)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs cursor-pointer"
             >
               <span>{t.nextPage}</span>
               <ChevronRight className="w-3.5 h-3.5" />
@@ -1845,46 +1853,46 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
       {/* Supervisor Release Dialog */}
       {releaseTarget && onReleaseHoldKey && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                <h4 className="text-sm font-bold text-slate-900">{t.dashRemoveFromHold}</h4>
+                <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <h4 className="text-sm font-bold text-[var(--text-primary)]">{t.dashRemoveFromHold}</h4>
               </div>
               <button
                 onClick={() => setReleaseTarget(null)}
-                className="text-slate-400 hover:text-slate-700"
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <label className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-300 cursor-pointer hover:border-amber-400 transition-colors">
+            <label className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 cursor-pointer hover:border-amber-400 transition-colors">
               <input
                 type="checkbox"
                 checked={supervisorConfirmed}
                 onChange={(e) => setSupervisorConfirmed(e.target.checked)}
-                className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                className="mt-0.5 rounded border-[var(--border)] text-emerald-600 focus:ring-emerald-500"
               />
-              <span className="text-xs text-slate-800 font-bold">{t.dashReleaseSupervisor}</span>
+              <span className="text-xs text-[var(--text-primary)] font-bold">{t.dashReleaseSupervisor}</span>
             </label>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
               {t.dashReleaseDesc.replace('{key}', releaseTarget.key).replace('{n}', String(releaseTarget.count))}
             </p>
 
-            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 space-y-1">
-              <div className="text-[11px] font-bold text-blue-900">{t.dashHoldReasonLabel}</div>
-              <div className="text-xs text-blue-800">
+            <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 space-y-1">
+              <div className="text-[11px] font-bold text-blue-900 dark:text-blue-200">{t.dashHoldReasonLabel}</div>
+              <div className="text-xs text-blue-800 dark:text-blue-300">
                 {holdReason.trim() ? holdReason : t.dashReleaseNoReason}
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
               <button
                 onClick={() => setReleaseTarget(null)}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 rounded-lg"
+                className="px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-surface-alt)] border border-[var(--border)] rounded-lg cursor-pointer"
               >
                 {t.cancel}
               </button>
@@ -1906,7 +1914,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                     setReleaseTarget(null);
                   }
                 }}
-                className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 {t.dashRemoveFromHold}
               </button>

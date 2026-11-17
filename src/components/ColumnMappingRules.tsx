@@ -216,27 +216,27 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
   return (
     <div className="space-y-6">
       {/* 1. Side-by-Side Column Mapping Interface */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-6 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border)]">
           <div>
             <div className="flex items-center gap-2">
-              <Link2 className="w-5 h-5 text-emerald-600" />
-              <h3 className="text-sm font-bold text-slate-900">{t.columnMappings}</h3>
+              <Link2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">{t.columnMappings}</h3>
             </div>
-            <p className="text-xs text-slate-500 mt-1">{t.columnMappingsDesc}</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">{t.columnMappingsDesc}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Recent & Saved Mapping Presets Button */}
             <button
               onClick={() => setShowPresetsModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100/80 border border-amber-200 rounded-lg transition-colors select-none shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100/80 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800 rounded-lg transition-colors select-none shadow-xs cursor-pointer"
               title={t.mapPresetsBtnTitle}
             >
-              <Bookmark className="w-3.5 h-3.5 text-amber-600" />
+              <Bookmark className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
               <span>{t.mapSavedRecentKeys}</span>
               {savedPresets.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-200 text-amber-800 font-bold">
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-200 font-bold">
                   {savedPresets.length}
                 </span>
               )}
@@ -249,10 +249,10 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
                   setNewPresetName('');
                   setShowSaveDialog(true);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors select-none shadow-xs"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-soft)] border border-[var(--border)] rounded-lg transition-colors select-none shadow-xs cursor-pointer"
                 title={t.mapSaveKeysBtnTitle}
               >
-                <Save className="w-3.5 h-3.5 text-emerald-600" />
+                <Save className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 <span>{t.mapSaveKeys}</span>
               </button>
             )}
@@ -260,7 +260,7 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
             <button
               onClick={handleAutoMap}
               disabled={!referenceWb || !comparisonWb}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 rounded-lg transition-colors disabled:opacity-40 shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-emerald-200 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800 rounded-lg transition-colors disabled:opacity-40 shadow-xs cursor-pointer"
               title={t.autoMap}
             >
               <Wand2 className="w-3.5 h-3.5" />
@@ -269,7 +269,7 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
             <button
               onClick={handleAddMapping}
               disabled={refHeaders.length === 0 || compHeaders.length === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors disabled:opacity-40 shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 dark:bg-[var(--accent)] dark:hover:bg-[var(--accent-hover)] border border-slate-700 dark:border-transparent rounded-lg transition-colors disabled:opacity-40 shadow-xs cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>{t.addMapping}</span>
@@ -279,17 +279,17 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
 
         {/* Quick Recent Keys Recall Ribbon if history exists */}
         {recentHistory.length > 0 && (
-          <div className="mt-3 py-2 px-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-slate-500 truncate">
-              <History className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-              <span className="font-semibold text-slate-700 shrink-0">{t.mapRecentKeys}</span>
-              <span className="text-slate-600 font-mono text-[11px] truncate">
+          <div className="mt-3 py-2 px-3 bg-[var(--bg-surface-alt)] rounded-lg border border-[var(--border)] flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-[var(--text-muted)] truncate">
+              <History className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+              <span className="font-semibold text-[var(--text-secondary)] shrink-0">{t.mapRecentKeys}</span>
+              <span className="text-[var(--text-muted)] font-mono text-[11px] truncate">
                 {recentHistory[0].summary}
               </span>
             </div>
             <button
               onClick={() => handleApplyPreset(recentHistory[0].mappings, t.mapRecentMappingName)}
-              className="text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 hover:underline shrink-0"
+              className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:underline shrink-0 cursor-pointer"
             >
               {t.mapRestoreLastUsed}
             </button>
@@ -302,15 +302,15 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
             mappings.map((mapping, idx) => (
               <div
                 key={mapping.id}
-                className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50/80 border border-slate-200 hover:border-slate-300 transition-colors"
+                className="flex items-center gap-3 p-3.5 rounded-xl bg-[var(--bg-surface-alt)] border border-[var(--border)] hover:border-[var(--accent-light)] transition-colors"
               >
-                <div className="w-6 text-center text-xs font-mono font-bold text-slate-400">
+                <div className="w-6 text-center text-xs font-mono font-bold text-[var(--text-muted)]">
                   {idx + 1}.
                 </div>
 
                 {/* Left: Main Reference Column */}
                 <div className="flex-1">
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">
                     {t.mainColumn}
                   </label>
                   <select
@@ -318,7 +318,7 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
                     onChange={(e) =>
                       handleUpdateMappingItem(mapping.id, 'mainCol', e.target.value)
                     }
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 font-mono shadow-xs"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-emerald-500 font-mono shadow-xs"
                   >
                     {refHeaders.map((header) => (
                       <option key={header} value={header}>
@@ -329,13 +329,13 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
                 </div>
 
                 {/* Equal / Match Icon */}
-                <div className="flex flex-col items-center justify-center pt-5 text-slate-400 font-bold">
+                <div className="flex flex-col items-center justify-center pt-5 text-[var(--text-muted)] font-bold">
                   <span className="text-xs font-mono">⟷</span>
                 </div>
 
                 {/* Right: Comparison Column */}
                 <div className="flex-1">
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">
                     {t.compColumn}
                   </label>
                   <select
@@ -343,7 +343,7 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
                     onChange={(e) =>
                       handleUpdateMappingItem(mapping.id, 'comparisonCol', e.target.value)
                     }
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-sky-500 font-mono shadow-xs"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-sky-500 font-mono shadow-xs"
                   >
                     {compHeaders.map((header) => (
                       <option key={header} value={header}>
@@ -357,7 +357,7 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
                 <div className="pt-5">
                   <button
                     onClick={() => handleDeleteMapping(mapping.id)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                    className="p-1.5 text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 rounded-md transition-colors cursor-pointer"
                     aria-label={t.mapDeleteMappingAria}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -366,7 +366,7 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
               </div>
             ))
           ) : (
-            <div className="py-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+            <div className="py-8 text-center text-xs text-[var(--text-muted)] border border-dashed border-[var(--border)] rounded-xl bg-[var(--bg-surface-alt)]">
               {t.noMappingsYet}
             </div>
           )}
@@ -374,12 +374,12 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
       </div>
 
       {/* 2. Key Normalization Toggles */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-        <div className="flex items-center gap-2 pb-4 border-b border-slate-200">
-          <Sliders className="w-5 h-5 text-sky-600" />
+      <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-6 shadow-xs">
+        <div className="flex items-center gap-2 pb-4 border-b border-[var(--border)]">
+          <Sliders className="w-5 h-5 text-sky-600 dark:text-sky-400" />
           <div>
-            <h3 className="text-sm font-bold text-slate-900">{t.normalizationOptions}</h3>
-            <p className="text-xs text-slate-500">{t.mapNormSectionDesc}</p>
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">{t.normalizationOptions}</h3>
+            <p className="text-xs text-[var(--text-muted)]">{t.mapNormSectionDesc}</p>
           </div>
         </div>
 
@@ -394,19 +394,19 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
             }
             className={`flex items-start justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
               normalization.trimSpaces
-                ? 'bg-emerald-50/60 border-emerald-300 shadow-xs'
-                : 'bg-slate-50/60 border-slate-200 hover:border-slate-300'
+                ? 'bg-emerald-50/60 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 shadow-xs'
+                : 'bg-[var(--bg-surface-alt)] border-[var(--border)] hover:border-[var(--accent-light)]'
             }`}
           >
             <div className="pr-3">
-              <div className="text-xs font-bold text-slate-800">{t.trimSpaces}</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">{t.trimSpacesDesc}</div>
+              <div className="text-xs font-bold text-[var(--text-primary)]">{t.trimSpaces}</div>
+              <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{t.trimSpacesDesc}</div>
             </div>
             <div
               className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition-colors ${
                 normalization.trimSpaces
                   ? 'bg-emerald-600 text-white'
-                  : 'border border-slate-300 bg-white'
+                  : 'border border-[var(--border)] bg-[var(--bg-input)]'
               }`}
             >
               {normalization.trimSpaces && <Check className="w-3.5 h-3.5" />}
@@ -423,19 +423,19 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
             }
             className={`flex items-start justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
               normalization.ignoreCase
-                ? 'bg-emerald-50/60 border-emerald-300 shadow-xs'
-                : 'bg-slate-50/60 border-slate-200 hover:border-slate-300'
+                ? 'bg-emerald-50/60 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 shadow-xs'
+                : 'bg-[var(--bg-surface-alt)] border-[var(--border)] hover:border-[var(--accent-light)]'
             }`}
           >
             <div className="pr-3">
-              <div className="text-xs font-bold text-slate-800">{t.ignoreCase}</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">{t.ignoreCaseDesc}</div>
+              <div className="text-xs font-bold text-[var(--text-primary)]">{t.ignoreCase}</div>
+              <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{t.ignoreCaseDesc}</div>
             </div>
             <div
               className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition-colors ${
                 normalization.ignoreCase
                   ? 'bg-emerald-600 text-white'
-                  : 'border border-slate-300 bg-white'
+                  : 'border border-[var(--border)] bg-[var(--bg-input)]'
               }`}
             >
               {normalization.ignoreCase && <Check className="w-3.5 h-3.5" />}
@@ -452,19 +452,19 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
             }
             className={`flex items-start justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
               normalization.removeSpacesAndHyphens
-                ? 'bg-emerald-50/60 border-emerald-300 shadow-xs'
-                : 'bg-slate-50/60 border-slate-200 hover:border-slate-300'
+                ? 'bg-emerald-50/60 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 shadow-xs'
+                : 'bg-[var(--bg-surface-alt)] border-[var(--border)] hover:border-[var(--accent-light)]'
             }`}
           >
             <div className="pr-3">
-              <div className="text-xs font-bold text-slate-800">{t.removeHyphens}</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">{t.removeHyphensDesc}</div>
+              <div className="text-xs font-bold text-[var(--text-primary)]">{t.removeHyphens}</div>
+              <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{t.removeHyphensDesc}</div>
             </div>
             <div
               className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition-colors ${
                 normalization.removeSpacesAndHyphens
                   ? 'bg-emerald-600 text-white'
-                  : 'border border-slate-300 bg-white'
+                  : 'border border-[var(--border)] bg-[var(--bg-input)]'
               }`}
             >
               {normalization.removeSpacesAndHyphens && <Check className="w-3.5 h-3.5" />}
@@ -481,19 +481,19 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
             }
             className={`flex items-start justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
               normalization.ignoreLeadingZeros
-                ? 'bg-emerald-50/60 border-emerald-300 shadow-xs'
-                : 'bg-slate-50/60 border-slate-200 hover:border-slate-300'
+                ? 'bg-emerald-50/60 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 shadow-xs'
+                : 'bg-[var(--bg-surface-alt)] border-[var(--border)] hover:border-[var(--accent-light)]'
             }`}
           >
             <div className="pr-3">
-              <div className="text-xs font-bold text-slate-800">{t.ignoreLeadingZeros}</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">{t.ignoreLeadingZerosDesc}</div>
+              <div className="text-xs font-bold text-[var(--text-primary)]">{t.ignoreLeadingZeros}</div>
+              <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{t.ignoreLeadingZerosDesc}</div>
             </div>
             <div
               className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition-colors ${
                 normalization.ignoreLeadingZeros
                   ? 'bg-emerald-600 text-white'
-                  : 'border border-slate-300 bg-white'
+                  : 'border border-[var(--border)] bg-[var(--bg-input)]'
               }`}
             >
               {normalization.ignoreLeadingZeros && <Check className="w-3.5 h-3.5" />}
@@ -510,19 +510,19 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
             }
             className={`flex items-start justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
               normalization.trimPunctuation !== false
-                ? 'bg-emerald-50/60 border-emerald-300 shadow-xs'
-                : 'bg-slate-50/60 border-slate-200 hover:border-slate-300'
+                ? 'bg-emerald-50/60 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 shadow-xs'
+                : 'bg-[var(--bg-surface-alt)] border-[var(--border)] hover:border-[var(--accent-light)]'
             }`}
           >
             <div className="pr-3">
-              <div className="text-xs font-bold text-slate-800">{t.trimPunctuation}</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">{t.trimPunctuationDesc}</div>
+              <div className="text-xs font-bold text-[var(--text-primary)]">{t.trimPunctuation}</div>
+              <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{t.trimPunctuationDesc}</div>
             </div>
             <div
               className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition-colors ${
                 normalization.trimPunctuation !== false
                   ? 'bg-emerald-600 text-white'
-                  : 'border border-slate-300 bg-white'
+                  : 'border border-[var(--border)] bg-[var(--bg-input)]'
               }`}
             >
               {normalization.trimPunctuation !== false && <Check className="w-3.5 h-3.5" />}
@@ -533,23 +533,23 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
 
       {/* Save Preset Dialog Modal */}
       {showSaveDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
-                <Bookmark className="w-5 h-5 text-emerald-600" />
-                <h4 className="text-sm font-bold text-slate-900">{t.mapSaveDialogTitle}</h4>
+                <Bookmark className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <h4 className="text-sm font-bold text-[var(--text-primary)]">{t.mapSaveDialogTitle}</h4>
               </div>
               <button
                 onClick={() => setShowSaveDialog(false)}
-                className="text-slate-400 hover:text-slate-700"
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
                 {t.mapPresetNameLabel}
               </label>
               <input
@@ -557,27 +557,27 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
                 value={newPresetName}
                 onChange={(e) => setNewPresetName(e.target.value)}
                 placeholder={t.mapPresetNamePh}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-medium"
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-emerald-500 font-medium"
                 autoFocus
               />
-              <p className="text-[11px] text-slate-500 mt-1.5">
+              <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
                 {t.mapWillSavePairs.replace('{count}', String(mappings.length))}:{' '}
-                <span className="font-mono text-slate-700 font-semibold">
+                <span className="font-mono text-[var(--text-secondary)] font-semibold">
                   {mappings.map(m => `${m.mainCol} ↔ ${m.comparisonCol}`).join(', ')}
                 </span>
               </p>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
               <button
                 onClick={() => setShowSaveDialog(false)}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 rounded-lg"
+                className="px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-surface-alt)] border border-[var(--border)] rounded-lg cursor-pointer"
               >
                 {t.cancel}
               </button>
               <button
                 onClick={handleSaveCurrentPreset}
-                className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm"
+                className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm cursor-pointer"
               >
                 {t.mapSavePreset}
               </button>
@@ -588,39 +588,39 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
 
       {/* Saved & Recent Column Mapping Keys Modal */}
       {showPresetsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+            <div className="p-4 sm:p-5 border-b border-[var(--border)] bg-[var(--bg-surface-alt)] flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 shadow-xs">
+                <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 shadow-xs">
                   <Bookmark className="w-5 h-5 stroke-[2.2]" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">
+                  <h3 className="text-base font-bold text-[var(--text-primary)]">
                     Saved & Recent Column Mapping Keys
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-[var(--text-muted)]">
                     Quickly restore previously used column key pairs or standard templates.
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowPresetsModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+                className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-2 px-5 py-2.5 bg-white border-b border-slate-200">
+            <div className="flex items-center gap-2 px-5 py-2.5 bg-[var(--bg-surface)] border-b border-[var(--border)]">
               <button
                 onClick={() => setPresetTab('saved')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   presetTab === 'saved'
-                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)]'
                 }`}
               >
                 <Bookmark className="w-3.5 h-3.5" />
@@ -628,10 +628,10 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
               </button>
               <button
                 onClick={() => setPresetTab('recent')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   presetTab === 'recent'
-                    ? 'bg-sky-50 text-sky-800 border border-sky-200'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'bg-sky-50 dark:bg-sky-950/50 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)]'
                 }`}
               >
                 <History className="w-3.5 h-3.5" />
@@ -639,10 +639,10 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
               </button>
               <button
                 onClick={() => setPresetTab('templates')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   presetTab === 'templates'
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)]'
                 }`}
               >
                 <Sparkles className="w-3.5 h-3.5" />
@@ -651,7 +651,7 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
             </div>
 
             {/* Tab Contents */}
-            <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-3 bg-slate-50/50">
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-3 bg-[var(--bg-surface-alt)]">
               {/* 1. Saved Presets */}
               {presetTab === 'saved' && (
                 <div className="space-y-2.5">
@@ -664,26 +664,26 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
                       return (
                         <div
                           key={preset.id}
-                          className="p-3.5 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                          className="p-3.5 bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl hover:border-[var(--accent-light)] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
                         >
                           <div className="space-y-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-slate-900 truncate">
+                              <span className="text-xs font-bold text-[var(--text-primary)] truncate">
                                 {preset.name}
                               </span>
-                              <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-slate-100 text-slate-600 font-bold border border-slate-200">
+                              <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-[var(--bg-surface-alt)] text-[var(--text-secondary)] font-bold border border-[var(--border)]">
                                 {preset.mappings.length} column{preset.mappings.length > 1 ? 's' : ''}
                               </span>
                               {matchedCount === preset.mappings.length && preset.mappings.length > 0 && (
-                                <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">
+                                <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold">
                                   100% in files
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] font-mono text-slate-600 truncate">
+                            <div className="text-[11px] font-mono text-[var(--text-secondary)] truncate">
                               {preset.mappings.map(m => `${m.mainCol} ↔ ${m.comparisonCol}`).join(' · ')}
                             </div>
-                            <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                            <div className="text-[10px] text-[var(--text-muted)] flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               <span>Saved {new Date(preset.createdAt).toLocaleDateString()}</span>
                             </div>
@@ -692,14 +692,14 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
                           <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                             <button
                               onClick={(e) => handleDeleteSavedPreset(preset.id, e)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                              className="p-1.5 text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
                               title={t.mapDeletePresetTitle}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleApplyPreset(preset.mappings, preset.name)}
-                              className="px-3 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg shadow-xs transition-colors"
+                              className="px-3 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg shadow-xs transition-colors cursor-pointer"
                             >
                               Apply Preset
                             </button>
@@ -709,9 +709,9 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
                     })
                   ) : (
                     <div className="py-10 text-center space-y-2">
-                      <Bookmark className="w-8 h-8 text-slate-400 mx-auto" />
-                      <p className="text-xs text-slate-600 font-medium">No custom presets saved yet.</p>
-                      <p className="text-[11px] text-slate-500">
+                      <Bookmark className="w-8 h-8 text-[var(--text-muted)] mx-auto" />
+                      <p className="text-xs text-[var(--text-secondary)] font-medium">No custom presets saved yet.</p>
+                      <p className="text-[11px] text-[var(--text-muted)]">
                         Configure your columns above and click "Save Keys" to store them here.
                       </p>
                     </div>
@@ -726,35 +726,35 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
                     recentHistory.map((item, idx) => (
                       <div
                         key={item.id}
-                        className="p-3.5 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                        className="p-3.5 bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl hover:border-[var(--accent-light)] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
                       >
                         <div className="space-y-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-slate-900">
+                            <span className="text-xs font-bold text-[var(--text-primary)]">
                               Recent Session #{idx + 1}
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-sky-50 text-sky-700 border border-sky-200 font-bold">
+                            <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 font-bold">
                               Auto-Saved
                             </span>
-                            <span className="text-[10px] text-slate-500">
+                            <span className="text-[10px] text-[var(--text-muted)]">
                               {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
-                          <div className="text-[11px] font-mono text-slate-600 truncate">
+                          <div className="text-[11px] font-mono text-[var(--text-secondary)] truncate">
                             {item.summary}
                           </div>
                         </div>
 
                         <button
                           onClick={() => handleApplyPreset(item.mappings, `Recent Session #${idx + 1}`)}
-                          className="px-3 py-1.5 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-lg shadow-xs transition-colors shrink-0 self-end sm:self-auto"
+                          className="px-3 py-1.5 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-lg shadow-xs transition-colors shrink-0 self-end sm:self-auto cursor-pointer"
                         >
                           {t.mapRestore}
                         </button>
                       </div>
                     ))
                   ) : (
-                    <div className="py-10 text-center text-xs text-slate-500">
+                    <div className="py-10 text-center text-xs text-[var(--text-muted)]">
                       {t.mapNoHistory}
                     </div>
                   )}
@@ -767,19 +767,19 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
                   {industryTemplates.map((template) => (
                     <div
                       key={template.name}
-                      className="p-3.5 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                      className="p-3.5 bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl hover:border-[var(--accent-light)] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
                     >
                       <div className="space-y-1 min-w-0">
-                        <div className="text-xs font-bold text-slate-900">{template.name}</div>
-                        <div className="text-[11px] text-slate-500">{template.desc}</div>
-                        <div className="text-[11px] font-mono text-emerald-700 font-semibold truncate">
+                        <div className="text-xs font-bold text-[var(--text-primary)]">{template.name}</div>
+                        <div className="text-[11px] text-[var(--text-muted)]">{template.desc}</div>
+                        <div className="text-[11px] font-mono text-emerald-700 dark:text-emerald-300 font-semibold truncate">
                           {template.mappings.map(m => `${m.mainCol} ↔ ${m.comparisonCol}`).join(' · ')}
                         </div>
                       </div>
 
                       <button
                         onClick={() => handleApplyPreset(template.mappings, template.name)}
-                        className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-xs transition-colors shrink-0 self-end sm:self-auto"
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-xs transition-colors shrink-0 self-end sm:self-auto cursor-pointer"
                       >
                         {t.mapUseTemplate}
                       </button>
@@ -790,11 +790,11 @@ export const ColumnMappingRules: React.FC<ColumnMappingRulesProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500">
+            <div className="p-4 bg-[var(--bg-surface-alt)] border-t border-[var(--border)] flex justify-between items-center text-xs text-[var(--text-muted)]">
               <span>{t.mapPresetsStoredNote}</span>
               <button
                 onClick={() => setShowPresetsModal(false)}
-                className="px-4 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 rounded-lg shadow-xs"
+                className="px-4 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg shadow-xs cursor-pointer"
               >
                 {t.close}
               </button>
